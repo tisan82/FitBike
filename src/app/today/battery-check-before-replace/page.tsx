@@ -122,7 +122,12 @@ export default function BatteryCheckPage() {
   );
 }
 
-function CheckItem({ title, desc }: any) {
+type ContentCardProps = {
+  title: string;
+  desc: string;
+};
+
+function CheckItem({ title, desc }: ContentCardProps) {
   return (
     <div>
       <h3 className="font-bold">{title}</h3>
@@ -131,7 +136,7 @@ function CheckItem({ title, desc }: any) {
   );
 }
 
-function CaseCard({ title, desc }: any) {
+function CaseCard({ title, desc }: ContentCardProps) {
   return (
     <div className="bg-zinc-100 p-4 rounded-lg">
       <p className="font-semibold">{title}</p>
