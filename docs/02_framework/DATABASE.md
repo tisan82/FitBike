@@ -1,0 +1,53 @@
+# FitBike Database Guide
+
+**Version:** v1.2\
+**Status:** Baseline
+
+## Principles
+
+Database First / Fitment Accuracy / Data Integrity / Null Preservation /
+No inferred fitment values.
+
+## Current Known Core Tables
+
+  Entity                       Table
+  ---------------------------- ------------------------------------
+  Brand                        `01_brand`
+  Bike Model                   `02_bike_model`
+  Bike Model Year              `03_bike_model_year`
+  Tire Product                 `04_tire_product`
+  Battery Product              `05_battery_product`
+  Brake Product                `06_brake_product`
+  Tire Mapping                 `07_bike_model_year_tire_product`
+  Battery Standard / Mapping   `08_battery_standard_product`
+  Brake Mapping                `09_bike_model_year_brake_product`
+  Model-Year Image             `10_bike_model_year_image`
+
+`03_bike_model_year`가 Fitment의 핵심 Entity다.
+
+## Identifier Policy
+
+정확한 컬럼은 `docs/04_database_schema/`의 현재 export를 확인한다.
+
+알려진 실제 컬럼 예: - Brand: `brand_id`, `brand_key`, `brand_en`,
+`brand_ko`, `logo_image_url` - Model: `bike_model_id`, `model_key`,
+`model_name_en`, `model_name_ko`, `default_category`, `engine_cc`
+
+문서상의 generic alias(`brand`, `bike_model`, `brand_name`,
+`model_name`, `category`, `cc`)를 실제 DB identifier로 추정 사용하지
+않는다.
+
+## Storage Path
+
+DB 이미지 필드는 전체 URL이 아니라 Storage object path일 수 있다.
+
+예: - `manufacturers/aprilia/logo.jpg` -
+`model/001/100082/10008201_MAIN.png`
+
+애플리케이션이 `bike-assets` public URL로 변환한다. DB에 환경 종속
+absolute URL을 저장하는 방식으로 임의 변경하지 않는다.
+
+## Schema Rule
+
+Schema 변경은 사용자 승인 없이 수행하지 않는다. Production query는
+필요한 컬럼을 명시하는 것을 기본으로 한다.

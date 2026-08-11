@@ -1,0 +1,11 @@
+table_schema,table_name,table_type
+public,01_brand,BASE TABLE
+public,02_bike_model,BASE TABLE
+public,03_bike_model_year,BASE TABLE
+public,04_tire_product,BASE TABLE
+public,05_battery_product,BASE TABLE
+public,06_brake_product,BASE TABLE
+public,07_bike_model_year_tire_product,BASE TABLE
+public,08_battery_standard_product,BASE TABLE
+public,09_bike_model_year_brake_product,BASE TABLE
+public,10_bike_model_year_image,BASE TABLE

@@ -1,0 +1,10 @@
+event_object_schema,event_object_table,trigger_name,event_manipulation,action_timing,action_statement
+public,01_brand,trg_01_brand_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()
+public,02_bike_model,trg_02_bike_model_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()
+public,03_bike_model_year,trg_03_bike_model_year_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()
+public,04_tire_product,trg_04_tire_product_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()
+public,05_battery_product,trg_05_battery_product_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()
+public,06_brake_product,trg_06_brake_product_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()
+public,07_bike_model_year_tire_product,trg_07_bike_model_year_tire_product_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()
+public,08_battery_standard_product,trg_08_battery_standard_product_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()
+public,09_bike_model_year_brake_product,trg_09_bike_model_year_brake_product_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()

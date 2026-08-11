@@ -1,0 +1,162 @@
+table_schema,table_name,ordinal_position,column_name,data_type,udt_name,character_maximum_length,numeric_precision,numeric_scale,is_nullable,column_default
+public,01_brand,1,brand_id,bigint,int8,null,64,0,NO,null
+public,01_brand,2,brand_key,text,text,null,null,null,NO,null
+public,01_brand,3,brand_en,text,text,null,null,null,NO,null
+public,01_brand,4,brand_ko,text,text,null,null,null,YES,null
+public,01_brand,5,brand_summary,text,text,null,null,null,YES,null
+public,01_brand,6,logo_image_url,text,text,null,null,null,YES,null
+public,01_brand,7,country_code,text,text,null,null,null,YES,null
+public,01_brand,8,slug,text,text,null,null,null,NO,null
+public,01_brand,9,is_active,boolean,bool,null,null,null,NO,true
+public,01_brand,10,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,01_brand,11,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,02_bike_model,1,bike_model_id,bigint,int8,null,64,0,NO,null
+public,02_bike_model,2,brand_id,bigint,int8,null,64,0,NO,null
+public,02_bike_model,3,model_key,text,text,null,null,null,NO,null
+public,02_bike_model,4,model_name_en,text,text,null,null,null,NO,null
+public,02_bike_model,5,model_name_ko,text,text,null,null,null,YES,null
+public,02_bike_model,6,default_category,text,text,null,null,null,YES,null
+public,02_bike_model,7,engine_cc,integer,int4,null,32,0,YES,null
+public,02_bike_model,8,model_summary,text,text,null,null,null,YES,null
+public,02_bike_model,9,model_image_url,text,text,null,null,null,YES,null
+public,02_bike_model,10,slug,text,text,null,null,null,NO,null
+public,02_bike_model,11,is_active,boolean,bool,null,null,null,NO,true
+public,02_bike_model,12,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,02_bike_model,13,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,03_bike_model_year,1,bike_model_year_id,bigint,int8,null,64,0,NO,null
+public,03_bike_model_year,2,bike_model_id,bigint,int8,null,64,0,NO,null
+public,03_bike_model_year,3,model_year_key,text,text,null,null,null,NO,null
+public,03_bike_model_year,4,model_key,text,text,null,null,null,NO,null
+public,03_bike_model_year,5,generation_key,text,text,null,null,null,YES,null
+public,03_bike_model_year,6,market_code,text,text,null,null,null,NO,'KR'::text
+public,03_bike_model_year,7,year_range_label,text,text,null,null,null,NO,null
+public,03_bike_model_year,8,start_year,integer,int4,null,32,0,NO,null
+public,03_bike_model_year,9,end_year,integer,int4,null,32,0,YES,null
+public,03_bike_model_year,10,generation_name,text,text,null,null,null,YES,null
+public,03_bike_model_year,11,frame_code,text,text,null,null,null,YES,null
+public,03_bike_model_year,12,trim_name,text,text,null,null,null,YES,null
+public,03_bike_model_year,13,variant_name,text,text,null,null,null,YES,null
+public,03_bike_model_year,14,canonical_key,text,text,null,null,null,NO,null
+public,03_bike_model_year,15,category_override,text,text,null,null,null,YES,null
+public,03_bike_model_year,16,engine_cc_override,integer,int4,null,32,0,YES,null
+public,03_bike_model_year,17,generation_image_url,text,text,null,null,null,YES,null
+public,03_bike_model_year,18,front_tire_full_size,text,text,null,null,null,YES,null
+public,03_bike_model_year,19,front_tire_width,numeric,numeric,null,null,null,YES,null
+public,03_bike_model_year,20,front_tire_ratio,numeric,numeric,null,null,null,YES,null
+public,03_bike_model_year,21,front_tire_diameter,numeric,numeric,null,null,null,YES,null
+public,03_bike_model_year,22,front_tire_load_index,integer,int4,null,32,0,YES,null
+public,03_bike_model_year,23,front_tire_speed_index,text,text,null,null,null,YES,null
+public,03_bike_model_year,24,front_tire_tube_type,text,text,null,null,null,YES,null
+public,03_bike_model_year,25,rear_tire_full_size,text,text,null,null,null,YES,null
+public,03_bike_model_year,26,rear_tire_width,numeric,numeric,null,null,null,YES,null
+public,03_bike_model_year,27,rear_tire_ratio,numeric,numeric,null,null,null,YES,null
+public,03_bike_model_year,28,rear_tire_diameter,numeric,numeric,null,null,null,YES,null
+public,03_bike_model_year,29,rear_tire_load_index,integer,int4,null,32,0,YES,null
+public,03_bike_model_year,30,rear_tire_speed_index,text,text,null,null,null,YES,null
+public,03_bike_model_year,31,rear_tire_tube_type,text,text,null,null,null,YES,null
+public,03_bike_model_year,32,battery_standard_code,text,text,null,null,null,YES,null
+public,03_bike_model_year,33,battery_voltage,text,text,null,null,null,YES,null
+public,03_bike_model_year,34,front_brake_spec,text,text,null,null,null,YES,null
+public,03_bike_model_year,35,front_brake_caliper_type,text,text,null,null,null,YES,null
+public,03_bike_model_year,36,rear_brake_spec,text,text,null,null,null,YES,null
+public,03_bike_model_year,37,rear_brake_caliper_type,text,text,null,null,null,YES,null
+public,03_bike_model_year,38,major_changes,text,text,null,null,null,YES,null
+public,03_bike_model_year,39,model_features,text,text,null,null,null,YES,null
+public,03_bike_model_year,40,is_active,boolean,bool,null,null,null,NO,true
+public,03_bike_model_year,41,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,03_bike_model_year,42,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,04_tire_product,1,tire_product_id,bigint,int8,null,64,0,NO,null
+public,04_tire_product,2,tire_product_key,text,text,null,null,null,NO,null
+public,04_tire_product,3,brand_name,text,text,null,null,null,NO,null
+public,04_tire_product,4,product_name,text,text,null,null,null,NO,null
+public,04_tire_product,5,tire_size_full,text,text,null,null,null,YES,null
+public,04_tire_product,6,width,numeric,numeric,null,null,null,YES,null
+public,04_tire_product,7,ratio,numeric,numeric,null,null,null,YES,null
+public,04_tire_product,8,diameter,numeric,numeric,null,null,null,YES,null
+public,04_tire_product,9,load_index,integer,int4,null,32,0,YES,null
+public,04_tire_product,10,speed_index,text,text,null,null,null,YES,null
+public,04_tire_product,11,tube_type,text,text,null,null,null,YES,null
+public,04_tire_product,12,position_type,text,text,null,null,null,YES,null
+public,04_tire_product,13,product_image_url,text,text,null,null,null,YES,null
+public,04_tire_product,14,product_url,text,text,null,null,null,YES,null
+public,04_tire_product,15,seller_name,text,text,null,null,null,YES,null
+public,04_tire_product,16,price,integer,int4,null,32,0,YES,null
+public,04_tire_product,17,is_active,boolean,bool,null,null,null,NO,true
+public,04_tire_product,18,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,04_tire_product,19,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,05_battery_product,1,battery_product_id,bigint,int8,null,64,0,NO,null
+public,05_battery_product,2,battery_part_key,text,text,null,null,null,NO,null
+public,05_battery_product,3,brand_name,text,text,null,null,null,NO,null
+public,05_battery_product,4,spec_code,text,text,null,null,null,NO,null
+public,05_battery_product,5,voltage,text,text,null,null,null,YES,null
+public,05_battery_product,6,length_mm,integer,int4,null,32,0,YES,null
+public,05_battery_product,7,width_mm,integer,int4,null,32,0,YES,null
+public,05_battery_product,8,height_mm,integer,int4,null,32,0,YES,null
+public,05_battery_product,9,weight_kg,numeric,numeric,null,null,null,YES,null
+public,05_battery_product,10,capacity_ah,numeric,numeric,null,null,null,YES,null
+public,05_battery_product,11,watt_hour,numeric,numeric,null,null,null,YES,null
+public,05_battery_product,12,internal_resistance_mohm,numeric,numeric,null,null,null,YES,null
+public,05_battery_product,13,continuous_discharge_cca,integer,int4,null,32,0,YES,null
+public,05_battery_product,14,max_discharge_cca,integer,int4,null,32,0,YES,null
+public,05_battery_product,15,battery_type,text,text,null,null,null,YES,null
+public,05_battery_product,16,terminal_polarity,text,text,null,null,null,YES,null
+public,05_battery_product,17,terminal_type,text,text,null,null,null,YES,null
+public,05_battery_product,18,product_image_url,text,text,null,null,null,YES,null
+public,05_battery_product,19,product_url,text,text,null,null,null,YES,null
+public,05_battery_product,20,seller_name,text,text,null,null,null,YES,null
+public,05_battery_product,21,price,integer,int4,null,32,0,YES,null
+public,05_battery_product,22,is_active,boolean,bool,null,null,null,NO,true
+public,05_battery_product,23,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,05_battery_product,24,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,06_brake_product,1,brake_product_id,bigint,int8,null,64,0,NO,null
+public,06_brake_product,2,brake_product_key,text,text,null,null,null,NO,null
+public,06_brake_product,3,brand_name,text,text,null,null,null,NO,null
+public,06_brake_product,4,product_name,text,text,null,null,null,NO,null
+public,06_brake_product,5,brake_type,text,text,null,null,null,YES,null
+public,06_brake_product,6,position_type,text,text,null,null,null,YES,null
+public,06_brake_product,7,compatible_code,text,text,null,null,null,YES,null
+public,06_brake_product,8,product_image_url,text,text,null,null,null,YES,null
+public,06_brake_product,9,product_url,text,text,null,null,null,YES,null
+public,06_brake_product,10,seller_name,text,text,null,null,null,YES,null
+public,06_brake_product,11,price,integer,int4,null,32,0,YES,null
+public,06_brake_product,12,is_active,boolean,bool,null,null,null,NO,true
+public,06_brake_product,13,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,06_brake_product,14,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,07_bike_model_year_tire_product,1,id,bigint,int8,null,64,0,NO,null
+public,07_bike_model_year_tire_product,2,bike_model_year_id,bigint,int8,null,64,0,NO,null
+public,07_bike_model_year_tire_product,3,tire_product_id,bigint,int8,null,64,0,NO,null
+public,07_bike_model_year_tire_product,4,position_type,text,text,null,null,null,NO,null
+public,07_bike_model_year_tire_product,5,match_type,text,text,null,null,null,NO,null
+public,07_bike_model_year_tire_product,6,display_order,integer,int4,null,32,0,NO,1
+public,07_bike_model_year_tire_product,7,is_active,boolean,bool,null,null,null,NO,true
+public,07_bike_model_year_tire_product,8,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,07_bike_model_year_tire_product,9,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,08_battery_standard_product,1,id,bigint,int8,null,64,0,NO,null
+public,08_battery_standard_product,2,battery_standard_code,text,text,null,null,null,NO,null
+public,08_battery_standard_product,3,battery_product_id,bigint,int8,null,64,0,NO,null
+public,08_battery_standard_product,4,match_type,text,text,null,null,null,NO,null
+public,08_battery_standard_product,5,display_order,integer,int4,null,32,0,NO,1
+public,08_battery_standard_product,6,is_active,boolean,bool,null,null,null,NO,true
+public,08_battery_standard_product,7,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,08_battery_standard_product,8,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,09_bike_model_year_brake_product,1,id,bigint,int8,null,64,0,NO,null
+public,09_bike_model_year_brake_product,2,bike_model_year_id,bigint,int8,null,64,0,NO,null
+public,09_bike_model_year_brake_product,3,brake_product_id,bigint,int8,null,64,0,NO,null
+public,09_bike_model_year_brake_product,4,position_type,text,text,null,null,null,NO,null
+public,09_bike_model_year_brake_product,5,match_type,text,text,null,null,null,NO,null
+public,09_bike_model_year_brake_product,6,display_order,integer,int4,null,32,0,NO,1
+public,09_bike_model_year_brake_product,7,is_active,boolean,bool,null,null,null,NO,true
+public,09_bike_model_year_brake_product,8,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,09_bike_model_year_brake_product,9,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,10_bike_model_year_image,1,image_id,bigint,int8,null,64,0,NO,null
+public,10_bike_model_year_image,2,brand_id,bigint,int8,null,64,0,NO,null
+public,10_bike_model_year_image,3,bike_model_id,bigint,int8,null,64,0,NO,null
+public,10_bike_model_year_image,4,bike_model_year_id,bigint,int8,null,64,0,NO,null
+public,10_bike_model_year_image,5,image_type,text,text,null,null,null,NO,null
+public,10_bike_model_year_image,6,image_storage_path,text,text,null,null,null,NO,null
+public,10_bike_model_year_image,7,display_order,integer,int4,null,32,0,NO,1
+public,10_bike_model_year_image,8,is_primary,boolean,bool,null,null,null,NO,false
+public,10_bike_model_year_image,9,is_active,boolean,bool,null,null,null,NO,true
+public,10_bike_model_year_image,10,source_file_name,text,text,null,null,null,YES,null
+public,10_bike_model_year_image,11,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,10_bike_model_year_image,12,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
