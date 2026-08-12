@@ -1,8 +1,16 @@
-import type { ModelDetailData } from "@/features/model-detail/types/model-detail.types";
+import type { ConnectedProduct, ModelDetailData, ModelDetailProductsData } from "@/features/model-detail/types/model-detail.types";
 import {
+  findBatteryMappings,
+  findBatteryProducts,
   findBrandDetail,
+  findBrakeMappings,
+  findBrakeProducts,
   findModelDetail,
+  findModelYearOptions,
   findModelYearDetail,
+  findPrimaryModelYearImage,
+  findTireMappings,
+  findTireProducts,
 } from "@/repositories/model-detail.repository";
 
 export class ModelDetailNotFoundError extends Error {
@@ -18,7 +26,11 @@ export async function getModelDetail(
   const modelYear = await findModelYearDetail(bikeModelYearId);
   if (!modelYear) throw new ModelDetailNotFoundError();
 
-  const model = await findModelDetail(modelYear.bike_model_id);
+  const [model, yearOptions, primaryImage] = await Promise.all([
+    findModelDetail(modelYear.bike_model_id),
+    findModelYearOptions(modelYear.bike_model_id),
+    findPrimaryModelYearImage(bikeModelYearId),
+  ]);
   if (!model) throw new ModelDetailNotFoundError();
 
   const brand = await findBrandDetail(model.brand_id);
@@ -46,7 +58,13 @@ export async function getModelDetail(
     yearRangeLabel: modelYear.year_range_label,
     startYear: modelYear.start_year,
     endYear: modelYear.end_year,
-    imageUrl: modelYear.generation_image_url ?? model.model_image_url,
+    imageUrl: primaryImage ?? modelYear.generation_image_url,
+    yearOptions: yearOptions.map((year) => ({
+      bikeModelYearId: year.bike_model_year_id,
+      yearRangeLabel: year.year_range_label,
+      startYear: year.start_year,
+      endYear: year.end_year,
+    })),
     frontTire: {
       fullSize: modelYear.front_tire_full_size,
       width: modelYear.front_tire_width,
@@ -73,5 +91,43 @@ export async function getModelDetail(
     rearBrakeCaliperType: modelYear.rear_brake_caliper_type,
     modelFeatures: modelYear.model_features,
     majorChanges: modelYear.major_changes,
+  };
+}
+
+function joinParts(parts: Array<string | number | null | undefined>) {
+  const value = parts.filter((part) => part !== null && part !== undefined && part !== "").join(" · ");
+  return value || null;
+}
+
+function connect<T extends { id: number; position_type?: "FRONT" | "REAR"; productId: number }>(mappings: T[], products: Map<number, ConnectedProduct>) {
+  return mappings.flatMap((mapping) => {
+    const product = products.get(mapping.productId);
+    return product ? [{ ...product, position: mapping.position_type }] : [];
+  });
+}
+
+export async function getModelDetailProducts(bikeModelYearId: number): Promise<ModelDetailProductsData> {
+  const modelYear = await findModelYearDetail(bikeModelYearId);
+  if (!modelYear) throw new ModelDetailNotFoundError();
+  const [tireMappings, batteryMappings, brakeMappings] = await Promise.all([
+    findTireMappings(bikeModelYearId),
+    modelYear.battery_standard_code ? findBatteryMappings(modelYear.battery_standard_code) : Promise.resolve([]),
+    findBrakeMappings(bikeModelYearId),
+  ]);
+  const [tires, batteries, brakes] = await Promise.all([
+    findTireProducts(tireMappings.flatMap((item) => item.tire_product_id ?? [])),
+    findBatteryProducts(batteryMappings.flatMap((item) => item.battery_product_id ?? [])),
+    findBrakeProducts(brakeMappings.flatMap((item) => item.brake_product_id ?? [])),
+  ]);
+  const tireMap = new Map(tires.map((p) => [p.tire_product_id as number, { id: p.tire_product_id as number, brandName: p.brand_name, productName: p.product_name as string, secondaryInformation: joinParts([p.tire_size_full, p.load_index, p.speed_index, p.tube_type]), detailHref: `/tire-detail/${p.tire_product_id}` }]));
+  const batteryMap = new Map(batteries.map((p) => [p.battery_product_id as number, { id: p.battery_product_id as number, brandName: p.brand_name, productName: p.spec_code as string, secondaryInformation: joinParts([p.voltage, p.capacity_ah === null || p.capacity_ah === undefined ? null : `${p.capacity_ah}Ah`, p.battery_type]), detailHref: `/battery-detail/${p.battery_product_id}` }]));
+  const brakeMap = new Map(brakes.map((p) => [p.brake_product_id as number, { id: p.brake_product_id as number, brandName: p.brand_name, productName: p.product_name as string, secondaryInformation: joinParts([p.brake_type, p.compatible_code]), detailHref: null }]));
+  const connectedTires = connect(tireMappings.map((m) => ({ id: m.id, position_type: m.position_type, productId: m.tire_product_id as number })), tireMap);
+  const connectedBrakes = connect(brakeMappings.map((m) => ({ id: m.id, position_type: m.position_type, productId: m.brake_product_id as number })), brakeMap);
+  const connectedBatteries = connect(batteryMappings.map((m) => ({ id: m.id, productId: m.battery_product_id as number })), batteryMap);
+  return {
+    tire: { front: connectedTires.filter((p) => p.position === "FRONT"), rear: connectedTires.filter((p) => p.position === "REAR") },
+    battery: connectedBatteries,
+    brake: { front: connectedBrakes.filter((p) => p.position === "FRONT"), rear: connectedBrakes.filter((p) => p.position === "REAR") },
   };
 }

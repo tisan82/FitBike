@@ -58,6 +58,38 @@ export type BrandDetailRow = {
   brand_summary: string | null;
 };
 
+export type ModelYearOptionRow = Pick<
+  ModelYearDetailRow,
+  "bike_model_year_id" | "bike_model_id" | "year_range_label" | "start_year" | "end_year"
+>;
+
+export type ProductMappingRow = {
+  id: number;
+  position_type?: "FRONT" | "REAR";
+  display_order: number;
+  tire_product_id?: number;
+  battery_product_id?: number;
+  brake_product_id?: number;
+};
+
+export type ProductRow = {
+  tire_product_id?: number;
+  battery_product_id?: number;
+  brake_product_id?: number;
+  brand_name: string;
+  product_name?: string;
+  tire_size_full?: string | null;
+  load_index?: number | null;
+  speed_index?: string | null;
+  tube_type?: string | null;
+  spec_code?: string;
+  voltage?: string | null;
+  capacity_ah?: number | null;
+  battery_type?: string | null;
+  brake_type?: string | null;
+  compatible_code?: string | null;
+};
+
 export async function findModelYearDetail(
   bikeModelYearId: number,
 ): Promise<ModelYearDetailRow | null> {
@@ -106,3 +138,55 @@ export async function findBrandDetail(
   if (error) throw new Error(error.message);
   return data as BrandDetailRow | null;
 }
+
+export async function findModelYearOptions(bikeModelId: number): Promise<ModelYearOptionRow[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("03_bike_model_year")
+    .select("bike_model_year_id, bike_model_id, year_range_label, start_year, end_year")
+    .eq("bike_model_id", bikeModelId)
+    .eq("is_active", true)
+    .order("start_year", { ascending: false })
+    .order("bike_model_year_id", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ModelYearOptionRow[];
+}
+
+export async function findPrimaryModelYearImage(bikeModelYearId: number): Promise<string | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("10_bike_model_year_image")
+    .select("image_storage_path")
+    .eq("bike_model_year_id", bikeModelYearId)
+    .eq("image_type", "MAIN")
+    .eq("is_active", true)
+    .order("is_primary", { ascending: false })
+    .order("display_order", { ascending: true })
+    .order("image_id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.image_storage_path ?? null;
+}
+
+async function findMappings(table: string, select: string, column: string, value: number | string) {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.from(table).select(select).eq(column, value).eq("is_active", true).order("display_order", { ascending: true }).order("id", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as ProductMappingRow[];
+}
+
+async function findProducts(table: string, select: string, idColumn: string, ids: number[]) {
+  if (ids.length === 0) return [];
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.from(table).select(select).in(idColumn, ids).eq("is_active", true);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as ProductRow[];
+}
+
+export const findTireMappings = (id: number) => findMappings("07_bike_model_year_tire_product", "id, tire_product_id, position_type, display_order", "bike_model_year_id", id);
+export const findBatteryMappings = (code: string) => findMappings("08_battery_standard_product", "id, battery_product_id, display_order", "battery_standard_code", code);
+export const findBrakeMappings = (id: number) => findMappings("09_bike_model_year_brake_product", "id, brake_product_id, position_type, display_order", "bike_model_year_id", id);
+export const findTireProducts = (ids: number[]) => findProducts("04_tire_product", "tire_product_id, brand_name, product_name, tire_size_full, load_index, speed_index, tube_type", "tire_product_id", ids);
+export const findBatteryProducts = (ids: number[]) => findProducts("05_battery_product", "battery_product_id, brand_name, spec_code, voltage, capacity_ah, battery_type", "battery_product_id", ids);
+export const findBrakeProducts = (ids: number[]) => findProducts("06_brake_product", "brake_product_id, brand_name, product_name, brake_type, compatible_code", "brake_product_id", ids);

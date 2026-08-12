@@ -2,19 +2,30 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --surface: #ffffff;
+  --surface-secondary: #f7f8fa;
+  --foreground: #111318;
+  --foreground-secondary: #667085;
+  --border: #e4e7ec;
+  --primary: #064ae8;
+  --primary-hover: #003cc7;
+  --primary-foreground: #ffffff;
+  --selected-background: #eef4ff;
+  --selected-border: #064ae8;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
   --color-foreground: var(--foreground);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-selected-background: var(--selected-background);
+  --color-selected-border: var(--selected-border);
 }
 
 body {

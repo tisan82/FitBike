@@ -1,7 +1,11 @@
 <!-- BEGIN:nextjs-agent-rules -->
+
 # This is NOT the Next.js you know
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
 <!-- END:nextjs-agent-rules -->
 
 # FitBike Codex Development Rules
@@ -40,10 +44,17 @@ repository for small changes.
 -   Architecture/API: `ARCHITECTURE.md` + `API.md` > Service Module >
     Task > implementation
 -   UI/UX: `SCREEN.md` > Service Module > Task > implementation
+-   Public SEO/GEO: `SEO_GEO.md` > Service Module > Task > implementation
 
 Existing code is evidence of current behavior but does not override an
 explicit higher-level policy. If sources conflict, do not guess; report
 the conflict before a policy/schema-breaking change.
+
+When changing a global customer-facing UI policy, update both the code and
+`SCREEN.md` in the same Task.
+
+Before changing a customer-facing public page, review `SEO_GEO.md`. Update it
+with the code when a global SEO/GEO policy changes.
 
 ## Product guardrails
 
@@ -82,7 +93,37 @@ the conflict before a policy/schema-breaking change.
 5.  Avoid unrelated refactoring.
 6.  Reuse existing utilities/components.
 7.  Run relevant validation.
-8.  Report result.
+8.  Review whether the Task established persistent development knowledge.
+9.  Update the appropriate existing Source of Truth when required.
+10. Report result.
+
+## Persistent development knowledge
+
+After implementation and validation, determine whether the Task established a
+Product, UX/UI, Architecture, Data, or API rule that future Tasks must follow.
+Do not leave such policy only in code, conversation, or a Task result. Update
+the smallest appropriate existing Source of Truth document instead of creating
+a duplicate document.
+
+Classify decisions before documenting them:
+
+-   Global rules used across services belong in the relevant Product or
+    Framework document.
+-   Rules limited to one feature belong in its Service Module.
+-   Implementation details such as local pixel values, debugging history,
+    build output, and temporary fixes remain in code or the Task result.
+
+Do not duplicate the same policy across Global and Service Module documents.
+If no persistent rule was established, report `Documentation Update: NONE`.
+When a major service gains durable Product/UX/Data contracts and has no Service
+Module, propose one; do not create it merely because a screen exists.
+
+If a Task conflicts with an existing Source of Truth, report `POLICY CONFLICT`
+with the existing rule, requested rule, and impact, then wait for a decision.
+Do not override a Global policy with a Feature requirement without explicit
+approval. If code and documentation materially differ, report
+`DOCUMENTATION DRIFT` and follow the Source of Truth precedence above rather
+than guessing which is correct.
 
 ## Normal local validation
 
@@ -111,3 +152,7 @@ These instructions do not override IDE/OS permission prompts.
 
 Report: goal/root cause, changed files, changes made, validation,
 remaining issues, and policy/schema conflicts.
+
+For Feature Tasks, also report a Persistent Knowledge Review with New Global
+Rules, New Service-specific Rules, Documentation Updated, and Policy Conflict;
+use `NONE` where applicable.

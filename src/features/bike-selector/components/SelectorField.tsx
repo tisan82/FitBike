@@ -31,11 +31,11 @@ export function SelectorField({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-semibold text-zinc-800" htmlFor={id}>
+      <label className="block text-sm font-semibold text-foreground" htmlFor={id}>
         {label}
       </label>
       <select
-        className="min-h-12 w-full rounded-xl border border-zinc-300 bg-white px-4 text-base text-zinc-900 outline-none transition focus:border-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500"
+        className="min-h-12 w-full rounded-xl border border-border bg-surface px-4 text-base text-foreground outline-none transition focus:border-primary disabled:cursor-not-allowed disabled:bg-surface-secondary disabled:text-foreground-secondary"
         disabled={disabled || loading}
         id={id}
         onChange={handleChange}

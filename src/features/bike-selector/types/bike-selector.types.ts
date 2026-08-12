@@ -13,6 +13,7 @@ export type ModelOption = {
   modelNameKo: string | null;
   category: string | null;
   engineCc: number | null;
+  modelImageUrl: string | null;
 };
 
 export type YearOption = {

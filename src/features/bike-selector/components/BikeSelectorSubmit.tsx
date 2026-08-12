@@ -1,9 +1,28 @@
-type BikeSelectorSubmitProps = { disabled: boolean };
+type BikeSelectorSubmitProps = {
+  disabled: boolean;
+  onPrevious: () => void;
+};
 
-export function BikeSelectorSubmit({ disabled }: BikeSelectorSubmitProps) {
+export function BikeSelectorSubmit({
+  disabled,
+  onPrevious,
+}: BikeSelectorSubmitProps) {
   return (
-    <button className="min-h-12 w-full rounded-xl bg-zinc-900 px-5 text-base font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300" disabled={disabled} type="submit">
-      장착 가능 상품 보기
-    </button>
+    <div className="flex gap-3">
+      <button
+        className="flex-1 rounded-xl border border-border bg-surface px-5 py-4 text-base font-semibold text-foreground transition hover:bg-surface-secondary disabled:cursor-not-allowed disabled:text-foreground-secondary"
+        onClick={onPrevious}
+        type="button"
+      >
+        이전 단계
+      </button>
+      <button
+        className="flex-1 rounded-xl bg-primary px-5 py-4 text-base font-semibold text-primary-foreground transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-border disabled:text-foreground-secondary"
+        disabled={disabled}
+        type="submit"
+      >
+        조회하기
+      </button>
+    </div>
   );
 }

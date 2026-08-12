@@ -6,7 +6,7 @@ Platform**입니다.
 
 ## Requirements
 
--   Node.js 20+
+-   Node.js 22+
 -   npm
 
 ## Local Setup

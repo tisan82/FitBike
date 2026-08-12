@@ -15,6 +15,7 @@ export type ModelRow = {
   model_name_ko: string | null;
   default_category: string | null;
   engine_cc: number | null;
+  model_image_url: string | null;
 };
 
 export type YearRow = {
@@ -47,7 +48,7 @@ export async function findActiveModelsByBrand(
   const { data, error } = await supabase
     .from("02_bike_model")
     .select(
-      "bike_model_id, model_key, model_name_en, model_name_ko, default_category, engine_cc",
+      "bike_model_id, model_key, model_name_en, model_name_ko, default_category, engine_cc, model_image_url",
     )
     .eq("brand_id", brandId)
     .eq("is_active", true)

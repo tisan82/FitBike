@@ -8,6 +8,27 @@ export type TireSpecification = {
   tubeType: string | null;
 };
 
+export type ModelYearOption = {
+  bikeModelYearId: number;
+  yearRangeLabel: string;
+  startYear: number;
+  endYear: number | null;
+};
+
+export type ConnectedProduct = {
+  id: number;
+  brandName: string;
+  productName: string;
+  secondaryInformation: string | null;
+  detailHref: string | null;
+};
+
+export type ModelDetailProductsData = {
+  tire: { front: ConnectedProduct[]; rear: ConnectedProduct[] };
+  battery: ConnectedProduct[];
+  brake: { front: ConnectedProduct[]; rear: ConnectedProduct[] };
+};
+
 export type ModelDetailData = {
   bikeModelYearId: number;
   bikeModelId: number;
@@ -31,6 +52,7 @@ export type ModelDetailData = {
   startYear: number;
   endYear: number | null;
   imageUrl: string | null;
+  yearOptions: ModelYearOption[];
   frontTire: TireSpecification;
   rearTire: TireSpecification;
   batteryStandardCode: string | null;

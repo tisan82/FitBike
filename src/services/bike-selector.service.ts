@@ -31,6 +31,7 @@ export async function getModelOptionsByBrand(
     modelNameKo: row.model_name_ko,
     category: row.default_category,
     engineCc: row.engine_cc,
+    modelImageUrl: row.model_image_url,
   }));
 }
 
