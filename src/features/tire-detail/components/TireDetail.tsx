@@ -16,7 +16,7 @@ export function TireDetail({ tireProductId }: Props) {
   const query = useTireDetailQuery(tireProductId);
 
   return (
-    <main className="mx-auto w-full max-w-5xl space-y-8 px-5 py-10 sm:py-16">
+    <main className="mx-auto w-full max-w-5xl space-y-6 px-5 py-8 sm:space-y-8 sm:py-14">
       <TireDetailHeader />
 
       {tireProductId === null ? <TireDetailInvalid /> : null}
@@ -32,7 +32,7 @@ export function TireDetail({ tireProductId }: Props) {
       ) : null}
 
       {query.data ? (
-        <div className="space-y-8">
+        <div className="space-y-5 sm:space-y-6">
           <TireProductSummary product={query.data} />
           <TireSpecification product={query.data} />
         </div>

@@ -23,3 +23,7 @@ Position은 다음 규칙으로 연결한다.
 -   Product `REAR`는 Mapping `REAR` 후보만 가능하다.
 -   Product `BOTH`는 Mapping `FRONT` 또는 `REAR` 후보가 될 수 있다.
 -   Product `COMMON`은 자동 Mapping하지 않고 Position 검증이 필요하다.
+
+Customer-facing Tire Product Detail은 Position DB code를 그대로 노출하지
+않고 `FRONT`는 `앞 타이어`, `REAR`는 `뒤 타이어`, `BOTH`는
+`앞·뒤 사용 가능`, `COMMON`은 `장착 위치 확인 필요`로 표시한다.

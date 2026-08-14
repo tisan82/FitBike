@@ -22,7 +22,9 @@ Core는 활성 Model-Year와 연결된 활성 Model/Brand, 동일 Model의 활�
 
 부품은 Tire → Battery → Brake 순서이며 **SPEC FIRST, PRODUCT SECOND**다. Tire와 Brake는 FRONT/REAR를 분리한다. Tire는 07→04, Battery는 `battery_standard_code` 기반 08→05, Brake는 09→06의 실제 활성 mapping만 사용한다. 특정 브랜드 전용 조건을 두지 않는다.
 
-Product row는 Brand, Product, schema에 있는 보조 정보를 공통 패턴으로 표시한다. 기존 detail route가 있는 Tire/Battery는 전체 행 링크를 사용한다. Brake detail route가 없으면 허위 링크를 만들지 않는다. 각 group은 처음 최대 3개, 나머지는 같은 영역에서 더보기/접기로 점진 공개한다.
+Product row는 Brand, Product, schema에 있는 보조 정보를 공통 패턴으로 표시한다. 기존 detail route가 있는 Tire/Battery는 전체 행 링크를 사용한다. Brake detail route가 없으면 허위 링크를 만들지 않는다. Battery와 Brake group은 처음 최대 3개, 나머지는 같은 영역에서 더보기/접기로 점진 공개한다. Tire Product는 Position 규격을 카드마다 반복하지 않고, 모바일에서는 해당 Position 내부의 가로 목록, 넓은 화면에서는 responsive grid로 전체 상품을 표시한다.
+
+Tire Product의 브랜드 표시는 `brand_name`과 등록된 언어별 alias를 정규화한 공통 로컬 asset 경로를 사용하며, asset은 `public/images/brands/tire/{normalized-brand}.png`에 둔다. 로고가 없거나 로드에 실패하면 빈 이미지 영역이나 broken image 대신 기존 브랜드 텍스트를 표시한다. 로고는 상품 식별을 돕는 보조 정보로 제한하고 원본 비율을 유지한다. Tire Product 목록에는 별도의 "호환상품" label을 표시하지 않는다. 별도 pattern field가 없는 동안 Model Detail의 간결한 상품명은 브랜드명 바로 다음 토큰이 제한된 pattern 형식일 때만 사용하고, 불확실하면 원래 `product_name`으로 fallback한다.
 
 ## Loading and Empty State
 
