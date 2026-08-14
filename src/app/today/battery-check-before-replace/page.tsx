@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export const metadata = {
   title: "바이크 배터리 교체 전에 꼭 확인해야 할 5가지",
   description:
@@ -38,10 +40,14 @@ export default function BatteryCheckPage() {
 
         {/* 이미지 영역 */}
         <section className="mt-10">
-          <img
-            src="https://images.unsplash.com/photo-1581093458791-9f3c4c66a9f6"
-            alt="motorcycle battery"
-            className="rounded-xl"
+          <Image
+            src="https://images.unsplash.com/photo-1760727467056-dfd5811970b9?auto=format&fit=crop&w=1200&h=800&q=80"
+            alt="정비소에서 모터사이클을 점검하는 정비사"
+            className="h-auto w-full rounded-xl"
+            height={800}
+            preload
+            sizes="(max-width: 808px) calc(100vw - 40px), 768px"
+            width={1200}
           />
           <p className="text-sm text-zinc-500 mt-2">
             배터리 상태는 외관과 전압 상태를 함께 확인해야 합니다

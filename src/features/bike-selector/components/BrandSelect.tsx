@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
@@ -25,11 +26,14 @@ function BrandImage({ imagePath, brandName }: BrandImageProps) {
   if (publicUrl && failedUrl !== publicUrl) {
     return (
       <div className="flex h-12 w-full max-w-16 flex-shrink-0 items-center justify-center">
-        <img
+        <Image
           src={publicUrl}
           alt={brandName}
-          className="max-h-full max-w-full origin-center scale-[1.15] object-contain"
+          className="h-full w-full origin-center scale-[1.15] object-contain"
+          height={48}
           onError={() => setFailedUrl(publicUrl)}
+          sizes="64px"
+          width={64}
         />
       </div>
     );
