@@ -48,9 +48,9 @@ export function BikeSelector() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="border-b border-border bg-surface px-5 py-6 sm:py-8">
+      <header className="border-b border-border bg-surface px-3 py-4 sm:px-5 sm:py-5">
         <div className="mx-auto max-w-2xl">
-          <div className="mb-6 text-center">
+          <div className="mb-3 text-center">
             <p className="text-2xl font-bold text-foreground">FitBike</p>
           </div>
           <StepIndicator currentStep={currentStep} />
@@ -58,7 +58,7 @@ export function BikeSelector() {
       </header>
 
       {/* Content */}
-      <div className="px-5 py-8 sm:py-12">
+      <div className="px-5 py-5 sm:py-8">
         <div className="mx-auto max-w-2xl">
           <form className="space-y-8" onSubmit={handleSubmit}>
             {/* Step 1: Brand Selection */}

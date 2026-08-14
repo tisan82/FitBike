@@ -33,3 +33,9 @@ Known Brand fields: `brand_id`, `brand_key`, `brand_en`, `brand_ko`,
 
 Mobile First, 최소 스크롤, 인지 가능한 브랜드 로고, 대량 모델의 검색
 지원. 명시적 Product Rule 없이 popularity ranking을 만들지 않는다.
+
+상단 진행 표시는 브랜드 선택, 모델 선택, 연식 선택의 단계명을 한 줄에
+제공하는 compact pattern을 사용한다. 완료 단계는 Primary Blue check,
+현재 단계는 Primary Blue 번호와 `aria-current="step"`, 예정 단계는 neutral
+상태로 구분하며 단계 사이 connector로 진행 상태를 표시한다. 320px에서도
+줄바꿈이나 가로 스크롤 없이 첫 브랜드 선택 영역을 가능한 한 빠르게 노출한다.
