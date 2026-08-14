@@ -51,7 +51,7 @@ export type TireProductRow = {
   load_index: number | null;
   speed_index: string | null;
   tube_type: string | null;
-  position_type: "FRONT" | "REAR" | "COMMON" | "UNKNOWN" | null;
+  position_type: "FRONT" | "REAR" | "BOTH" | "COMMON" | null;
   product_image_url: string | null;
   product_url: string | null;
   seller_name: string | null;

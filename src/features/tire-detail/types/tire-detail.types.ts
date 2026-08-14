@@ -1,4 +1,4 @@
-export type TirePositionType = "FRONT" | "REAR" | "COMMON" | "UNKNOWN";
+export type TirePositionType = "FRONT" | "REAR" | "BOTH" | "COMMON";
 
 export type TireProductDetail = {
   tireProductId: number;

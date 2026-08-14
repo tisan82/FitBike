@@ -11,7 +11,8 @@ export type AdminRow = Record<string, string | number | boolean | null>;
 export type AdminField = {
   key: string;
   label: string;
-  type: "text" | "number" | "boolean" | "textarea";
+  type: "text" | "number" | "boolean" | "textarea" | "select";
+  options?: Array<{ label: string; value: string }>;
   required?: boolean;
   readonly?: boolean;
 };

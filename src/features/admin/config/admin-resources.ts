@@ -60,7 +60,17 @@ export const ADMIN_RESOURCES: AdminResourceConfig[] = [
       { key: "brand_name", label: "브랜드", type: "text", required: true },
       { key: "product_name", label: "상품명", type: "text", required: true },
       { key: "tire_size_full", label: "규격", type: "text" },
-      { key: "position_type", label: "위치", type: "text" },
+      {
+        key: "position_type",
+        label: "위치",
+        type: "select",
+        options: [
+          { value: "FRONT", label: "FRONT — 앞 타이어" },
+          { value: "REAR", label: "REAR — 뒤 타이어" },
+          { value: "BOTH", label: "BOTH — 앞·뒤 사용 가능" },
+          { value: "COMMON", label: "COMMON — 미검증" },
+        ],
+      },
       { key: "tube_type", label: "튜브 타입", type: "text" },
       { key: "product_url", label: "상품 URL", type: "text" },
       { key: "seller_name", label: "판매처", type: "text" },

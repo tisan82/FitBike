@@ -25,7 +25,7 @@ export type TireFitmentProduct = {
   tireProductId: number;
   tireProductKey: string;
   fitmentPositionType: FitmentPositionType;
-  productPositionType: "FRONT" | "REAR" | "COMMON" | "UNKNOWN" | null;
+  productPositionType: "FRONT" | "REAR" | "BOTH" | "COMMON" | null;
   matchType: string;
   displayOrder: number;
   brandName: string;

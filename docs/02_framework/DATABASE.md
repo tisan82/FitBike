@@ -51,3 +51,16 @@ absolute URL을 저장하는 방식으로 임의 변경하지 않는다.
 
 Schema 변경은 사용자 승인 없이 수행하지 않는다. Production query는
 필요한 컬럼을 명시하는 것을 기본으로 한다.
+
+## Tire Position Policy
+
+`04_tire_product.position_type`은 상품 자체의 공식 장착 위치 검증 상태를
+나타낸다.
+
+-   `FRONT`: 공식 Front 전용
+-   `REAR`: 공식 Rear 전용
+-   `BOTH`: 공식 Front/Rear 모두 사용 가능
+-   `COMMON`: Legacy 또는 Position 미검증
+-   `NULL`: 위치 정보 없음
+
+`UNKNOWN`은 Product DB 저장값이 아니며 Review workflow에서만 사용한다.

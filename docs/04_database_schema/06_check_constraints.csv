@@ -2,7 +2,7 @@ table_name,constraint_name,constraint_definition
 """03_bike_model_year""",03_bike_model_year_front_tire_tube_type_check,"CHECK (((front_tire_tube_type IS NULL) OR (front_tire_tube_type = ANY (ARRAY['TL'::text, 'TT'::text, 'TL_TT'::text, 'UNKNOWN'::text]))))"
 """03_bike_model_year""",03_bike_model_year_rear_tire_tube_type_check,"CHECK (((rear_tire_tube_type IS NULL) OR (rear_tire_tube_type = ANY (ARRAY['TL'::text, 'TT'::text, 'TL_TT'::text, 'UNKNOWN'::text]))))"
 """03_bike_model_year""",chk_03_bike_model_year_year_range,CHECK (((end_year IS NULL) OR (end_year >= start_year)))
-"""04_tire_product""",04_tire_product_position_type_check,"CHECK (((position_type IS NULL) OR (position_type = ANY (ARRAY['FRONT'::text, 'REAR'::text, 'COMMON'::text, 'UNKNOWN'::text]))))"
+"""04_tire_product""",04_tire_product_position_type_check,"CHECK (((position_type IS NULL) OR (position_type = ANY (ARRAY['FRONT'::text, 'REAR'::text, 'BOTH'::text, 'COMMON'::text]))))"
 """04_tire_product""",04_tire_product_tube_type_check,"CHECK (((tube_type IS NULL) OR (tube_type = ANY (ARRAY['TL'::text, 'TT'::text, 'TL_TT'::text, 'UNKNOWN'::text]))))"
 """05_battery_product""",05_battery_product_battery_type_check,"CHECK (((battery_type IS NULL) OR (battery_type = ANY (ARRAY['LITHIUM'::text, 'AGM'::text, 'MF'::text, 'GEL'::text, 'LEAD_ACID'::text, 'UNKNOWN'::text]))))"
 """05_battery_product""",05_battery_product_terminal_polarity_check,"CHECK (((terminal_polarity IS NULL) OR (terminal_polarity = ANY (ARRAY['L'::text, 'R'::text, 'CENTER'::text, 'UNKNOWN'::text]))))"

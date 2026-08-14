@@ -13,6 +13,17 @@ function displayValue(value: SpecificationItem["value"]) {
   return value === null || value === "" ? "정보 없음" : String(value);
 }
 
+const POSITION_LABELS: Record<NonNullable<TireProductDetail["positionType"]>, string> = {
+  FRONT: "앞 타이어",
+  REAR: "뒤 타이어",
+  BOTH: "앞·뒤 사용 가능",
+  COMMON: "장착 위치 확인 필요",
+};
+
+function displayPosition(position: TireProductDetail["positionType"]) {
+  return position === null ? null : POSITION_LABELS[position];
+}
+
 export function TireSpecification({ product }: Props) {
   const items: SpecificationItem[] = [
     { label: "전체 규격", value: product.tireSizeFull },
@@ -22,7 +33,7 @@ export function TireSpecification({ product }: Props) {
     { label: "하중 지수", value: product.loadIndex },
     { label: "속도 지수", value: product.speedIndex },
     { label: "튜브 타입", value: product.tubeType },
-    { label: "장착 위치", value: product.positionType },
+    { label: "장착 위치", value: displayPosition(product.positionType) },
   ];
 
   return (
