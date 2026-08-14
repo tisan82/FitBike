@@ -12,7 +12,7 @@ export function YearSelect({ years, value, disabled, loading, onChange }: YearSe
   if (disabled) {
     return (
       <div className="space-y-2">
-        <p className="text-sm font-semibold text-foreground">연식을 선택하세요</p>
+        <p className="text-base font-semibold text-foreground">연식을 선택하세요</p>
         <p className="text-sm text-foreground-secondary">모델을 먼저 선택하세요</p>
       </div>
     );
@@ -21,7 +21,7 @@ export function YearSelect({ years, value, disabled, loading, onChange }: YearSe
   if (loading) {
     return (
       <div className="space-y-2">
-        <p className="text-sm font-semibold text-foreground">연식을 선택하세요</p>
+        <p className="text-base font-semibold text-foreground">연식을 선택하세요</p>
         <div className="space-y-2">
           {[...Array(3)].map((_, i) => (
             <div
@@ -37,7 +37,7 @@ export function YearSelect({ years, value, disabled, loading, onChange }: YearSe
   if (years.length === 0) {
     return (
       <div className="space-y-2">
-        <p className="text-sm font-semibold text-foreground">연식을 선택하세요</p>
+        <p className="text-base font-semibold text-foreground">연식을 선택하세요</p>
         <p className="text-sm text-foreground-secondary">등록된 연식이 없습니다</p>
       </div>
     );
@@ -45,7 +45,7 @@ export function YearSelect({ years, value, disabled, loading, onChange }: YearSe
 
   return (
     <div className="space-y-2">
-      <p className="text-sm font-semibold text-foreground">연식을 선택하세요</p>
+      <p className="text-base font-semibold text-foreground">연식을 선택하세요</p>
       <div className="space-y-2">
         {years.map((year) => (
           <button
@@ -74,11 +74,11 @@ export function YearSelect({ years, value, disabled, loading, onChange }: YearSe
 
             {/* Year Info */}
             <div className="flex flex-1 flex-col items-start">
-              <p className="text-sm font-semibold text-foreground">
+              <p className="text-base font-semibold text-foreground">
                 {year.yearRangeLabel}
               </p>
               {(year.generationName || year.trimName || year.variantName) && (
-                <p className="text-xs text-foreground-secondary">
+                <p className="text-sm leading-5 text-foreground-secondary">
                   {[year.generationName, year.trimName, year.variantName]
                     .filter(Boolean)
                     .join(" · ")}

@@ -41,7 +41,7 @@ function BrandImage({ imagePath, brandName }: BrandImageProps) {
 
   return (
     <div className="flex h-12 w-full max-w-16 flex-shrink-0 items-center justify-center rounded-lg bg-surface-secondary">
-      <span className="text-xs font-semibold text-foreground-secondary">
+      <span className="text-sm font-semibold text-foreground-secondary">
         {brandName.substring(0, 1)}
       </span>
     </div>
@@ -62,14 +62,13 @@ export function BrandSelect({ brands, value, loading, onChange, selectedOnly = f
             brandName={selectedBrand.brandNameEn}
           />
           <div className="flex flex-1 flex-col items-start">
-            <p className="text-sm font-semibold text-foreground">
+            <p className="text-base font-semibold text-foreground">
               {selectedBrand.brandNameKo ?? selectedBrand.brandNameEn}
             </p>
-            <p className="text-xs text-foreground-secondary">{selectedBrand.brandNameEn}</p>
           </div>
           <button
             onClick={() => onChange(null)}
-            className="text-xs text-primary underline hover:text-primary-hover"
+            className="text-sm font-medium text-primary underline hover:text-primary-hover"
             type="button"
           >
             변경
@@ -82,7 +81,7 @@ export function BrandSelect({ brands, value, loading, onChange, selectedOnly = f
   if (loading) {
     return (
       <div className="space-y-2">
-        <p className="text-sm font-semibold text-foreground">브랜드를 선택하세요</p>
+        <p className="text-base font-semibold text-foreground">브랜드를 선택하세요</p>
         <div className="grid gap-3">
           {[...Array(3)].map((_, i) => (
             <div
@@ -98,7 +97,7 @@ export function BrandSelect({ brands, value, loading, onChange, selectedOnly = f
   if (brands.length === 0) {
     return (
       <div className="space-y-2">
-        <p className="text-sm font-semibold text-foreground">브랜드를 선택하세요</p>
+        <p className="text-base font-semibold text-foreground">브랜드를 선택하세요</p>
         <p className="text-sm text-foreground-secondary">등록된 브랜드가 없습니다</p>
       </div>
     );
@@ -106,7 +105,7 @@ export function BrandSelect({ brands, value, loading, onChange, selectedOnly = f
 
   return (
     <div className="space-y-2">
-      <p className="text-sm font-semibold text-foreground">브랜드를 선택하세요</p>
+      <p className="text-base font-semibold text-foreground">브랜드를 선택하세요</p>
       <div className="grid grid-cols-4 gap-1.5 sm:gap-3">
         {brands.map((brand) => (
           <button
@@ -124,18 +123,12 @@ export function BrandSelect({ brands, value, loading, onChange, selectedOnly = f
               imagePath={brand.logoImageUrl}
               brandName={brand.brandNameEn}
             />
-            <div className="flex w-full min-w-0 flex-col items-center">
+            <div className="flex w-full min-w-0 items-center justify-center">
               <p
-                className="w-full truncate text-[11px] font-semibold text-foreground sm:text-sm"
+                className="flex min-h-10 w-full items-center justify-center break-words text-sm font-semibold leading-5 text-foreground"
                 title={brand.brandNameKo ?? brand.brandNameEn}
               >
                 {brand.brandNameKo ?? brand.brandNameEn}
-              </p>
-              <p
-                className="w-full truncate text-[9px] text-foreground-secondary sm:text-xs"
-                title={brand.brandNameEn}
-              >
-                {brand.brandNameEn}
               </p>
             </div>
             {value === brand.brandId && (

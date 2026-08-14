@@ -33,7 +33,7 @@ export function TireProductCard({ product }: Props) {
           {product.tireSizeFull ? (
             <p className="mt-2 text-sm text-zinc-600">{product.tireSizeFull}</p>
           ) : null}
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-600">
+          <div className="mt-2 flex flex-wrap gap-2 text-sm text-zinc-600">
             {product.tubeType ? (
               <span className="rounded-full bg-zinc-100 px-2.5 py-1">{product.tubeType}</span>
             ) : null}

@@ -11,7 +11,7 @@ export function FitmentResultHeader() {
       </Link>
       <div className="space-y-2">
         <p className="text-sm font-semibold text-zinc-500">FITMENT RESULT</p>
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-950">
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-950">
           내 바이크 장착 가능 상품
         </h1>
         <p className="text-base leading-7 text-zinc-600">

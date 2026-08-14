@@ -69,7 +69,7 @@ export function BikeSelector() {
                     ? "1단계. 브랜드 선택"
                     : "선택된 브랜드"}
                 </h2>
-                <p className="mt-2 text-sm text-foreground-secondary">
+                <p className="mt-2 text-base leading-6 text-foreground-secondary">
                   {currentStep === 1
                     ? "내 바이크의 브랜드를 선택하세요."
                     : (() => {
@@ -100,7 +100,7 @@ export function BikeSelector() {
                       ? "2단계. 모델 선택"
                       : "선택된 모델"}
                   </h2>
-                  <p className="mt-2 text-sm text-foreground-secondary">
+                  <p className="mt-2 text-base leading-6 text-foreground-secondary">
                     {currentStep === 2
                       ? "선택한 브랜드의 모델을 선택하세요."
                       : (() => {
@@ -131,7 +131,7 @@ export function BikeSelector() {
                   <h2 className="text-2xl font-bold text-foreground">
                     3단계. 연식 선택
                   </h2>
-                  <p className="mt-2 text-sm text-foreground-secondary">
+                  <p className="mt-2 text-base leading-6 text-foreground-secondary">
                     선택한 모델의 연식을 선택하세요.
                   </p>
                 </div>

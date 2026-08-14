@@ -19,7 +19,7 @@ export default function HomePage() {
             FitBike Today
           </p>
 
-          <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
+          <h1 className="text-3xl font-bold leading-tight tracking-tight sm:text-5xl">
             내 바이크 관리,
             <br />
             정비소 가기 전에 먼저 확인하세요.
@@ -53,7 +53,7 @@ export default function HomePage() {
         <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-border bg-surface p-6">
             <h2 className="text-lg font-bold">정비소 가기 전 확인</h2>
-            <p className="mt-3 text-sm leading-6 text-foreground-secondary">
+            <p className="mt-3 text-base leading-7 text-foreground-secondary">
               증상만 보고 바로 교체하지 말고, 먼저 확인해야 할 기준을
               정리합니다.
             </p>
@@ -61,14 +61,14 @@ export default function HomePage() {
 
           <div className="rounded-2xl border border-border bg-surface p-6">
             <h2 className="text-lg font-bold">교체 필요 여부 판단</h2>
-            <p className="mt-3 text-sm leading-6 text-foreground-secondary">
+            <p className="mt-3 text-base leading-7 text-foreground-secondary">
               배터리, 타이어, 오일 상태를 체크리스트 기반으로 판단합니다.
             </p>
           </div>
 
           <div className="rounded-2xl border border-border bg-surface p-6">
             <h2 className="text-lg font-bold">내 바이크 기준 연결</h2>
-            <p className="mt-3 text-sm leading-6 text-foreground-secondary">
+            <p className="mt-3 text-base leading-7 text-foreground-secondary">
               일반 정보에서 끝나지 않고, 내 바이크에 맞는 규격 확인으로
               연결합니다.
             </p>
@@ -79,7 +79,7 @@ export default function HomePage() {
       {/* Checklist */}
       <section id="checklist" className="px-5 py-14">
         <div className="mx-auto max-w-5xl">
-          <h2 className="text-3xl font-bold">먼저 확인해야 할 관리 항목</h2>
+          <h2 className="text-2xl font-bold">먼저 확인해야 할 관리 항목</h2>
           <p className="mt-4 text-foreground-secondary">
             FitBike Today는 교체 방법보다 “교체가 필요한지” 판단하는
             기준을 제공합니다.
@@ -110,7 +110,7 @@ export default function HomePage() {
       {/* CTA */}
       <section className="px-5 pb-20">
         <div className="mx-auto max-w-5xl rounded-3xl bg-primary p-8 text-primary-foreground sm:p-10">
-          <h2 className="text-3xl font-bold">
+          <h2 className="text-2xl font-bold">
             내 바이크에 맞는 부품 규격을 확인하세요
           </h2>
 
@@ -144,7 +144,7 @@ function ArticleCard({
     <article className="rounded-2xl border border-border bg-surface p-6">
       <p className="mb-4 text-sm font-semibold text-primary">{tag}</p>
       <h3 className="text-xl font-bold leading-snug">{title}</h3>
-      <p className="mt-4 text-sm leading-6 text-foreground-secondary">{description}</p>
+      <p className="mt-4 text-base leading-7 text-foreground-secondary">{description}</p>
       <button className="mt-6 text-sm font-semibold text-primary transition hover:text-primary-hover">
         곧 공개 예정 →
       </button>

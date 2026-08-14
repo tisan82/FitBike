@@ -11,7 +11,7 @@ export function TireDetailHeader() {
       </Link>
       <div>
         <p className="text-sm font-semibold text-zinc-500">Tire Detail</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-zinc-950">
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-950">
           타이어 상품 상세
         </h1>
       </div>

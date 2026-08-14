@@ -61,6 +61,40 @@ Service Module은 특별한 Product/UX 근거가 없는 한 이 Global Visual
 Standard를 override하지 않는다. Admin은 이 Front Office Theme 정책의
 적용 범위에서 제외한다.
 
+## Global Typography Standard
+
+Customer-facing typography는 실제 모바일 사용을 먼저 설계하며 Desktop을
+축소해 적용하지 않는다. 정보가 좁은 공간에 맞지 않으면 중복 정보 제거,
+hierarchy 단순화, 자연스러운 줄바꿈, layout 조정을 글자 축소보다 먼저
+적용한다.
+
+FitBike의 기본 typography scale은 다음과 같다.
+
+| Role | Size | Weight | Line height | Purpose |
+|---|---:|---:|---:|---|
+| Display / Model Identity | 30px | 700 | 1.2~1.3 | 바이크·모델의 핵심 identity |
+| Page Title | 24px | 700 | 1.25~1.35 | 화면의 주 제목 |
+| Section Title | 20px | 600~700 | 1.3~1.4 | 주요 정보 section |
+| Card Title | 18px | 600~700 | 1.3~1.4 | 상품·모델·카드 제목 |
+| Body / Important Value | 16px | 400~600 | 1.5~1.6 | 본문과 주요 규격 값 |
+| Secondary / Metadata | 14px | 400~500 | 1.4~1.5 | 보조 설명과 label |
+
+Primary body와 중요한 값은 원칙적으로 16px 이상, secondary와 metadata는
+14px 이상을 사용한다. 14px 미만은 이해나 조작에 필요하지 않은 예외적
+비핵심 정보에만 허용하며, 공간 확보를 위해 11px/12px를 사용하지 않는다.
+Page identity와 section/card title은 Bold 또는 Semibold, 중요한 값은
+Semibold, body와 secondary는 Regular 또는 Medium을 기본으로 한다. 작은
+글자에 Bold를 일괄 적용해 hierarchy를 대신하지 않는다.
+
+Primary text는 `--foreground`, secondary text는
+`--foreground-secondary`를 사용하되 작고 얇고 연한 조합을 만들지 않는다.
+한국어 본문은 압축된 line-height를 피하고, 긴 문자열은 핵심 정보를
+말줄임하기 전에 wrapping 또는 layout 변경을 우선한다.
+
+Bike Selector의 고객용 브랜드명은 `brand_ko`를 우선하고 없으면
+`brand_en`을 사용한다. 두 이름을 기본 카드에 동시에 표시하지 않으며 DB와
+API의 영문 값은 그대로 유지한다.
+
 ## Bike Selection
 
 Brand → Model → Model Year 순차 선택. 이전 단계가 결정되기 전 다음

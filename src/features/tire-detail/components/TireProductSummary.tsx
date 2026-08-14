@@ -54,7 +54,7 @@ export function TireProductSummary({ product }: Props) {
               {product.tireSizeFull}
             </p>
           ) : null}
-          <p className="mt-1 text-sm text-foreground-secondary">
+          <p className="mt-1 text-sm leading-5 text-foreground-secondary">
             {[position, product.tubeType].filter(Boolean).join(" · ")}
           </p>
           {price ? (

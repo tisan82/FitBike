@@ -82,17 +82,17 @@ export function ModelSelect({
             modelName={selectedModel.modelNameEn}
           />
           <div className="flex min-w-0 flex-1 flex-col items-start">
-            <p className="text-sm font-semibold text-foreground">
+            <p className="text-base font-semibold text-foreground">
               {selectedModel.modelNameKo ?? selectedModel.modelNameEn}
             </p>
-            <p className="text-xs text-foreground-secondary">
+            <p className="text-sm text-foreground-secondary">
               {selectedModel.category}
               {selectedModel.engineCc && ` · ${selectedModel.engineCc}cc`}
             </p>
           </div>
           <button
             onClick={() => onChange(null)}
-            className="text-xs text-primary underline hover:text-primary-hover"
+            className="text-sm font-medium text-primary underline hover:text-primary-hover"
             type="button"
           >
             변경
@@ -117,7 +117,7 @@ export function ModelSelect({
   if (disabled) {
     return (
       <div className="space-y-2">
-        <p className="text-sm font-semibold text-foreground">모델을 선택하세요</p>
+        <p className="text-base font-semibold text-foreground">모델을 선택하세요</p>
         <p className="text-sm text-foreground-secondary">브랜드를 먼저 선택하세요</p>
       </div>
     );
@@ -125,7 +125,7 @@ export function ModelSelect({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-semibold text-foreground">모델을 선택하세요</p>
+      <p className="text-base font-semibold text-foreground">모델을 선택하세요</p>
 
       {/* Search Input */}
       <div className="relative">
@@ -149,7 +149,7 @@ export function ModelSelect({
           placeholder="모델명을 검색하세요"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-xl border border-border bg-surface py-3 pl-10 pr-4 text-sm text-foreground outline-none transition focus:border-primary"
+          className="w-full rounded-xl border border-border bg-surface py-3 pl-10 pr-4 text-base text-foreground outline-none transition focus:border-primary"
           disabled={loading}
         />
       </div>
@@ -188,18 +188,18 @@ export function ModelSelect({
               />
               <div className="flex min-w-0 flex-1 flex-col items-start text-left">
                 <p
-                  className="w-full truncate text-sm font-semibold text-foreground"
+                  className="w-full truncate text-base font-semibold text-foreground"
                   title={model.modelNameKo ?? model.modelNameEn}
                 >
                   {model.modelNameKo ?? model.modelNameEn}
                 </p>
-                <p className="w-full truncate text-xs text-foreground-secondary">
+                <p className="w-full truncate text-sm text-foreground-secondary">
                   {model.category}
                   {model.engineCc && ` · ${model.engineCc}cc`}
                 </p>
               </div>
               {value === model.bikeModelId && (
-                <div className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
+                <div className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-primary text-sm text-primary-foreground">
                   ✓
                 </div>
               )}

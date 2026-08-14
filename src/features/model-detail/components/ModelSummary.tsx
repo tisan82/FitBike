@@ -18,7 +18,7 @@ function Item({
   return (
     <div>
       <dt className="text-sm text-foreground-secondary">{label}</dt>
-      <dd className="mt-1 font-semibold">{value}</dd>
+      <dd className="mt-1 text-base font-semibold leading-6">{value}</dd>
     </div>
   );
 }
@@ -55,7 +55,7 @@ export function ModelSummary({ model }: { model: ModelDetailData }) {
             {model.modelSummary}
           </p>
         ) : null}
-        <dl className="grid grid-cols-2 gap-5 text-sm sm:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-5 sm:grid-cols-4">
           <Item
             label="배기량"
             value={model.engineCc === null ? null : `${model.engineCc}cc`}

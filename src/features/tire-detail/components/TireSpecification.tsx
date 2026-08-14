@@ -32,10 +32,10 @@ export function TireSpecification({ product }: Props) {
             className={`min-w-0 p-3 sm:p-4 ${index % 2 === 1 ? "border-l border-border" : ""} ${index >= 2 ? "border-t border-border" : ""} sm:border-l sm:border-t-0 sm:[&:nth-child(3n+1)]:border-l-0 sm:[&:nth-child(n+4)]:border-t`}
             key={item.label}
           >
-            <dt className="text-xs font-medium text-foreground-secondary">
+            <dt className="text-sm font-medium leading-5 text-foreground-secondary">
               {item.label}
             </dt>
-            <dd className="mt-1 truncate font-bold text-foreground" title={displayValue(item.value)}>
+            <dd className="mt-1 truncate text-base font-semibold leading-6 text-foreground" title={displayValue(item.value)}>
               {displayValue(item.value)}
             </dd>
           </div>

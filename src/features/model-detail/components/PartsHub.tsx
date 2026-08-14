@@ -39,7 +39,7 @@ function Products({ label, items, loading, error }: ProductStateProps) {
         const body = (
           <>
             <span className="min-w-0">
-              <span className="block text-xs font-semibold text-foreground-secondary">{item.brandName}</span>
+              <span className="block text-sm font-medium text-foreground-secondary">{item.brandName}</span>
               <span className="block truncate font-semibold" title={item.productName}>{item.productName}</span>
               {item.secondaryInformation ? <span className="block text-sm text-foreground-secondary">{item.secondaryInformation}</span> : null}
             </span>
@@ -126,9 +126,9 @@ function Tire({ label, spec, items, loading, error }: ProductStateProps & { spec
       <div className="space-y-1">
         <div className="flex items-baseline justify-between gap-4">
           <h3 className="font-bold">{label}</h3>
-          {!loading && !error && items?.length ? <span className="text-xs font-medium text-foreground-secondary">{items.length}개</span> : null}
+          {!loading && !error && items?.length ? <span className="text-sm font-medium text-foreground-secondary">{items.length}개</span> : null}
         </div>
-        <p className="break-words text-sm font-semibold text-foreground">{tireSpecification(spec)}</p>
+        <p className="break-words text-base font-semibold leading-6 text-foreground">{tireSpecification(spec)}</p>
       </div>
       <TireProducts error={error} items={items} label={label} loading={loading} />
     </article>

@@ -11,7 +11,7 @@ export function TireBrandLogo({ brandName }: { brandName: string }) {
 
   if (!src || failedSrc === src) {
     return (
-      <span className="block text-xs font-semibold text-foreground-secondary">
+      <span className="block text-sm font-medium text-foreground-secondary">
         {brandName}
       </span>
     );

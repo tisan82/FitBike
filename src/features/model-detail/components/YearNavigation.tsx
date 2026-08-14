@@ -7,7 +7,7 @@ export function YearNavigation({ years, currentId }: { years: ModelYearOption[];
       <ul className="flex w-max gap-2">
         {years.map((year) => {
           const selected = year.bikeModelYearId === currentId;
-          return <li key={year.bikeModelYearId}><Link aria-current={selected ? "page" : undefined} className={`inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold ${selected ? "border-selected-border bg-selected-background text-primary" : "border-border bg-surface text-foreground hover:border-primary"}`} href={`/model-detail/${year.bikeModelYearId}`}>{year.yearRangeLabel}</Link></li>;
+          return <li key={year.bikeModelYearId}><Link aria-current={selected ? "page" : undefined} className={`inline-flex min-h-11 items-center rounded-full border px-4 text-base font-semibold ${selected ? "border-selected-border bg-selected-background text-primary" : "border-border bg-surface text-foreground hover:border-primary"}`} href={`/model-detail/${year.bikeModelYearId}`}>{year.yearRangeLabel}</Link></li>;
         })}
       </ul>
     </nav>
