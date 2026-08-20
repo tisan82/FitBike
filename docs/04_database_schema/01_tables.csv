@@ -9,3 +9,4 @@ public,07_bike_model_year_tire_product,BASE TABLE
 public,08_battery_standard_product,BASE TABLE
 public,09_bike_model_year_brake_product,BASE TABLE
 public,10_bike_model_year_image,BASE TABLE
+public,11_tire_model,BASE TABLE

@@ -8,3 +8,4 @@ public,06_brake_product,trg_06_brake_product_updated_at,UPDATE,BEFORE,EXECUTE FU
 public,07_bike_model_year_tire_product,trg_07_bike_model_year_tire_product_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()
 public,08_battery_standard_product,trg_08_battery_standard_product_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()
 public,09_bike_model_year_brake_product,trg_09_bike_model_year_brake_product_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()
+public,11_tire_model,trg_11_tire_model_updated_at,UPDATE,BEFORE,EXECUTE FUNCTION set_updated_at()

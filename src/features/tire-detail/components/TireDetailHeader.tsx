@@ -2,19 +2,13 @@ import Link from "next/link";
 
 export function TireDetailHeader() {
   return (
-    <header className="space-y-4">
+    <header>
       <Link
-        className="inline-flex text-sm font-semibold text-zinc-600 hover:text-zinc-950"
+        className="inline-flex min-h-11 items-center text-sm font-semibold text-foreground-secondary hover:text-primary"
         href="/bike-selector"
       >
         바이크 다시 선택하기
       </Link>
-      <div>
-        <p className="text-sm font-semibold text-zinc-500">Tire Detail</p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-950">
-          타이어 상품 상세
-        </h1>
-      </div>
     </header>
   );
 }

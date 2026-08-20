@@ -107,3 +107,25 @@ Brand → Model → Model Year 순차 선택. 이전 단계가 결정되기 전 
 Header → Content → Primary Action → Bottom Navigation(필요 시)
 
 Fitment/specification 정보는 상업적 프로모션보다 우선한다.
+
+## Tire Model Detail Disclosure
+
+타이어 모델 상세는 모델 이해 후 판매 규격을 선택하는 Gate다. 규격명, 고객용 장착
+위치, 가격을 위치별로 묶어 표시하고 선택하면 해당 SKU Detail로 이동한다. 상세 제원,
+Fitment, 구매 CTA는 Model Detail에서 펼치지 않고 SKU Detail에서 제공한다.
+
+SKU Detail은 선택 규격, 역방향 Fitment, 구매 CTA 순서를 우선한다. Fitment가 많으면
+초기 5~10개만 표시하고 명시적인 전체 보기 control로 확장한다. Fitment가 0건이면
+실제 장착 불가로 단정하지 않고 Section을 숨긴다. 공통 `타이어 규격 보는 법`은
+기본적으로 접힌 상태로 제공한다.
+
+Model/SKU Hero는 1:1 `object-fit: contain`을 사용하고 저장 이미지가 없거나 로드에
+실패하면 공통 Tire no-image asset을 사용한다. `sub_image_url_1/2`는 별도 콘텐츠
+이미지이므로 대표 이미지 fallback을 재사용하지 않으며 URL이 없거나 로드에 실패하면
+해당 Section을 숨긴다.
+
+모바일 Tire Detail은 16px page gutter, Hero 이미지와 정보 사이 약 20px, 주요
+Section 사이 28~32px, 제목과 콘텐츠 사이 14~16px을 기준으로 한다. 규격 가이드는
+compact Utility accordion, Fitment는 제조사 horizontal navigation과 divider 기반
+compact list, 다른 판매 규격은 Product selection card로 구분해 같은 카드 표현을
+반복하지 않는다.

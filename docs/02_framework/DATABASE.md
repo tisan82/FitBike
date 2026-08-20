@@ -22,8 +22,19 @@ No inferred fitment values.
   Battery Standard / Mapping   `08_battery_standard_product`
   Brake Mapping                `09_bike_model_year_brake_product`
   Model-Year Image             `10_bike_model_year_image`
+  Tire Model                   `11_tire_model`
 
 `03_bike_model_year`가 Fitment의 핵심 Entity다.
+
+타이어 commerce에서 `11_tire_model`은 공통 모델 identity이고
+`04_tire_product`는 판매 SKU다. 애플리케이션은
+`11_tire_model.tire_model_key`로 모델을 조회하고
+`04_tire_product.tire_model_id`로 해당 SKU를 조회한다. 정확한 FK와 index
+정의는 `docs/04_database_schema/`의 최신 export만을 따른다.
+
+SKU의 Bike Model + Year Fitment는 기존
+`07_bike_model_year_tire_product` 관계만 사용한다. 타이어 모델 또는 규격
+문자열을 기준으로 별도 Fitment 관계를 만들거나 추정하지 않는다.
 
 ## Identifier Policy
 

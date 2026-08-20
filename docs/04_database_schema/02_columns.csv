@@ -84,6 +84,7 @@ public,04_tire_product,16,price,integer,int4,null,32,0,YES,null
 public,04_tire_product,17,is_active,boolean,bool,null,null,null,NO,true
 public,04_tire_product,18,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
 public,04_tire_product,19,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,04_tire_product,20,tire_model_id,bigint,int8,null,64,0,YES,null
 public,05_battery_product,1,battery_product_id,bigint,int8,null,64,0,NO,null
 public,05_battery_product,2,battery_part_key,text,text,null,null,null,NO,null
 public,05_battery_product,3,brand_name,text,text,null,null,null,NO,null
@@ -160,3 +161,24 @@ public,10_bike_model_year_image,9,is_active,boolean,bool,null,null,null,NO,true
 public,10_bike_model_year_image,10,source_file_name,text,text,null,null,null,YES,null
 public,10_bike_model_year_image,11,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
 public,10_bike_model_year_image,12,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,11_tire_model,1,tire_model_id,bigint,int8,null,64,0,NO,null
+public,11_tire_model,2,tire_model_key,text,text,null,null,null,NO,null
+public,11_tire_model,3,brand_name,text,text,null,null,null,NO,null
+public,11_tire_model,4,model_name,text,text,null,null,null,NO,null
+public,11_tire_model,5,display_name,text,text,null,null,null,YES,null
+public,11_tire_model,6,category_type,text,text,null,null,null,YES,null
+public,11_tire_model,7,riding_type,text,text,null,null,null,YES,null
+public,11_tire_model,8,summary,text,text,null,null,null,YES,null
+public,11_tire_model,9,description,text,text,null,null,null,YES,null
+public,11_tire_model,10,is_active,boolean,bool,null,null,null,NO,true
+public,11_tire_model,11,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,11_tire_model,12,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,11_tire_model,13,feature_1_title,text,text,null,null,null,YES,null
+public,11_tire_model,14,feature_1_description,text,text,null,null,null,YES,null
+public,11_tire_model,15,feature_2_title,text,text,null,null,null,YES,null
+public,11_tire_model,16,feature_2_description,text,text,null,null,null,YES,null
+public,11_tire_model,17,feature_3_title,text,text,null,null,null,YES,null
+public,11_tire_model,18,feature_3_description,text,text,null,null,null,YES,null
+public,11_tire_model,19,main_image_url,text,text,null,null,null,YES,null
+public,11_tire_model,20,sub_image_url_1,text,text,null,null,null,YES,null
+public,11_tire_model,21,sub_image_url_2,text,text,null,null,null,YES,null
