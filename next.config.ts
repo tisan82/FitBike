@@ -21,6 +21,12 @@ if (supabaseUrl) {
       port,
       pathname: "/storage/v1/object/public/bike-assets/**",
     });
+    remotePatterns.push({
+      protocol: protocol.slice(0, -1) as "https" | "http",
+      hostname,
+      port,
+      pathname: "/storage/v1/object/public/tire-assets/**",
+    });
   }
 }
 

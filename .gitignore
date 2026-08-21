@@ -42,3 +42,7 @@ next-env.d.ts
 
 # commit the environment variable template only
 !.env.example
+
+# local tire image sources and generated upload assets
+/assets-source/tire-models/**/original/
+/assets-source/tire-models/**/upload/

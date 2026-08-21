@@ -58,6 +58,11 @@ DB 이미지 필드는 전체 URL이 아니라 Storage object path일 수 있다
 애플리케이션이 `bike-assets` public URL로 변환한다. DB에 환경 종속
 absolute URL을 저장하는 방식으로 임의 변경하지 않는다.
 
+타이어 모델 이미지는 `tire-assets` bucket에 저장한다. DB에는
+`tire-models/{brand}/{tire_model_key}/{slot}.webp` object path를 저장하고,
+애플리케이션은 `tire-models/` prefix를 `tire-assets` public URL로 변환한다.
+그 외 기존 asset path는 계속 `bike-assets`를 사용한다.
+
 ## Schema Rule
 
 Schema 변경은 사용자 승인 없이 수행하지 않는다. Production query는

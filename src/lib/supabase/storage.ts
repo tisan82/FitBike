@@ -4,7 +4,8 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
  * Converts a Supabase Storage object path to a public URL
  *
  * @param storagePath - The object path in Supabase Storage (e.g., "manufacturers/aprilia/logo.jpg")
- * @param bucketName - The bucket name (default: "bike-assets")
+ * @param bucketName - Optional bucket override. Tire model paths use "tire-assets";
+ * other object paths default to "bike-assets".
  * @returns The public URL, or null if storagePath is null/empty
  *
  * @example
@@ -13,7 +14,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
  */
 export function getStoragePublicUrl(
   storagePath: string | null | undefined,
-  bucketName: string = "bike-assets",
+  bucketName?: string,
 ): string | null {
   const normalizedPath = storagePath?.trim();
   if (!normalizedPath) {
@@ -28,7 +29,9 @@ export function getStoragePublicUrl(
   }
 
   const objectPath = normalizedPath.replace(/^\/+/, "");
+  const resolvedBucketName =
+    bucketName ?? (objectPath.startsWith("tire-models/") ? "tire-assets" : "bike-assets");
   const supabase = createBrowserSupabaseClient();
-  const { data } = supabase.storage.from(bucketName).getPublicUrl(objectPath);
+  const { data } = supabase.storage.from(resolvedBucketName).getPublicUrl(objectPath);
   return data.publicUrl;
 }
