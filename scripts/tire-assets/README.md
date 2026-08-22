@@ -16,7 +16,42 @@ tire-models/{brand}/{tire_model_key}/sub-01.webp
 tire-models/{brand}/{tire_model_key}/sub-02.webp
 ```
 
-현재 MAXXIS 실행에서는 `main.webp`만 반영했다.
+기존 MAXXIS 일괄 실행에서는 `main.webp`만 반영했다. MA-RS는 2026-08-23 별도
+승인 작업에서 `main.webp`, `sub-01.webp`, `sub-02.webp` 3개를 모두 반영했다.
+
+## Source and rights registry
+
+`tire-image-source-registry.csv`는 원본 존재, 현재 Production 반영 상태와 이미지
+사용 권리를 분리해 기록한다. 로컬 파일 보유나 과거 업로드 성공은 권리 확인
+근거가 아니다.
+
+- Main 및 제품이 등장하는 Sub 01은 `RIGHTS_CLEARED`, `USER_OWNED` 또는
+  `OFFICIAL_APPROVED` 근거가 있어야 신규 Production 후보로 사용할 수 있다.
+- `REFERENCE_ONLY`, `USAGE_UNCLEAR`, `RIGHTS_UNKNOWN`, `DO_NOT_USE`는 신규
+  Production 사용을 차단한다.
+- `RIGHTS_UNKNOWN`은 기존 자산 조사 상태이며 권리 승인이 아니다.
+- `review_status`는 시각·운영 검토 상태이고 `usage_status`를 대체하지 않는다.
+- 권리 상태 변경 시 owner, URL, 승인 범위 또는 내부 증빙을 함께 기록한다.
+- 사용자 확인에 따라 MAXXIS 본사 공식 웹사이트·catalogue·media asset은
+  `OFFICIAL_APPROVED`로 기록할 수 있다. 현지 distributor 이미지는 동일한 본사
+  asset임을 확인했거나 출처·사용 범위를 기록하고 사용자가 명시적으로 승인한
+  경우에만 승인할 수 있다.
+
+## MA-RS Reference Model
+
+2026-08-23 Production QA 결과:
+
+```text
+MA-RS Reference Model: APPROVED
+Production: PASS
+3-image Standard: CONFIRMED
+22-model rollout: READY (execution not started)
+```
+
+전용 검증·반영 스크립트는 `ma-rs-production.mjs`이며 기본 실행은 read-only
+preflight, `--execute`는 기존 object/DB 값과 로컬 파일을 검증한 뒤 MA-RS 한 행만
+guarded update한다. HTTP와 browser QA는 각각 `ma-rs-http-qa.mjs`,
+`ma-rs-browser-qa.mjs`로 수행한다.
 
 ## Dry run
 

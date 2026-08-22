@@ -84,6 +84,9 @@ not use a generated visual when customers could reasonably mistake it for an
 actual product characteristic. Production Storage upload remains a separately
 approved operation.
 
+Detailed canvas, content, generation, expansion, and QA rules are governed by
+`TIRE_MODEL_IMAGE_STANDARD.md`.
+
 ## Tire Position Contract
 
 `04_tire_product.position_type`은 상품의 공식 사용 가능 위치이며
