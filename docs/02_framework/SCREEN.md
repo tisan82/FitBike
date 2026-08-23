@@ -120,12 +120,26 @@ SKU Detail은 선택 규격, 역방향 Fitment, 구매 CTA 순서를 우선한�
 기본적으로 접힌 상태로 제공한다.
 
 Model/SKU Hero는 1:1 `object-fit: contain`을 사용하고 저장 이미지가 없거나 로드에
-실패하면 공통 Tire no-image asset을 사용한다. `sub_image_url_1/2`는 별도 콘텐츠
-이미지이므로 대표 이미지 fallback을 재사용하지 않으며 URL이 없거나 로드에 실패하면
-해당 Section을 숨긴다.
+실패하면 공통 Tire no-image asset을 사용한다. Tire Model의 headline, supporting
+copy, feature, 규격 정보는 접근 가능하고 반응형인 HTML이 소유한다. 텍스트가 포함된
+기존 `sub_image_url_1`은 DB/Storage에는 보존하되 Model Detail UI에서 표시하지 않는다.
+`sub_image_url_2`는 주행 환경 visual로 별도 Section에 표시하며 URL이 없거나 로드에
+실패하면 해당 Section을 숨긴다.
+
+Tire Model Detail의 모바일 disclosure 순서는 Hero → 주요 특징 → 제품 정보/규격 안내
+→ SKU 선택 → 주행 환경 visual → 브랜드 모델 목록 CTA다. Model Detail에는 SKU 관계로
+확인되지 않은 호환 바이크 정보를 만들지 않는다.
 
 모바일 Tire Detail은 16px page gutter, Hero 이미지와 정보 사이 약 20px, 주요
 Section 사이 28~32px, 제목과 콘텐츠 사이 14~16px을 기준으로 한다. 규격 가이드는
 compact Utility accordion, Fitment는 제조사 horizontal navigation과 divider 기반
 compact list, 다른 판매 규격은 Product selection card로 구분해 같은 카드 표현을
 반복하지 않는다.
+
+## Tire Model Directory
+
+`/tire-models/maxxis`는 활성 MAXXIS 타이어 모델을 `model_name` 오름차순으로 보여주는
+탐색 page다. 모바일은 2열, 넓은 화면은 3~4열 card grid를 사용하며 각 card는 실제
+대표 이미지, 모델명, 저장된 summary와 Model Detail link를 제공한다. 추천, 인기순,
+임의 ranking을 만들지 않는다. 분류 filter는 실제 DB의 검증된 category/riding 값이
+있을 때만 제공하고 NULL 모델은 항상 전체 결과에 남긴다.

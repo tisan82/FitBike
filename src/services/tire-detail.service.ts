@@ -1,6 +1,7 @@
 import type {
   TireModelDetailData,
   TireModelFeature,
+  TireModelListItem,
   TireProductDetail,
   TireProductFitment,
 } from "@/features/tire-detail/types/tire-detail.types";
@@ -11,6 +12,7 @@ import {
   findActiveTireFitmentMappings,
   findActiveTireModelById,
   findActiveTireModelByKey,
+  findActiveTireModelsByBrandName,
   findActiveTireProductById,
   findActiveTireProductsByModelId,
 } from "@/repositories/tire-detail.repository";
@@ -125,6 +127,8 @@ export async function getTireModelDetail(
     brandName: model.brand_name,
     modelName: model.model_name,
     displayName: model.display_name?.trim() || model.model_name,
+    categoryType: model.category_type,
+    ridingType: model.riding_type,
     summary: model.summary,
     description: model.description,
     mainImageUrl: model.main_image_url,
@@ -148,6 +152,21 @@ export async function getTireModelDetail(
       fitmentCount: 0,
     })),
   };
+}
+
+export async function getActiveTireModelsByBrandName(
+  brandName: string,
+): Promise<TireModelListItem[]> {
+  const models = await findActiveTireModelsByBrandName(brandName);
+  return models.map((model) => ({
+    tireModelKey: model.tire_model_key,
+    modelName: model.model_name,
+    displayName: model.display_name?.trim() || model.model_name,
+    summary: model.summary,
+    categoryType: model.category_type,
+    ridingType: model.riding_type,
+    mainImageUrl: model.main_image_url,
+  }));
 }
 
 export async function getTireProductFitments(

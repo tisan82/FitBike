@@ -6,6 +6,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE_URL },
     { url: `${SITE_URL}/bike-selector` },
+    { url: `${SITE_URL}/tire-models/maxxis` },
   ];
   try {
     const years = await findActiveModelYearsForSitemap();

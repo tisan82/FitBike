@@ -59,6 +59,8 @@ export type TireModelDetailData = {
   brandName: string;
   modelName: string;
   displayName: string;
+  categoryType: string | null;
+  ridingType: string | null;
   summary: string | null;
   description: string | null;
   mainImageUrl: string | null;
@@ -66,6 +68,16 @@ export type TireModelDetailData = {
   subImageUrl2: string | null;
   features: TireModelFeature[];
   skus: TireModelSku[];
+};
+
+export type TireModelListItem = {
+  tireModelKey: string;
+  modelName: string;
+  displayName: string;
+  summary: string | null;
+  categoryType: string | null;
+  ridingType: string | null;
+  mainImageUrl: string | null;
 };
 
 export type TireProductFitment = {

@@ -417,6 +417,13 @@ Rollout: COMPLETE
 검증했다. 완료된 22개 asset set은 `FROZEN`이며 신규 task가 명시하지 않는 한
 재분석, 재생성, 재인코딩 또는 재업로드하지 않는다.
 
+## Current UI consumption
+
+이미지 asset과 DB path는 그대로 보존한다. Public Tire Model Detail에서는 HTML이
+headline, supporting copy, feature와 규격 정보를 소유하므로 텍스트가 합성된 기존
+`sub_image_url_1`을 표시하지 않는다. `sub_image_url_2`는 주행 환경 visual로 표시한다.
+이 UI 규칙은 frozen asset의 수정 또는 재생성을 의미하지 않는다.
+
 ## New model operating rule
 
 - 공통: canvas, safe area, typography, filename, Storage path, DB mapping, QA.

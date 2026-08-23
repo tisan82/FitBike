@@ -26,6 +26,8 @@ export type TireModelDetailRow = {
   brand_name: string;
   model_name: string;
   display_name: string | null;
+  category_type: string | null;
+  riding_type: string | null;
   summary: string | null;
   description: string | null;
   feature_1_title: string | null;
@@ -38,6 +40,17 @@ export type TireModelDetailRow = {
   sub_image_url_1: string | null;
   sub_image_url_2: string | null;
 };
+
+export type TireModelListRow = Pick<
+  TireModelDetailRow,
+  | "tire_model_key"
+  | "model_name"
+  | "display_name"
+  | "summary"
+  | "category_type"
+  | "riding_type"
+  | "main_image_url"
+>;
 
 export type TireModelProductRow = Pick<
   TireProductDetailRow,
@@ -106,7 +119,7 @@ export async function findActiveTireModelById(
   const { data, error } = await supabase
     .from("11_tire_model")
     .select(
-      "tire_model_id, tire_model_key, brand_name, model_name, display_name, summary, description, feature_1_title, feature_1_description, feature_2_title, feature_2_description, feature_3_title, feature_3_description, main_image_url, sub_image_url_1, sub_image_url_2",
+      "tire_model_id, tire_model_key, brand_name, model_name, display_name, category_type, riding_type, summary, description, feature_1_title, feature_1_description, feature_2_title, feature_2_description, feature_3_title, feature_3_description, main_image_url, sub_image_url_1, sub_image_url_2",
     )
     .eq("tire_model_id", tireModelId)
     .eq("is_active", true)
@@ -123,7 +136,7 @@ export async function findActiveTireModelByKey(
   const { data, error } = await supabase
     .from("11_tire_model")
     .select(
-      "tire_model_id, tire_model_key, brand_name, model_name, display_name, summary, description, feature_1_title, feature_1_description, feature_2_title, feature_2_description, feature_3_title, feature_3_description, main_image_url, sub_image_url_1, sub_image_url_2",
+      "tire_model_id, tire_model_key, brand_name, model_name, display_name, category_type, riding_type, summary, description, feature_1_title, feature_1_description, feature_2_title, feature_2_description, feature_3_title, feature_3_description, main_image_url, sub_image_url_1, sub_image_url_2",
     )
     .eq("tire_model_key", tireModelKey)
     .eq("is_active", true)
@@ -131,6 +144,23 @@ export async function findActiveTireModelByKey(
 
   if (error) throw new Error(error.message);
   return data as TireModelDetailRow | null;
+}
+
+export async function findActiveTireModelsByBrandName(
+  brandName: string,
+): Promise<TireModelListRow[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("11_tire_model")
+    .select(
+      "tire_model_key, model_name, display_name, summary, category_type, riding_type, main_image_url",
+    )
+    .eq("brand_name", brandName)
+    .eq("is_active", true)
+    .order("model_name", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as TireModelListRow[];
 }
 
 export async function findActiveTireProductsByModelId(

@@ -19,11 +19,18 @@ The public detail routes are:
 
 - SKU Detail: `/tire-detail/[tireProductId]`
 - Tire Model Detail: `/tire-detail/model/[tireModelKey]`
+- MAXXIS Tire Model Directory: `/tire-models/maxxis`
 
 Model Detail resolves an active `11_tire_model` by `tire_model_key` and lists
 all active `04_tire_product` rows with the resolved `tire_model_id`. Inactive
 models and inactive SKUs are not public detail content. The existing SKU Detail
 route remains unchanged.
+
+The MAXXIS directory resolves active `11_tire_model` rows with
+`brand_name = '맥시스'`, orders them by `model_name` ascending, and links each
+card to Tire Model Detail. Category/riding filters may use only stored,
+verified values; when those values are NULL the directory remains an unfiltered
+model list. It does not rank or recommend models.
 
 ### SKU Fitment Disclosure
 
@@ -86,6 +93,11 @@ approved operation.
 
 Detailed canvas, content, generation, expansion, and QA rules are governed by
 `TIRE_MODEL_IMAGE_STANDARD.md`.
+
+In the public Model Detail UI, HTML owns product copy, features, and SKU-derived
+attributes. Existing text-composited `sub_image_url_1` assets remain stored but
+are hidden to avoid duplicate, inaccessible mobile copy. `sub_image_url_2`
+remains the Riding/Usage visual.
 
 ## Tire Position Contract
 
