@@ -39,6 +39,12 @@ disclosure. It accepts a positive active Tire Product ID and returns only
 active, explicitly mapped Bike Model + Year rows with their mapping position.
 It does not perform size-based matching or return inferred fitment.
 
+`GET /api/v1/tire-models/[tireModelKey]/fitments` aggregates only active,
+explicit SKU mappings for an active Tire Model. It groups rows by
+`bike_model_year_id` and preserves distinct mapping position, stored
+`tire_size_full`, and Tire Product identity within each Bike Model-Year. It
+does not infer compatibility from size or model identity.
+
 ## MVP Scope
 
 브랜드, 모델, 연식, Fitment 결과, 상품 연결, 콘텐츠 조회.

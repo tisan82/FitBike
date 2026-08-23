@@ -1,5 +1,6 @@
 import type {
   ApiResponse,
+  TireModelCompatibleBike,
   TireProductDetail,
   TireProductFitment,
 } from "@/features/tire-detail/types/tire-detail.types";
@@ -17,6 +18,24 @@ export async function getTireProductDetail(
       ? "타이어 상품 정보를 불러오지 못했습니다."
       : body.error.message;
     throw new Error(message);
+  }
+
+  return body.data;
+}
+
+export async function getTireModelCompatibleBikes(
+  tireModelKey: string,
+): Promise<TireModelCompatibleBike[]> {
+  const response = await fetch(
+    `/api/v1/tire-models/${encodeURIComponent(tireModelKey)}/fitments`,
+    { headers: { Accept: "application/json" } },
+  );
+  const body = (await response.json()) as ApiResponse<TireModelCompatibleBike[]>;
+
+  if (!response.ok || !body.success) {
+    throw new Error(
+      body.success ? "호환 바이크를 불러오지 못했습니다." : body.error.message,
+    );
   }
 
   return body.data;

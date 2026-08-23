@@ -38,11 +38,14 @@ SKU fitment uses the existing `07_bike_model_year_tire_product` relationship.
 Do not create a tire-model fitment table or infer fitment from tire size,
 position, product name, or another SKU.
 
-Fitment disclosure belongs to SKU Detail, not the Model Detail selection gate.
-Resolve it in reverse from the selected `04_tire_product` through active
-mappings to active Bike Model + Year rows. When many mappings exist, show only
-an initial subset and disclose the full deduplicated set on demand. If no
-mapping exists, omit the section rather than claiming the tire is incompatible.
+SKU Detail resolves Fitment in reverse from the selected `04_tire_product`
+through active mappings to active Bike Model + Year rows. Tire Model Detail may
+aggregate those same explicit mappings across its active SKUs; it groups by
+`bike_model_year_id` while preserving distinct mapping position, stored tire
+size, and Tire Product identity. Neither route may infer Fitment from size or
+model identity. When many mappings exist, show only an initial subset and
+disclose the full deduplicated set on demand. If no mapping exists, omit the
+section rather than claiming the tire is incompatible.
 
 ### Tire Specification Guide
 

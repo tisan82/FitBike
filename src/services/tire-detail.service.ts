@@ -1,5 +1,6 @@
 import type {
   TireModelDetailData,
+  TireModelCompatibleBike,
   TireModelFeature,
   TireModelListItem,
   TireProductDetail,
@@ -13,6 +14,8 @@ import {
   findActiveTireModelById,
   findActiveTireModelByKey,
   findActiveTireModelsByBrandName,
+  findActiveTireModelFitmentModels,
+  findActiveTireModelFitmentYears,
   findActiveTireProductById,
   findActiveTireProductsByModelId,
 } from "@/repositories/tire-detail.repository";
@@ -212,4 +215,95 @@ export async function getTireProductFitments(
       ]),
     ).values(),
   ];
+}
+
+function createYearRangeLabel(
+  storedLabel: string,
+  startYear: number,
+  endYear: number | null,
+) {
+  const label = storedLabel.trim();
+  if (label) return label.replaceAll("~", "–");
+  if (endYear === startYear) return String(startYear);
+  return endYear === null ? `${startYear}–` : `${startYear}–${endYear}`;
+}
+
+export async function getTireModelCompatibleBikes(
+  tireModelKey: string,
+): Promise<TireModelCompatibleBike[]> {
+  const model = await findActiveTireModelByKey(tireModelKey);
+  if (!model) throw new TireModelNotFoundError();
+
+  const products = await findActiveTireProductsByModelId(model.tire_model_id);
+  const productMap = new Map(products.map((product) => [product.tire_product_id, product]));
+  const mappings = await findActiveTireFitmentMappings([...productMap.keys()]);
+  const years = await findActiveTireModelFitmentYears(
+    [...new Set(mappings.map((mapping) => mapping.bike_model_year_id))],
+  );
+  const bikes = await findActiveTireModelFitmentModels(
+    [...new Set(years.map((year) => year.bike_model_id))],
+  );
+  const brands = await findActiveFitmentBrands(
+    [...new Set(bikes.map((bike) => bike.brand_id))],
+  );
+
+  const yearMap = new Map(years.map((year) => [year.bike_model_year_id, year]));
+  const bikeMap = new Map(bikes.map((bike) => [bike.bike_model_id, bike]));
+  const brandMap = new Map(brands.map((brand) => [brand.brand_id, brand]));
+  const compatibleBikes = new Map<number, TireModelCompatibleBike>();
+  const fitmentKeys = new Map<number, Set<string>>();
+
+  for (const mapping of mappings) {
+    const product = productMap.get(mapping.tire_product_id);
+    const year = yearMap.get(mapping.bike_model_year_id);
+    const bike = year ? bikeMap.get(year.bike_model_id) : null;
+    const brand = bike ? brandMap.get(bike.brand_id) : null;
+    if (!product?.tire_size_full || !year || !bike || !brand) continue;
+
+    let item = compatibleBikes.get(year.bike_model_year_id);
+    if (!item) {
+      item = {
+        bikeModelYearId: year.bike_model_year_id,
+        brandName: brand.brand_ko ?? brand.brand_en,
+        bikeModelKey: bike.model_key,
+        bikeModelName: bike.model_name_ko ?? bike.model_name_en,
+        yearRangeLabel: createYearRangeLabel(
+          year.year_range_label,
+          year.start_year,
+          year.end_year,
+        ),
+        generationName: year.generation_name?.trim() || null,
+        trimName: year.trim_name?.trim() || null,
+        variantName: year.variant_name?.trim() || null,
+        fitments: [],
+      };
+      compatibleBikes.set(year.bike_model_year_id, item);
+      fitmentKeys.set(year.bike_model_year_id, new Set());
+    }
+
+    const fitmentKey = `${mapping.position_type}|${product.tire_size_full}|${product.tire_product_id}`;
+    const keys = fitmentKeys.get(year.bike_model_year_id);
+    if (keys?.has(fitmentKey)) continue;
+    keys?.add(fitmentKey);
+    item.fitments.push({
+      position: mapping.position_type,
+      tireSize: product.tire_size_full,
+      tireProductId: product.tire_product_id,
+      tireProductKey: product.tire_product_key,
+    });
+  }
+
+  return [...compatibleBikes.values()]
+    .map((item) => ({
+      ...item,
+      fitments: item.fitments.sort((left, right) =>
+        left.position.localeCompare(right.position),
+      ),
+    }))
+    .sort(
+      (left, right) =>
+        left.brandName.localeCompare(right.brandName, ["ko", "en"]) ||
+        left.bikeModelName.localeCompare(right.bikeModelName, ["ko", "en"]) ||
+        left.bikeModelYearId - right.bikeModelYearId,
+    );
 }

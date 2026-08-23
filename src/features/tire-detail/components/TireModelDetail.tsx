@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { TireModelHero } from "@/features/tire-detail/components/TireModelHero";
 import { TireModelImageSection } from "@/features/tire-detail/components/TireModelImageSection";
+import { TireModelFitmentList } from "@/features/tire-detail/components/TireModelFitmentList";
 import { TireModelSkuList } from "@/features/tire-detail/components/TireModelSkuList";
 import { TireSizeGuide } from "@/features/tire-detail/components/TireSizeGuide";
 import type { TireModelDetailData } from "@/features/tire-detail/types/tire-detail.types";
@@ -97,6 +98,8 @@ export function TireModelDetail({ model }: { model: TireModelDetailData }) {
             />
           </section>
         ) : null}
+
+        <TireModelFitmentList tireModelKey={model.tireModelKey} />
 
         <section className="rounded-2xl bg-surface-secondary p-5 text-center sm:p-8" aria-labelledby="maxxis-models-title">
           <h2 className="text-xl font-bold text-foreground" id="maxxis-models-title">다른 MAXXIS 타이어도 살펴보세요</h2>

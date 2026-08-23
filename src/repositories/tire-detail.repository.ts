@@ -95,6 +95,21 @@ export type TireFitmentBrandRow = {
   brand_ko: string | null;
 };
 
+export type TireModelFitmentModelYearRow = {
+  bike_model_year_id: number;
+  bike_model_id: number;
+  year_range_label: string;
+  start_year: number;
+  end_year: number | null;
+  generation_name: string | null;
+  trim_name: string | null;
+  variant_name: string | null;
+};
+
+export type TireModelFitmentModelRow = TireFitmentModelRow & {
+  model_key: string;
+};
+
 export async function findActiveTireProductById(
   tireProductId: number,
 ): Promise<TireProductDetailRow | null> {
@@ -245,4 +260,36 @@ export async function findActiveFitmentBrands(
 
   if (error) throw new Error(error.message);
   return (data ?? []) as TireFitmentBrandRow[];
+}
+
+export async function findActiveTireModelFitmentYears(
+  bikeModelYearIds: number[],
+): Promise<TireModelFitmentModelYearRow[]> {
+  if (bikeModelYearIds.length === 0) return [];
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("03_bike_model_year")
+    .select(
+      "bike_model_year_id, bike_model_id, year_range_label, start_year, end_year, generation_name, trim_name, variant_name",
+    )
+    .in("bike_model_year_id", bikeModelYearIds)
+    .eq("is_active", true);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as TireModelFitmentModelYearRow[];
+}
+
+export async function findActiveTireModelFitmentModels(
+  bikeModelIds: number[],
+): Promise<TireModelFitmentModelRow[]> {
+  if (bikeModelIds.length === 0) return [];
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("02_bike_model")
+    .select("bike_model_id, brand_id, model_key, model_name_en, model_name_ko")
+    .in("bike_model_id", bikeModelIds)
+    .eq("is_active", true);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as TireModelFitmentModelRow[];
 }

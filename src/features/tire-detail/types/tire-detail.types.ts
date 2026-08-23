@@ -88,6 +88,25 @@ export type TireProductFitment = {
   position: "FRONT" | "REAR";
 };
 
+export type TireModelCompatibleFitment = {
+  position: "FRONT" | "REAR";
+  tireSize: string;
+  tireProductId: number;
+  tireProductKey: string;
+};
+
+export type TireModelCompatibleBike = {
+  bikeModelYearId: number;
+  brandName: string;
+  bikeModelKey: string;
+  bikeModelName: string;
+  yearRangeLabel: string;
+  generationName: string | null;
+  trimName: string | null;
+  variantName: string | null;
+  fitments: TireModelCompatibleFitment[];
+};
+
 export type ApiSuccessResponse<T> = {
   success: true;
   data: T;
