@@ -130,6 +130,10 @@ Tire Model Detail의 모바일 disclosure 순서는 Hero → 주요 특징 → �
 → SKU 선택 → 주행 환경 visual → 브랜드 모델 목록 CTA다. Model Detail에는 SKU 관계로
 확인되지 않은 호환 바이크 정보를 만들지 않는다.
 
+SKU 선택은 모바일 horizontal swipe card와 명확한 selected state를 사용한다. 선택한
+SKU의 저장 제원을 바로 아래에 표시하고 호환 바이크는 해당 SKU mapping만 보여준다.
+호환 row에서는 이미 선택 영역에 표시한 position과 tire size를 반복하지 않는다.
+
 모바일 Tire Detail은 16px page gutter, Hero 이미지와 정보 사이 약 20px, 주요
 Section 사이 28~32px, 제목과 콘텐츠 사이 14~16px을 기준으로 한다. 규격 가이드는
 compact Utility accordion, Fitment는 제조사 horizontal navigation과 divider 기반

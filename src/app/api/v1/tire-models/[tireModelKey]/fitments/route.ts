@@ -9,20 +9,29 @@ import {
 const paramsSchema = z.object({
   tireModelKey: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/),
 });
+const querySchema = z.object({
+  tireProductId: z.coerce.number().int().positive().optional(),
+});
 
 type RouteContext = {
   params: Promise<{ tireModelKey: string }>;
 };
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const parsed = paramsSchema.safeParse(await context.params);
-  if (!parsed.success) {
+  const query = querySchema.safeParse(
+    Object.fromEntries(new URL(request.url).searchParams),
+  );
+  if (!parsed.success || !query.success) {
     return errorResponse("VALIDATION_ERROR", "올바른 타이어 모델 키가 필요합니다.", 422);
   }
 
   try {
     return successResponse(
-      await getTireModelCompatibleBikes(parsed.data.tireModelKey),
+      await getTireModelCompatibleBikes(
+        parsed.data.tireModelKey,
+        query.data.tireProductId,
+      ),
     );
   } catch (error) {
     if (error instanceof TireModelNotFoundError) {

@@ -43,7 +43,9 @@ It does not perform size-based matching or return inferred fitment.
 explicit SKU mappings for an active Tire Model. It groups rows by
 `bike_model_year_id` and preserves distinct mapping position, stored
 `tire_size_full`, and Tire Product identity within each Bike Model-Year. It
-does not infer compatibility from size or model identity.
+does not infer compatibility from size or model identity. The optional positive
+`tireProductId` query parameter limits the response to an active SKU belonging
+to that Tire Model; omitting it preserves the model-wide response.
 
 ## MVP Scope
 

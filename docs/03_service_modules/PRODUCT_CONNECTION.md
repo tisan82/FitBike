@@ -44,8 +44,13 @@ aggregate those same explicit mappings across its active SKUs; it groups by
 `bike_model_year_id` while preserving distinct mapping position, stored tire
 size, and Tire Product identity. Neither route may infer Fitment from size or
 model identity. When many mappings exist, show only an initial subset and
-disclose the full deduplicated set on demand. If no mapping exists, omit the
-section rather than claiming the tire is incompatible.
+disclose the full deduplicated set on demand.
+
+Tire Model Detail selects one active SKU at a time, shows its stored
+specification, and filters compatible bikes by that `tire_product_id`.
+Changing the SKU resets search, brand filter, and expansion state. A SKU with
+zero mappings remains selectable and shows a concise registered-fitment empty
+message; it is not removed from the model.
 
 ### Tire Specification Guide
 

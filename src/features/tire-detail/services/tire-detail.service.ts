@@ -25,9 +25,13 @@ export async function getTireProductDetail(
 
 export async function getTireModelCompatibleBikes(
   tireModelKey: string,
+  tireProductId?: number,
 ): Promise<TireModelCompatibleBike[]> {
+  const query = tireProductId === undefined
+    ? ""
+    : `?tireProductId=${encodeURIComponent(tireProductId)}`;
   const response = await fetch(
-    `/api/v1/tire-models/${encodeURIComponent(tireModelKey)}/fitments`,
+    `/api/v1/tire-models/${encodeURIComponent(tireModelKey)}/fitments${query}`,
     { headers: { Accept: "application/json" } },
   );
   const body = (await response.json()) as ApiResponse<TireModelCompatibleBike[]>;

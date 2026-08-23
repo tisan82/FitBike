@@ -230,12 +230,18 @@ function createYearRangeLabel(
 
 export async function getTireModelCompatibleBikes(
   tireModelKey: string,
+  tireProductId?: number,
 ): Promise<TireModelCompatibleBike[]> {
   const model = await findActiveTireModelByKey(tireModelKey);
   if (!model) throw new TireModelNotFoundError();
 
   const products = await findActiveTireProductsByModelId(model.tire_model_id);
-  const productMap = new Map(products.map((product) => [product.tire_product_id, product]));
+  const selectedProducts = tireProductId === undefined
+    ? products
+    : products.filter((product) => product.tire_product_id === tireProductId);
+  const productMap = new Map(
+    selectedProducts.map((product) => [product.tire_product_id, product]),
+  );
   const mappings = await findActiveTireFitmentMappings([...productMap.keys()]);
   const years = await findActiveTireModelFitmentYears(
     [...new Set(mappings.map((mapping) => mapping.bike_model_year_id))],

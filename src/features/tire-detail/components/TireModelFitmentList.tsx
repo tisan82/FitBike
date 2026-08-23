@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getTireModelCompatibleBikes } from "@/features/tire-detail/services/tire-detail.service";
 import type { TireModelCompatibleBike } from "@/features/tire-detail/types/tire-detail.types";
-import { getTirePositionLabel } from "@/features/tire-detail/utils/tire-position";
 
 const INITIAL_ROWS = 8;
 
@@ -15,7 +14,13 @@ function getSupplementaryLabel(bike: TireModelCompatibleBike) {
     .join(" · ");
 }
 
-export function TireModelFitmentList({ tireModelKey }: { tireModelKey: string }) {
+export function TireModelFitmentList({
+  tireModelKey,
+  tireProductId,
+}: {
+  tireModelKey: string;
+  tireProductId: number;
+}) {
   const [bikes, setBikes] = useState<TireModelCompatibleBike[] | null>(null);
   const [selectedBrand, setSelectedBrand] = useState("전체");
   const [search, setSearch] = useState("");
@@ -23,7 +28,7 @@ export function TireModelFitmentList({ tireModelKey }: { tireModelKey: string })
 
   useEffect(() => {
     let active = true;
-    getTireModelCompatibleBikes(tireModelKey)
+    getTireModelCompatibleBikes(tireModelKey, tireProductId)
       .then((data) => {
         if (active) setBikes(data);
       })
@@ -33,7 +38,7 @@ export function TireModelFitmentList({ tireModelKey }: { tireModelKey: string })
     return () => {
       active = false;
     };
-  }, [tireModelKey]);
+  }, [tireModelKey, tireProductId]);
 
   const brands = useMemo(
     () => [
@@ -54,17 +59,26 @@ export function TireModelFitmentList({ tireModelKey }: { tireModelKey: string })
     );
   }, [bikes, search, selectedBrand]);
 
-  if (!bikes?.length) return null;
   const visibleBikes = expanded ? filteredBikes : filteredBikes.slice(0, INITIAL_ROWS);
 
   return (
-    <section aria-labelledby="compatible-bikes-title" data-compatible-bikes-count={bikes.length}>
+    <section aria-labelledby="compatible-bikes-title" data-compatible-bikes-count={bikes?.length ?? 0}>
       <h2 className="text-xl font-bold text-foreground" id="compatible-bikes-title">호환 바이크</h2>
       <p className="mt-2 text-base text-foreground-secondary">
-        이 타이어를 장착할 수 있는 바이크와 규격을 확인하세요.
+        선택한 규격을 장착할 수 있는 바이크를 확인하세요.
       </p>
 
-      <label className="mt-5 block" htmlFor="compatible-bike-search">
+      {bikes === null ? (
+        <p className="mt-4 text-sm text-foreground-secondary">호환 바이크를 불러오는 중입니다.</p>
+      ) : null}
+
+      {bikes?.length === 0 ? (
+        <p className="mt-4 rounded-xl bg-surface-secondary p-4 text-base text-foreground-secondary">
+          현재 등록된 호환 바이크 정보가 없습니다.
+        </p>
+      ) : null}
+
+      {bikes?.length ? <><label className="mt-5 block" htmlFor="compatible-bike-search">
         <span className="sr-only">바이크 모델 검색</span>
         <input
           className="min-h-11 w-full rounded-xl border border-border bg-surface px-4 text-base text-foreground outline-none placeholder:text-foreground-secondary focus:border-primary"
@@ -123,14 +137,6 @@ export function TireModelFitmentList({ tireModelKey }: { tireModelKey: string })
                   <p className="mt-1 text-sm text-foreground-secondary">
                     {bike.yearRangeLabel}{supplementary ? ` · ${supplementary}` : ""}
                   </p>
-                  <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {bike.fitments.map((fitment) => (
-                      <div className="min-w-0 rounded-xl bg-surface-secondary px-3 py-2.5" key={`${fitment.position}-${fitment.tireSize}-${fitment.tireProductId}`}>
-                        <dt className="text-sm font-bold text-primary">{getTirePositionLabel(fitment.position)}</dt>
-                        <dd className="mt-1 break-words text-base font-semibold text-foreground">{fitment.tireSize}</dd>
-                      </div>
-                    ))}
-                  </dl>
                 </li>
               );
             })}
@@ -146,7 +152,7 @@ export function TireModelFitmentList({ tireModelKey }: { tireModelKey: string })
             </button>
           ) : null}
         </>
-      )}
+      )}</> : null}
     </section>
   );
 }
