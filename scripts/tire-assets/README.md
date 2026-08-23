@@ -1,7 +1,27 @@
 # Tire model image pipeline
 
+## Purpose
+
 MAXXIS 원본 이미지와 실제 `11_tire_model` 행을 대조하고, 승인 후 WebP 변환 및
-Supabase 반영으로 이어가기 위한 관리 파일이다.
+Supabase 반영으로 이어가기 위한 운영 진입점이다. 신규 모델은 Source Gate부터
+시작하며, 승인된 Production asset은 `FROZEN`으로 관리한다.
+
+## Folder structure
+
+```text
+assets-source/tire-models/{brand}/
+├─ original/  # 권리가 확인된 원본 보존
+├─ review/    # Main/Sub01/Sub02 candidate와 사용자 검토본
+└─ upload/    # 승인 후 Production filename으로 확정한 WebP
+
+scripts/tire-assets/
+├─ README.md
+├─ dry-run.mjs
+├─ execute-upload.mjs
+├─ tire-image-map.csv
+├─ tire-image-source-registry.csv
+└─ tire-image-upload-result.csv
+```
 
 ## Storage buckets
 
@@ -16,8 +36,8 @@ tire-models/{brand}/{tire_model_key}/sub-01.webp
 tire-models/{brand}/{tire_model_key}/sub-02.webp
 ```
 
-기존 MAXXIS 일괄 실행에서는 `main.webp`만 반영했다. MA-RS는 2026-08-23 별도
-승인 작업에서 `main.webp`, `sub-01.webp`, `sub-02.webp` 3개를 모두 반영했다.
+2026-08-23 기준 MAXXIS active 22개 모델은 세 slot의 Storage/DB/Production 반영을
+완료했다. 기존 asset은 재실행 대상이 아니며 신규 모델만 아래 운영 flow를 따른다.
 
 ## Source and rights registry
 
@@ -37,7 +57,7 @@ tire-models/{brand}/{tire_model_key}/sub-02.webp
   asset임을 확인했거나 출처·사용 범위를 기록하고 사용자가 명시적으로 승인한
   경우에만 승인할 수 있다.
 
-## MA-RS Reference Model
+## Rollout status
 
 2026-08-23 Production QA 결과:
 
@@ -45,7 +65,11 @@ tire-models/{brand}/{tire_model_key}/sub-02.webp
 MA-RS Reference Model: APPROVED
 Production: PASS
 3-image Standard: CONFIRMED
-22-model rollout: READY (execution not started)
+MAXXIS Active Tire Models: 22
+Main: 22 / 22
+Sub01: 22 / 22
+Sub02: 22 / 22
+Rollout: COMPLETE
 ```
 
 전용 검증·반영 스크립트는 `ma-rs-production.mjs`이며 기본 실행은 read-only
@@ -90,7 +114,10 @@ node scripts/tire-assets/execute-upload.mjs --create-bucket --reuse-webp
 Supabase 환경변수와 런타임 credential을 사용하며 credential은 코드, 로그, CSV에
 기록하지 않는다. 실행 결과는 `tire-image-upload-result.csv`에 기록한다.
 
-## 변환 및 반영 정책
+## Legacy main upload script policy
+
+다음 정책은 기존 `execute-upload.mjs`의 main-only 일괄 실행 범위다. 신규 3-image
+운영 절차는 아래 Operating flow와 `TIRE_MODEL_IMAGE_STANDARD.md`를 따른다.
 
 - 원본은 수정하지 않는다.
 - `sharp`의 WebP 변환을 사용하되 crop, 형태 보정, 배경 생성 및 upscale을 하지
@@ -110,5 +137,104 @@ Supabase 환경변수와 런타임 credential을 사용하며 credential은 코�
 재실행할 때 기존 Storage object 또는 기존 `main_image_url`이 있으면 덮어쓰지 않고
 각각 `SKIPPED_EXISTING_OBJECT`, `SKIPPED_EXISTING_URL`로 기록한다.
 
-제외 대상은 `M073_tube.png`(`SKIPPED_NOT_TIRE_MODEL`)이며, 원본이 없는 MA-MT와
-별도 제작 예정인 MA-RS는 이 파이프라인에서 변경하지 않는다.
+해당 legacy 실행 당시 제외 대상은 `M073_tube.png`(`SKIPPED_NOT_TIRE_MODEL`)였고,
+MA-MT와 MA-RS는 main-only script 범위 밖에서 별도 승인 절차로 완료했다.
+
+## Operating flow
+
+```text
+SOURCE
+→ QUALITY GATE
+→ MAIN / SUB01 CANDIDATE
+→ USAGE CATEGORY / SUB02 CANDIDATE
+→ USER VISUAL REVIEW
+→ TARGETED REVISION
+→ APPROVED FINAL WEBP
+→ STORAGE / DB
+→ SAMPLE PRODUCTION QA
+→ FROZEN
+```
+
+Source Gate가 실패하면 같은 실행에서 탐색 범위를 확대하지 않는다. 별도 Official
+Source Acquisition task로 전환하고, 원본을 `original/`에 보존한 뒤 Gate를 다시
+실행한다.
+
+## Source priority
+
+1. `assets-source/tire-models/{brand}/original/`의 사용자 관리 original
+2. 제조사 공식 source
+3. 공식 distributor source
+4. 사용 범위가 승인된 공식 asset
+
+일반 쇼핑몰, 블로그, 커뮤니티 이미지는 Production product source로 사용하지 않는다.
+
+## Rights Gate
+
+- Production 가능: `OFFICIAL_APPROVED`, `USER_OWNED`, `RIGHTS_CLEARED`
+- Production 불가: `REFERENCE_ONLY`, `USAGE_UNCLEAR`, `RIGHTS_UNKNOWN`,
+  `DO_NOT_USE`
+
+Source owner, page/asset URL, 승인 범위와 local file을 Registry에 기록한다. 기존
+Production asset은 이 Gate를 반복하지 않고 `FROZEN` 상태를 유지한다.
+
+## Main rule
+
+- Actual Product, 1200×1200, WebP, sRGB, contain, white/light-neutral background
+- 제품 전체 외곽과 tread, sidewall, profile을 보존한다.
+- baked-in text, logo overlay, AI product reconstruction, generative upscale와 없는
+  detail 생성은 금지한다.
+
+## Sub01 rule
+
+- Product / Feature visual, 1200×900, 실제 승인 product source 재사용
+- Headline 1개, Supporting 1~2줄, Feature Chip 최대 3개
+- DB·공식 source에 존재하는 제품 용도, 구성, 규격과 속성만 사용하고 같은 정보를
+  반복하거나 성능 claim을 추론하지 않는다.
+
+## Sub02 rule
+
+- Riding / Usage visual, 1200×900, 이미지 내부 text 없음
+- `TRACK`, `SPORT_ROAD`, `TOURING`, `ADVENTURE`, `OFF_ROAD`, `SCOOTER`,
+  `URBAN`, `UNKNOWN` 중 검증된 category를 사용한다.
+- 불확실하면 `UNKNOWN`이며 추측하지 않는다. product close-up보다 usage context를
+  우선한다.
+
+## Candidate, review, and final flow
+
+Candidate는 바로 Production에 반영하지 않는다. `CANDIDATE → USER VISUAL REVIEW →
+APPROVED → FINAL WEBP` 순서를 유지하고, 수정 대상만 Targeted Revision한다. 승인된
+asset은 재생성·재인코딩·재분석하지 않는다.
+
+## Storage and DB rule
+
+- Bucket: `tire-assets`
+- Object: `tire-models/{brand}/{tire_model_key}/{main|sub-01|sub-02}.webp`
+- DB: `11_tire_model.main_image_url`, `sub_image_url_1`, `sub_image_url_2`
+- DB에는 public URL이 아니라 object path만 저장한다.
+- 기존 object나 DB 값은 자동 overwrite하지 않는다. Storage 검증을 통과한 모델만
+  guarded DB update하고 read-back으로 확인한다.
+
+## Batch workflow
+
+```text
+Inventory
+→ Ready 모델만 Batch Candidate 생성
+→ Contact Sheet / User Batch Review
+→ 문제 모델만 Targeted Revision
+→ 승인 Asset만 Batch Production
+→ 전체 Storage/DB 자동 검증
+→ 대표 Sample Production QA
+```
+
+## Failure and stop rule
+
+예상 밖의 source, rights, file, Storage 또는 DB 충돌은 해당 모델을 `BLOCKED`/`HOLD`로
+보고하고 멈춘다. 승인이나 권한 없이 overwrite, 삭제 또는 범위 확장을 하지 않는다.
+
+## Codex fast execution rule
+
+- 이미 PASS한 QA와 FROZEN asset을 다시 검사하지 않는다.
+- Source, Candidate, Review, Revision, Storage/DB, Sample QA, Commit/Closeout을 별도
+  task로 실행하고 각 task 완료 후 종료한다.
+- 이미지 task에서 Production/Git을, Production task에서 Source 조사를 실행하지 않는다.
+- 요청하지 않은 문서 검토, lint, build, test 또는 인접 작업을 추가하지 않는다.

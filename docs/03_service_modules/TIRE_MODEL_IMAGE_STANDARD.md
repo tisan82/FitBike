@@ -1,7 +1,7 @@
 # Service Module --- Tire Model Image Standard
 
-**Version:** v1.0
-**Status:** MA-RS Reference Model approved
+**Version:** v1.1
+**Status:** Production operating standard
 
 ## Purpose
 
@@ -404,48 +404,20 @@ headline: "서킷 주행을 위한 선택". Supporting text: "트랙 사용 맥�
 
 ## Active 22-model image status
 
-DB field 기준 상태다. Storage에 DB와 연결되지 않은 object가 있는지 여부는 별도
-검증 대상이며, MA-RS prefix에는 현재 object가 없다.
-
-| tire_model_key | model_name | main | sub01 | sub02 | required |
-|---|---|---|---|---|---:|
-| MAXXIS_M186 | M186 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_M6017 | M6017 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_M6024 | M6024 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_M6029 | M6029 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_M6135 | M6135 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_M6233 | M6233 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_M6234 | M6234 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_M6240 | M6240 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_MA_ADV | MA-ADV | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_MA_AT | MA-AT | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_MA_CT1 | MA-CT1 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_MA_HS | MA-HS | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_MA_MT | MA-MT | MISSING | MISSING | MISSING | 3 |
-| MAXXIS_MA_PRO | MA-PRO | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_MA_R1 | MA-R1 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_MA_RACE | MA-RACE | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_MA_RS | MA-RS | MISSING | MISSING | MISSING | 3 |
-| MAXXIS_MA_SC | MA-SC | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_MA_SP | MA-SP | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_MA_ST2 | MA-ST2 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_MA_ST3 | MA-ST3 | EXISTS | MISSING | MISSING | 2 |
-| MAXXIS_S98 | S98 | EXISTS | MISSING | MISSING | 2 |
-
-Workload:
-
 ```text
 Active models: 22
-Existing main: 20
-Missing main: 2
-Existing sub01: 0
-Missing sub01: 22
-Existing sub02: 0
-Missing sub02: 22
-Total new images required: 46
+Main: 22 / 22
+Sub01: 22 / 22
+Sub02: 22 / 22
+Missing: 0
+Rollout: COMPLETE
 ```
 
-## 22-model expansion rule
+2026-08-23 Production closeout에서 Storage object, DB path와 대표 sample QA를
+검증했다. 완료된 22개 asset set은 `FROZEN`이며 신규 task가 명시하지 않는 한
+재분석, 재생성, 재인코딩 또는 재업로드하지 않는다.
+
+## New model operating rule
 
 - 공통: canvas, safe area, typography, filename, Storage path, DB mapping, QA.
 - 모델별: verified product source, feature headline/support, SKU configuration, usage
@@ -455,28 +427,10 @@ Total new images required: 46
   확인한 뒤 production spec을 승인받는다.
 - `category_type`/`riding_type` NULL을 장면 생성으로 보완하지 않는다.
 
-## 22-model source strategy
-
-Registry 결과에 따라 다음 그룹으로 운영한다.
-
-- Group A: 권리 근거가 기록된 기존 Main source. Main 재편집과 Sub 01 재사용 후보로
-  진행할 수 있으나 asset별 시각 검수는 유지한다.
-- Group B: Production Main과 local source는 있으나 권리 근거가 없다. 현재 20개
-  MAXXIS Main이 여기에 해당하며 운영 중인 Main을 자동 삭제하지는 않지만 신규
-  파생 제작과 Sub 01 재사용은 차단한다.
-- Group C: 제품 source 자체가 없거나 공식 reference만 있고 권리가 불명확하다.
-  MA-MT와 MA-RS Main이 해당하며 사용자 보유 source, 공급사 승인 asset 또는 별도
-  촬영 source를 확보해야 한다.
-- Group D: 제품을 식별 가능하게 표현하지 않는 Usage Visual. 검증된 usage spec을
-  바탕으로 생성 후보를 만들 수 있지만 asset 권리 검토와 Human Visual Review 및
-  Production Approval은 별도로 통과한다.
-
-MA-RS Main source 확보 우선순위는 (1) 사용 권한이 확인된 사용자 보유 이미지,
-(2) MAXXIS 공급사·유통사의 명시적 승인 asset, (3) 제조사 media asset의 사용 조건
-확인, (4) 별도 제품 촬영이다. 1번은 가장 빠르고 비용이 낮지만 모델별 보유 여부에
-좌우되고, 2·3번은 22-model 확장성이 높지만 승인 범위와 응답 시간이 변수다. 4번은
-권리 통제가 가장 명확하지만 촬영·제품 확보 비용이 가장 크다. 공식 이미지를
-reference로만 사용한 생성형 제품 대체는 선택지가 아니다.
+표준 실행 순서는 `Source Inventory/Quality Gate → Candidate Generation → User Review
+→ Targeted Revision → Storage/DB → Sample Production QA → Commit/Closeout`이다. 각
+단계를 별도 task로 실행하고 완료 후 종료한다. Batch는 Ready 모델만 생성한 뒤
+Contact Sheet로 검토하며, 전체를 반복 생성하지 않고 문제 모델만 수정한다.
 
 ## Automation boundary
 
@@ -539,24 +493,22 @@ reference로만 사용한 생성형 제품 대체는 선택지가 아니다.
 - [x] Next Image가 올바른 `tire-assets` URL을 사용한다.
 - [x] 원본과 optimized URL에 404/403이 없다.
 
-## MA-RS approval gates and next step
+## Reference model and rollout closeout
 
-1. 현재 콘텐츠의 제조사 근거 확인 및 수정안 승인
-2. 실제 MA-RS product source 확보와 권리 확인
-3. MA-RS production specification 승인
-4. Main 제작 및 실제 제품 대조
-5. Sub 01 제작 및 feature/SKU 검수
-6. Sub 02 제작 및 usage/safety 검수
-7. 모바일/desktop visual QA
-8. WebP와 dimensions 검증
-9. 별도 승인 후 Storage upload
-10. 별도 승인 후 DB path update 및 Production QA
-11. MA-RS 결과 승인 후 22-model rollout
+MA-RS는 2026-08-23 모든 gate를 통과해 `REFERENCE_MODEL_APPROVED`로 확정됐고,
+MAXXIS active 22-model rollout도 같은 날 완료했다. Production 반영 단계에서는 전체
+Storage object와 DB row를 자동 검증하고 Browser Visual QA는 대표 sample만 수행한다.
+모든 모델을 매 task마다 브라우저로 전수 검증하지 않는다.
 
-MA-RS는 2026-08-23 모든 gate를 통과해 `REFERENCE_MODEL_APPROVED`로 확정됐다.
-Main/Sub 01/Sub 02의 Storage object와 DB path, 공개 URL, Next Image Optimizer,
-390×844 모바일 및 1440px desktop 표시를 검증했다. 22-model rollout 기준은
-`READY`이나 다른 21개 모델 실행은 별도 승인 작업에서 시작한다.
+신규 모델은 다음 gate를 순서대로 통과한다.
+
+1. Local original inventory와 Source Quality/Rights Gate
+2. Main/Sub 01 candidate와 모델별 DB/SKU content 검수
+3. 검증된 Usage Category 기반 Sub 02 candidate
+4. User Visual Review와 문제 asset만 Targeted Revision
+5. 승인된 Final WebP의 Storage upload 및 guarded DB update
+6. 자동 Storage/DB verification과 대표 Sample Production QA
+7. 완료 asset `FROZEN` 및 task closeout
 
 Rights-cleared source 확보 후 Main/Sub 01 후보 제작 capability는 `AVAILABLE`이다.
 비생성형 배경 정리, contain canvas 구성, 노출·색상 보정, WebP 변환, FitBike 자체
