@@ -1,4 +1,4 @@
-# FitBike Content Factory v1.1
+# FitBike Content Factory v1.2
 
 ## Purpose
 
@@ -20,21 +20,23 @@ node scripts/content-factory/generate-content.mjs --topic "PCX125 타이어 관�
 
 ## Pipeline
 
-The generator follows `PLAN → EVIDENCE → DRAFT → RELATIONS → IMAGE PLAN → QA → PACKAGE`. It writes `plan.json`, `evidence.json`, `body-blocks.json`, `relations.json`, `image-plan.json`, `qa.json`, and `content-package.json` under `content-work/{contentKey}/`.
+The generator follows `REQUEST → NORMALIZE INTENT → CHECK EXISTING CONTENT → PLAN → EVIDENCE → SELECT TYPE STRATEGY → GENERATE BODY → QUALITY QA → IMAGE PLAN → PACKAGE`. It writes `plan.json`, `evidence.json`, `body-blocks.json`, `relations.json`, `image-plan.json`, `qa.json`, and `content-package.json` under `content-work/{contentKey}/`.
 
 ## Evidence Rules
 
-The production database is read only. Duplicate keys and exact published titles stop generation. A targeted bike key must resolve to one active `02_bike_model`; active `03_bike_model_year` rows are recorded as facts. Missing evidence produces `BLOCKED_EVIDENCE`. Generic copy without model, fitment, specification, product, position, or performance claims may use `NOT_REQUIRED`.
+The production database is read only. Existing active content is indexed by key, title, summary, type, part relation, and bike relation before body generation. A targeted bike key must resolve to one active `02_bike_model`; active `03_bike_model_year` rows are recorded as facts. Missing evidence produces `BLOCKED_EVIDENCE`. Generic copy without model, fitment, specification, product, position, or performance claims may use `NOT_REQUIRED`.
 
 ## Output Files
 
-All seven files are JSON and are intermediate review artifacts. `content-work/` is ignored by Git.
+All seven files are JSON and are intermediate review artifacts. Exact and near duplicates stop before body generation and write only `duplicate-report.json`. `content-work/` is ignored by Git.
 
 ## QA Status
 
 - `READY_FOR_REVIEW`: evidence is complete or not required, schemas and relations are valid, no unsupported claim was found, semantic duplication and incomplete procedures are absent, information priority passes, and information density is `GOOD`.
 - `REVIEW_REQUIRED`: the package is structurally valid but copy or relation judgment remains.
 - `BLOCKED_EVIDENCE`: required internal evidence is missing.
+- `DUPLICATE_CONTENT`: the normalized request intent matches an existing content item.
+- `DUPLICATE_REVIEW_REQUIRED`: the same entity and action substantially overlap an existing item and generation stops for review.
 
 ## Quality Rules
 
@@ -43,6 +45,13 @@ All seven files are JSON and are intermediate review artifacts. `content-work/` 
 - Each major section needs enough explanation to help the reader act; heading-heavy, explanation-light output is `TOO_LIGHT` and cannot be ready for review.
 - Core information and the actual procedure take priority over warnings and optional tips.
 - `NOT_REQUIRED` content cannot introduce exact pressure or temperature values, model-specific specifications, or performance claims without evidence.
+
+## Type Strategies
+
+- `MAINTENANCE`: what to check, preparation, check procedure, evaluation, follow-up, and reference warning. Procedure QA applies to inspection, replacement, and maintenance actions.
+- `DIY`: prerequisites, tools and parts, ordered work, result verification, and safety warning. Procedure QA always applies.
+- `PARTS_GUIDE`: definition, reading or understanding, key elements, comparison example, and application. Explanation blocks take priority over forced steps.
+- `MODEL_GUIDE`: model context, year or generation distinctions, verified part data, data use, and related checks. A bike key and model/year Evidence are required; procedure QA applies only to procedural actions.
 
 ## Review Flow
 
