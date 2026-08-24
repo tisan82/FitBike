@@ -42,8 +42,10 @@ Candidates are written under `content-work/{content-key}/images/`. The pipeline 
 - Model guides reuse existing approved bike assets first. Real model replicas are not generated.
 - Specific products reuse approved product assets first. Only generic educational visuals may be generated.
 
-## Source priority
+## Brand asset first
 
-Use the first asset that is both approved and suitable for the content role: `APPROVED_BRAND_ASSET → APPROVED_GENERIC_ASSET → GENERATED_GENERIC → IMAGE_REVIEW_REQUIRED`. Approved Poweroad assets are preferred for battery content and approved MAXXIS assets for tire content, but brand availability never overrides role suitability. Do not recreate a real product with generation. Image review and publish approval record `sourceType` explicitly.
+Image roles are explicit: `PRODUCT_REPRESENTATION`, `USAGE_ACTION`, or `EDUCATIONAL_DIAGRAM`. Tire product/part representation and thumbnails use an approved MAXXIS asset first; battery equivalents use an approved POWEROAD asset first. Generated product substitutes are prohibited. Usage/action visuals may fall back only when the plan records `brand_asset_not_suitable_reason`. Educational body diagrams may be generated when they explain a concept or location without presenting invented technical structure or performance claims.
+
+Every prepared asset records `sourceType`, `brand`, `sourceAsset`, `role`, `brandAssetChecked`, `brandAssetResult`, and `fallbackReason`. The current approved registry is `brand-asset-registry.json`: MAXXIS assets resolve from the public `tire-assets` bucket under `tire-models/maxxis/`; no approved POWEROAD source is currently registered. A newly approved POWEROAD asset must be registered before it can be used as a battery product representation.
 
 Technical QA checks file existence, format, exact dimensions, nonzero size, sRGB colourspace, and decodability. Visual QA checks text overload, unexpected logos, unsupported technical claims, and role alignment before `READY_FOR_VISUAL_REVIEW`.

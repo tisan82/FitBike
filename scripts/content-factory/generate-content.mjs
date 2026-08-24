@@ -741,9 +741,9 @@ async function main() {
     relationRequirements: [targetPart ? `${targetPart}:CATEGORY` : null, targetBikeModelKey ? `BIKE_MODEL:${targetBikeModelKey}` : null].filter(Boolean)
   };
   const imageDefaults = typeRules[contentType].images;
-  const bodyImages = imageDefaults.bodyVisualPreferred ? [{ type: "diagram", description: `${partLabel(targetPart)}의 주요 표기 또는 확인 위치를 텍스트보다 빠르게 이해할 수 있는 단순 도식. 수치나 긴 문장 없음.` }] : [];
+  const bodyImages = imageDefaults.bodyVisualPreferred ? [{ type: "diagram", imageRole: "EDUCATIONAL_DIAGRAM", description: `${partLabel(targetPart)}의 주요 표기 또는 확인 위치를 텍스트보다 빠르게 이해할 수 있는 단순 도식. 수치나 긴 문장 없음.` }] : [];
   const imagePlan = {
-    thumbnail: { required: imageDefaults.thumbnail, type: "editorial context image", description: `${topic} 주제를 한눈에 식별할 수 있는 단순한 장면. 긴 설명문이나 수치 텍스트를 넣지 않는다.` },
+    thumbnail: { required: imageDefaults.thumbnail, type: "editorial context image", imageRole: contentType === "PARTS_GUIDE" ? "PRODUCT_REPRESENTATION" : "USAGE_ACTION", description: `${topic} 주제를 한눈에 식별할 수 있는 단순한 장면. 긴 설명문이나 수치 텍스트를 넣지 않는다.` },
     hero: { required: imageDefaults.hero, type: "context image", description: imageDefaults.hero ? `${topic}의 실제 맥락을 보여주는 이미지` : "필수 아님" },
     bodyImages
   };

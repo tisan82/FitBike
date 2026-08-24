@@ -82,7 +82,7 @@ node scripts/content-factory/publish-content.mjs --content-dir content-work/{con
 
 The publish command requires `publish-approval.json`, rechecks Production duplicates and Storage conflicts, verifies every required approved thumbnail, hero, and body image, uploads without overwrite, then inserts content and relations in one database transaction. Approved body images are mapped to `contents/{contentKey}/body-NN.webp` and inserted as existing-schema image blocks near the most relevant section (or at the explicit image-plan placement). Re-running an equivalent published package returns `ALREADY_PUBLISHED` instead of inserting duplicates.
 
-Image source priority is `APPROVED_BRAND_ASSET → APPROVED_GENERIC_ASSET → GENERATED_GENERIC → IMAGE_REVIEW_REQUIRED`. Approved, role-suitable Poweroad assets are preferred for battery content and MAXXIS assets for tire content. Brand availability never overrides content suitability, and real products are not recreated with generation.
+Content images use a brand-asset-first policy. Tire thumbnails and product representation default to approved MAXXIS assets; battery equivalents default to approved POWEROAD assets. Product/part representation cannot use a generated generic substitute. A usage/action visual may fall back only with a recorded brand-unsuitability reason, while an educational body diagram may be generated when it avoids invented structure, specifications, and performance claims. Prepared image metadata records the selected source, brand check, result, and fallback reason.
 
 ## Automation policy v1
 

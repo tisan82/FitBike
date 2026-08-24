@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "brands": {
+    "TIRE": {
+      "brand": "MAXXIS",
+      "assetSource": "Supabase Storage",
+      "storageBucket": "tire-assets",
+      "pathPattern": "tire-models/maxxis/{tire_model_key}/{asset}.webp",
+      "approvedUsage": ["PRODUCT_REPRESENTATION", "THUMBNAIL", "USAGE_ACTION_REFERENCE"],
+      "availableAssetCount": 66
+    },
+    "BATTERY": {
+      "brand": "POWEROAD",
+      "assetSource": null,
+      "storageBucket": null,
+      "pathPattern": null,
+      "approvedUsage": [],
+      "availableAssetCount": 0
+    }
+  }
+}

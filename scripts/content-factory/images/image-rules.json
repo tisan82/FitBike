@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "assets": {
     "thumbnail": {
       "width": 1200,
@@ -34,11 +34,11 @@
   "generation": {
     "sourcePriority": [
       "APPROVED_BRAND_ASSET",
-      "APPROVED_GENERIC_ASSET",
+      "GENERATED_EDUCATIONAL",
       "GENERATED_GENERIC",
       "IMAGE_REVIEW_REQUIRED"
     ],
-    "sourceTypes": ["APPROVED_BRAND_ASSET", "APPROVED_GENERIC_ASSET", "GENERATED_GENERIC", "NONE"],
+    "sourceTypes": ["APPROVED_BRAND_ASSET", "GENERATED_EDUCATIONAL", "GENERATED_GENERIC", "NONE"],
     "prohibited": ["brand logo", "watermark", "invented product number", "unsupported technical value", "advertising layout"],
     "modelGuide": {
       "preferExistingBikeAsset": true,
@@ -49,8 +49,8 @@
       "preferApprovedProductAsset": true,
       "generatedProductReplica": false,
       "genericEducationalVisual": true,
-      "preferredApprovedBrandByPart": {
-        "BATTERY": "Poweroad",
+      "requiredApprovedBrandByPart": {
+        "BATTERY": "POWEROAD",
         "TIRE": "MAXXIS"
       }
     }

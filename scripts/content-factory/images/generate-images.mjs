@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
+import { selectImageSource } from "./image-source-policy.mjs";
+
 const imageFactoryDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 function parseArguments(argv) {
@@ -53,17 +55,25 @@ function buildPrompt(asset, contentPackage, rules) {
 }
 
 async function prepareRequests(contentDirectory, imagePlan, contentPackage, rules) {
+  const registry = await readJson(path.join(imageFactoryDirectory, "brand-asset-registry.json"));
+  const partType = contentPackage.relations.parts[0]?.partType ?? null;
   const assets = requestedAssets(imagePlan);
+  const selections = assets.map((asset) => {
+    const brandRegistry = registry.brands[partType];
+    const imageRole = asset.plan.imageRole ?? (asset.role === "body" && asset.plan.type === "diagram" ? "EDUCATIONAL_DIAGRAM" : "PRODUCT_REPRESENTATION");
+    return { role: imageRole, ...selectImageSource({ partType, role: asset.role, imageRole, brandAssetAvailable: (brandRegistry?.availableAssetCount ?? 0) > 0, brandAssetSuitable: asset.plan.brandAssetSuitable !== false, sourceAsset: asset.plan.sourceAsset ?? null, fallbackReason: asset.plan.brand_asset_not_suitable_reason ?? null }) };
+  });
   const request = {
-    status: assets.length > 0 ? "READY_FOR_IMAGE_GENERATION" : "NO_IMAGES_REQUIRED",
+    status: assets.length === 0 ? "NO_IMAGES_REQUIRED" : selections.some((selection) => selection.status === "FAIL") ? "IMAGE_SOURCE_BLOCKED" : selections.every((selection) => selection.sourceType === "APPROVED_BRAND_ASSET") ? "READY_FOR_BRAND_ASSET" : "READY_FOR_IMAGE_GENERATION",
     contentKey: contentPackage.content.contentKey,
-    assets: assets.map((asset) => ({
+    assets: assets.map((asset, index) => ({
       id: asset.id,
       role: asset.role,
       sourceArgument: `${asset.id}-source`,
       outputFile: outputName(asset, rules),
       standard: rules.assets[asset.role],
-      prompt: buildPrompt(asset, contentPackage, rules)
+      sourceSelection: selections[index],
+      prompt: selections[index].sourceType.startsWith("GENERATED") ? buildPrompt(asset, contentPackage, rules) : null
     }))
   };
   await writeFile(path.join(contentDirectory, "image-generation-request.json"), `${JSON.stringify(request, null, 2)}\n`, "utf8");
