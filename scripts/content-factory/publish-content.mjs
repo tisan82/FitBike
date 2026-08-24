@@ -178,6 +178,19 @@ async function verifyPublished(readDb, contentKey, expectedPart) {
   return rows[0];
 }
 
+async function validateRegistryTopic(readDb, topicKey, content, duplicateStatus) {
+  if (!topicKey) throw new Error("PUBLISH_BLOCKED_REGISTRY_TOPIC_MISSING");
+  const rows = await readDb(`select t.content_topic_id,t.topic_key,t.topic,t.content_type,t.part_type,t.normalized_subject,t.normalized_action,t.normalized_scope,t.status,t.content_id,c.content_key from public."16_content_topic" t left join public."12_content" c on c.content_id=t.content_id where t.topic_key=$1`, [topicKey]);
+  if (rows.length !== 1) throw new Error("PUBLISH_BLOCKED_REGISTRY_TOPIC_MISSING");
+  const topic = rows[0];
+  if (duplicateStatus === "ALREADY_PUBLISHED") {
+    if (topic.status !== "PUBLISHED" || topic.content_key !== content.contentKey) throw new Error("PUBLISH_BLOCKED_REGISTRY_STATE");
+  } else if (topic.status !== "APPROVED" || topic.content_id !== null) {
+    throw new Error("PUBLISH_BLOCKED_REGISTRY_STATE");
+  }
+  return topic;
+}
+
 async function main() {
   const args = parseArguments(process.argv.slice(2));
   if (!args["content-dir"] || !["preflight", "publish"].includes(args.mode)) throw new Error("--content-dir and --mode preflight|publish are required");
@@ -202,6 +215,7 @@ async function main() {
   const duplicate = await duplicatePreflight(readDb, packageWithImages.content, relations, normalizedIntent);
   if (duplicate.status === "PUBLISH_BLOCKED_DUPLICATE") throw new Error(`PUBLISH_BLOCKED_DUPLICATE:${duplicate.duplicateWith}`);
   if (duplicate.status === "PARTIAL_STATE") throw new Error("PARTIAL_STATE");
+  const registryTopic = await validateRegistryTopic(readDb, approval.topicKey, packageWithImages.content, duplicate.status);
 
   const thumbnail = approvedAssets.find((asset) => asset.type === "thumbnail");
   if (!thumbnail) throw new Error("PUBLISH_BLOCKED_REQUIRED_IMAGE_MISSING");
@@ -210,7 +224,7 @@ async function main() {
   const localImagePath = path.join(contentDirectory, thumbnail.file);
   const storagePreflight = await inspectStorage(storage, bucketName, objectPath, localImagePath);
   if (storagePreflight.objectStatus === "CONFLICT") throw new Error("PUBLISH_BLOCKED_ASSET_CONFLICT");
-  const preflight = { status: "PASS", approval: "PASS", duplicate: duplicate.status, storage: storagePreflight, contentKey: packageWithImages.content.contentKey, objectPath };
+  const preflight = { status: "PASS", approval: "PASS", duplicate: duplicate.status, registry: { topicKey: registryTopic.topic_key, status: registryTopic.status }, storage: storagePreflight, contentKey: packageWithImages.content.contentKey, objectPath };
   if (args.mode === "preflight") {
     await writeFile(path.join(contentDirectory, "publish-preflight.json"), `${JSON.stringify(preflight, null, 2)}\n`, "utf8");
     console.log(JSON.stringify(preflight, null, 2));
@@ -252,8 +266,13 @@ async function main() {
           insert into public."15_content_part_link" (content_id,part_type,scope_type,display_order,is_active)
           select inserted_content.content_id, relation.part_type, relation.scope_type, relation.display_order, true
           from inserted_content cross join jsonb_to_recordset($10::jsonb) as relation(part_type text,scope_type text,display_order integer)
+        ), published_topic as (
+          update public."16_content_topic"
+          set status='PUBLISHED',content_id=(select content_id from inserted_content)
+          where topic_key=$11 and status='APPROVED' and content_id is null
+          returning content_topic_id
         )
-        select content_id from inserted_content;`;
+        select content_id,(select count(*) from published_topic) as published_topic_count from inserted_content;`;
       const inserted = await queryDatabase(projectRef, accessToken, publishStatement, [
         packageWithImages.content.contentKey,
         packageWithImages.content.title,
@@ -264,9 +283,10 @@ async function main() {
         new Date().toISOString(),
         relations.bikeModels.map((relation) => relation.bikeModelId),
         relations.bikeModelYears.map((relation) => relation.bikeModelYearId),
-        JSON.stringify(relations.parts.map((relation, index) => ({ part_type: relation.partType, scope_type: relation.scopeType, display_order: index })))
+        JSON.stringify(relations.parts.map((relation, index) => ({ part_type: relation.partType, scope_type: relation.scopeType, display_order: index }))),
+        approval.topicKey
       ], false);
-      if (inserted.length !== 1) throw new Error("DB_WRITE_FAILED:no content row returned");
+      if (inserted.length !== 1 || Number(inserted[0].published_topic_count) !== 1) throw new Error("DB_WRITE_FAILED:content or registry topic not returned");
       dbStatus = "INSERTED";
     }
   } catch (error) {

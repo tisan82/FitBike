@@ -8,6 +8,8 @@ Generate one review package for the existing Content System. Version 1 never ins
 
 Required: `--topic` and `--type`. Optional: `--part` and `--bike-model-key`.
 
+Production operation should select a `PLANNED` row from `16_content_topic` instead of starting from unrestricted free text. Direct topic input remains a controlled development interface.
+
 ## CLI Usage
 
 ```bash
@@ -57,6 +59,18 @@ All seven files are JSON and are intermediate review artifacts. Exact and near d
 
 Review evidence against every factual claim, edit copy if needed, approve relations and image concepts, then use a separate explicitly authorized publish task.
 
+## Topic registry
+
+Supabase `16_content_topic` is the production queue and duplicate-prevention registry. It stores normalized intent, priority, lifecycle status, and the resulting `12_content.content_id`. Anonymous public access is disabled.
+
+```bash
+node scripts/content-factory/topic-registry.mjs --operation register-topic --topic-key {key} --topic "{topic}" --content-type MAINTENANCE --part-type BATTERY --dry-run true
+node scripts/content-factory/topic-registry.mjs --operation get-next-topic
+node scripts/content-factory/topic-registry.mjs --operation update-topic-status --topic-key {key} --status GENERATING --dry-run true
+```
+
+Queue order is priority ascending and then creation time ascending. Allowed lifecycle transitions are enforced by the CLI. Publishing requires an `APPROVED` registry topic and atomically changes it to `PUBLISHED` with the new content ID. Failed publishing must not mark a topic published.
+
 ## Publish Deferred
 
 Approved packages use the final operating flow: `SOURCE / TOPIC → GENERATE → QA → IMAGE → REVIEW → APPROVE → PUBLISH`. Publishing is a separate explicit command and never follows `READY_FOR_REVIEW` automatically.
@@ -69,3 +83,12 @@ node scripts/content-factory/publish-content.mjs --content-dir content-work/{con
 The publish command requires `publish-approval.json`, rechecks Production duplicates and Storage conflicts, verifies every required approved image, uploads without overwrite, then inserts content and relations in one database transaction. Re-running an equivalent published package returns `ALREADY_PUBLISHED` instead of inserting duplicates.
 
 Image source priority is `APPROVED_BRAND_ASSET → APPROVED_GENERIC_ASSET → GENERATED_GENERIC → IMAGE_REVIEW_REQUIRED`. Approved, role-suitable Poweroad assets are preferred for battery content and MAXXIS assets for tire content. Brand availability never overrides content suitability, and real products are not recreated with generation.
+
+## System and content ownership
+
+- GitHub stores application and Factory code, rules, block and database schema migrations, and operating documentation.
+- Supabase Database stores Topic Registry rows, generated/review/publish status, published content, and relations.
+- Supabase Storage `content-assets` stores Production content images under `contents/{content_key}/`.
+- Local `content-work/` stores temporary generation, Evidence, QA, image candidate, approval, and publish artifacts and is always Git-ignored.
+
+Factory/schema/rule/UI/API changes require Git commits. Topic registration, content generation, image review, approval, status changes, and publishing never create Git commits. New schema uses migrations in Git; new Topic or Content data is written at runtime and must not be added as seed migrations. Historical content migrations remain unchanged.
