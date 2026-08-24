@@ -7,6 +7,7 @@ import { ModelDetailInvalid } from "@/features/model-detail/components/ModelDeta
 import { ModelDetailLoading } from "@/features/model-detail/components/ModelDetailLoading";
 import { ModelSummary } from "@/features/model-detail/components/ModelSummary";
 import { PartsHub } from "@/features/model-detail/components/PartsHub";
+import { RelatedGuides } from "@/features/model-detail/components/RelatedGuides";
 import { YearNavigation } from "@/features/model-detail/components/YearNavigation";
 import { useModelDetailQuery } from "@/features/model-detail/hooks/useModelDetailQuery";
 import type { ModelDetailData } from "@/features/model-detail/types/model-detail.types";
@@ -38,6 +39,7 @@ export function ModelDetail({ bikeModelYearId, initialData }: Props) {
           <ModelSummary model={query.data} />
           <ModelDescription model={query.data} />
           <PartsHub model={query.data} />
+          <RelatedGuides guides={query.data.relatedGuides} />
         </div>
       ) : null}
     </main>

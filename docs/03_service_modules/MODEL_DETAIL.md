@@ -30,6 +30,10 @@ Tire Product의 브랜드 표시는 `brand_name`과 등록된 언어별 alias를
 
 Brand, Model, 현재 연식, Year List, 대표 이미지, 특징/변경사항, Parts Spec은 core priority다. Product list, 추가 이미지, 관련 콘텐츠는 deferred 대상이다. Product는 viewport 접근 시 요청하고 section skeleton을 쓰며 core 화면을 비우지 않는다. 규격 없음과 등록 상품 없음은 구분한다. 이미지 실패는 broken image 대신 준비중 placeholder를 표시한다.
 
+## Related Guides
+
+Model Detail reads published `12_content` rows through `13_content_bike_model` using the page's `bike_model_id`. It shows at most three guides ordered by `published_at DESC`, then `content_id DESC`. Content type, title, and summary link to `/contents/[contentKey]`; when no published relation exists, the entire section is omitted.
+
 ## Mobile UX and Accessibility
 
 320–430px을 우선하며 연식은 줄바꿈 없는 horizontal navigation, 상품은 vertical list다. 현재 연식, section loading, Product link 이름, 이미지 alt와 native link/button semantics를 제공한다. 모든 시각 상태는 `SCREEN.md`의 semantic token과 Global Visual Standard를 따른다.

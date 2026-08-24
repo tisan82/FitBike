@@ -1,6 +1,12 @@
 import {
   findPublishedContentByKey,
   findPublishedContents,
+  findPublishedContentsByIds,
+  findContentBikeModelRelationsByBikeModelId,
+  findContentBikeModelRelationsByContentId,
+  findActiveRelatedBikes,
+  findActiveRelatedBikeBrands,
+  findLatestActiveRelatedBikeYears,
   type ContentDetailRow,
   type ContentListRow,
 } from "@/repositories/content.repository";
@@ -10,6 +16,8 @@ import {
   type ContentListItem,
   type ContentType,
   type PublishedContent,
+  type RelatedBike,
+  type RelatedGuide,
 } from "@/features/content/types/content.types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -110,4 +118,27 @@ export async function getPublishedContentByKey(
 ): Promise<PublishedContent | null> {
   const row = await findPublishedContentByKey(contentKey);
   return row ? mapDetailRow(row) : null;
+}
+
+export async function getPublishedGuidesByBikeModelId(bikeModelId: number): Promise<RelatedGuide[]> {
+  const relations = await findContentBikeModelRelationsByBikeModelId(bikeModelId);
+  return (await findPublishedContentsByIds(relations.map((relation) => relation.content_id), 3)).map(mapListRow).map(({ contentId, contentKey, title, summary, contentType }) => ({ contentId, contentKey, title, summary, contentType }));
+}
+
+export async function getRelatedBikesByContentId(contentId: number): Promise<RelatedBike[]> {
+  const relations = await findContentBikeModelRelationsByContentId(contentId);
+  const bikeModelIds = relations.map((relation) => relation.bike_model_id);
+  const bikes = await findActiveRelatedBikes(bikeModelIds);
+  const [brands, years] = await Promise.all([
+    findActiveRelatedBikeBrands([...new Set(bikes.map((bike) => bike.brand_id))]),
+    findLatestActiveRelatedBikeYears(bikeModelIds),
+  ]);
+  const brandMap = new Map(brands.map((brand) => [brand.brand_id, brand]));
+  const latestYearMap = new Map<number, number>();
+  for (const year of years) if (!latestYearMap.has(year.bike_model_id)) latestYearMap.set(year.bike_model_id, year.bike_model_year_id);
+  return bikes.flatMap((bike) => {
+    const brand = brandMap.get(bike.brand_id);
+    const bikeModelYearId = latestYearMap.get(bike.bike_model_id);
+    return brand && bikeModelYearId ? [{ bikeModelId: bike.bike_model_id, bikeModelYearId, brandNameEn: brand.brand_en, brandNameKo: brand.brand_ko, modelNameEn: bike.model_name_en, modelNameKo: bike.model_name_ko }] : [];
+  });
 }

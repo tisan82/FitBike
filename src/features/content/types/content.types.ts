@@ -34,3 +34,17 @@ export type PublishedContent = ContentListItem & {
   createdAt: string;
   updatedAt: string;
 };
+
+export type RelatedBike = {
+  bikeModelId: number;
+  bikeModelYearId: number;
+  brandNameEn: string;
+  brandNameKo: string | null;
+  modelNameEn: string;
+  modelNameKo: string | null;
+};
+
+export type RelatedGuide = Pick<
+  ContentListItem,
+  "contentId" | "contentKey" | "title" | "summary" | "contentType"
+>;

@@ -12,6 +12,7 @@ import {
   findTireMappings,
   findTireProducts,
 } from "@/repositories/model-detail.repository";
+import { getPublishedGuidesByBikeModelId } from "@/services/content.service";
 
 export class ModelDetailNotFoundError extends Error {
   constructor() {
@@ -26,10 +27,11 @@ export async function getModelDetail(
   const modelYear = await findModelYearDetail(bikeModelYearId);
   if (!modelYear) throw new ModelDetailNotFoundError();
 
-  const [model, yearOptions, primaryImage] = await Promise.all([
+  const [model, yearOptions, primaryImage, relatedGuides] = await Promise.all([
     findModelDetail(modelYear.bike_model_id),
     findModelYearOptions(modelYear.bike_model_id),
     findPrimaryModelYearImage(bikeModelYearId),
+    getPublishedGuidesByBikeModelId(modelYear.bike_model_id),
   ]);
   if (!model) throw new ModelDetailNotFoundError();
 
@@ -91,6 +93,7 @@ export async function getModelDetail(
     rearBrakeCaliperType: modelYear.rear_brake_caliper_type,
     modelFeatures: modelYear.model_features,
     majorChanges: modelYear.major_changes,
+    relatedGuides,
   };
 }
 

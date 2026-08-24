@@ -13,7 +13,7 @@ Provide published motorcycle maintenance, DIY, parts specification, and model gu
 - `14_content_bike_model_year`: content-to-model-year relation
 - `15_content_part_link`: content-to-part relation
 
-The current implementation reads only `12_content`. It does not mutate database or Storage data.
+The public implementation reads content and its bike-model relations. Database mutations are delivered through reviewed migrations; the application does not mutate content or Storage data.
 
 ## Routes
 
@@ -42,10 +42,11 @@ Public content must satisfy all of the following: `is_active = true`, `published
 - Optional thumbnail and hero rendering from `content-assets` object paths
 - Detail metadata, canonical URL, Open Graph fields, and Article JSON-LD based on stored values
 - Missing, inactive, and unpublished content handled with Next.js `notFound()`
+- Up to three published guides on a related Bike Model Detail page
+- Related active bike cards on content detail, linked through the newest active model-year route
 
 ## Deferred Scope
 
-- Bike relation UI
 - Part relation UI
 - Related content
 - Admin CRUD

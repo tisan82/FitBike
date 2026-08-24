@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ContentBlockRenderer } from "@/features/content";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
 import { SITE_NAME, SITE_URL } from "@/lib/seo/site";
-import { getPublishedContentByKey } from "@/services/content.service";
+import { getPublishedContentByKey, getRelatedBikesByContentId } from "@/services/content.service";
 
 type Props = { params: Promise<{ contentKey: string }> };
 
@@ -41,6 +42,7 @@ export default async function ContentDetailPage({ params }: Props) {
   if (!contentKey) notFound();
   const content = await getPublishedContentByKey(contentKey);
   if (!content) notFound();
+  const relatedBikes = await getRelatedBikesByContentId(content.contentId);
   const hero = getStoragePublicUrl(content.heroImageStoragePath, "content-assets");
   const jsonLd = {
     "@context": "https://schema.org",
@@ -64,6 +66,7 @@ export default async function ContentDetailPage({ params }: Props) {
         </header>
         {hero ? <Image alt={content.title} className="mt-8 aspect-video w-full rounded-2xl object-cover" height={675} priority src={hero} unoptimized width={1200} /> : null}
         <div className="mt-10"><ContentBlockRenderer blocks={content.bodyBlocks} /></div>
+        {relatedBikes.length > 0 ? <section aria-labelledby="related-bikes-title" className="mt-12 border-t border-border pt-8"><h2 className="text-xl font-bold" id="related-bikes-title">관련 바이크</h2><div className="mt-4 grid gap-3 sm:grid-cols-2">{relatedBikes.map((bike) => <div className="rounded-2xl border border-border bg-surface p-5" key={bike.bikeModelId}><p className="text-sm font-semibold text-foreground-secondary">{bike.brandNameKo ?? bike.brandNameEn}</p><p className="mt-1 text-lg font-bold">{bike.modelNameKo ?? bike.modelNameEn}</p><Link className="mt-4 inline-flex min-h-11 items-center font-bold text-primary" href={`/model-detail/${bike.bikeModelYearId}`}>모델 정보 보기</Link></div>)}</div></section> : null}
       </article>
     </main>
   );

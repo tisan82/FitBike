@@ -23,6 +23,14 @@ export type ConnectedProduct = {
   detailHref: string | null;
 };
 
+export type RelatedGuide = {
+  contentId: number;
+  contentKey: string;
+  title: string;
+  summary: string;
+  contentType: "MAINTENANCE" | "DIY" | "PARTS_GUIDE" | "MODEL_GUIDE";
+};
+
 export type ModelDetailProductsData = {
   tire: { front: ConnectedProduct[]; rear: ConnectedProduct[] };
   battery: ConnectedProduct[];
@@ -63,6 +71,7 @@ export type ModelDetailData = {
   rearBrakeCaliperType: string | null;
   modelFeatures: string | null;
   majorChanges: string | null;
+  relatedGuides: RelatedGuide[];
 };
 
 export type ApiSuccessResponse<T> = {
