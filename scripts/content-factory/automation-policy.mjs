@@ -25,6 +25,24 @@ function classifyTopicRisk(topic) {
   return { riskLevel, automationLevel, reason };
 }
 
+function resolveExecutionClassification(topic, currentClassification = classifyTopicRisk(topic)) {
+  const storedRisk = topic.risk_level;
+  const storedAutomation = topic.automation_level;
+  if (!["LOW", "MEDIUM", "HIGH"].includes(storedRisk) || !["L1", "L2"].includes(storedAutomation)) {
+    return { status: "BLOCKED", reason: "MISSING_STORED_CLASSIFICATION", stored: null, current: currentClassification, drift: true };
+  }
+  const stored = { riskLevel: storedRisk, automationLevel: storedAutomation };
+  const safetyDowngrade = storedAutomation === "L2" && currentClassification.automationLevel === "L1";
+  return {
+    status: safetyDowngrade ? "SAFETY_REVIEW_REQUIRED" : "READY",
+    reason: safetyDowngrade ? "CURRENT_CLASSIFIER_IS_MORE_RESTRICTIVE" : "REGISTRY_SOURCE_OF_TRUTH",
+    stored,
+    current: currentClassification,
+    drift: stored.riskLevel !== currentClassification.riskLevel || stored.automationLevel !== currentClassification.automationLevel,
+    execution: safetyDowngrade ? { riskLevel: currentClassification.riskLevel, automationLevel: "L1" } : stored
+  };
+}
+
 function evaluateAutoPublish({ topic, evidenceStatus, duplicateStatus, qa, images }) {
   const classification = classifyTopicRisk(topic);
   const blockers = [];
@@ -39,4 +57,4 @@ function evaluateAutoPublish({ topic, evidenceStatus, duplicateStatus, qa, image
   return { eligible: blockers.length === 0, classification, blockers };
 }
 
-export { classifyTopicRisk, evaluateAutoPublish };
+export { classifyTopicRisk, evaluateAutoPublish, resolveExecutionClassification };

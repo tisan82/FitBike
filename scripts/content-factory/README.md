@@ -98,6 +98,10 @@ Auto-publish requires `DISTINCT_CONTENT`, `NOT_REQUIRED` evidence, `GOOD` inform
 
 Automatic attempts are capped at two. A failed run records `last_error`; after two failures the topic remains `BLOCKED` for human action. Publish failures never advance a topic to `PUBLISHED`. Registry rows store only `automation_level`, `risk_level`, `attempt_count`, and `last_error`; detailed prompts and run artifacts remain in ignored `content-work/`.
 
+### Classification source of truth
+
+`16_content_topic.risk_level` and `16_content_topic.automation_level` are the execution source of truth. The runtime classifier reports drift but cannot automatically upgrade a stored L1 topic to L2. If the current classifier is more restrictive than stored L2, the run uses L1 and requires safety review without silently rewriting the Registry. Missing stored classification fails closed. Explicit reclassification is dry-run by default: `node scripts/content-factory/topic-registry.mjs --operation classify-topic --topic-key {key}`. Add `--apply true` only for an authorized single-topic Registry update.
+
 `run-next-topic.mjs` processes at most one row. Dry-run selects and classifies the next topic without generation or mutation:
 
 ```bash

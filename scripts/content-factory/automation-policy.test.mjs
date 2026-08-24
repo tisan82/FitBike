@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { classifyTopicRisk, evaluateAutoPublish } from "./automation-policy.mjs";
+import { classifyTopicRisk, evaluateAutoPublish, resolveExecutionClassification } from "./automation-policy.mjs";
 
 test("classifies low-risk generic guides as L2 candidates", () => {
   assert.deepEqual(classifyTopicRisk({ topic: "TL과 TT 타이어 차이", content_type: "PARTS_GUIDE", part_type: "TIRE", normalized_subject: "TIRE_TUBE_TYPE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC" }).riskLevel, "LOW");
@@ -18,4 +18,32 @@ test("auto publish fails closed unless every gate passes", () => {
   const result = evaluateAutoPublish({ topic: { topic: "TL과 TT 타이어 차이", content_type: "PARTS_GUIDE", part_type: "TIRE", normalized_scope: "GENERIC" }, evidenceStatus: "NOT_REQUIRED", duplicateStatus: "DISTINCT_CONTENT", qa: { informationDensity: "GOOD", semanticDuplication: true, proceduralCompleteness: true, informationPriority: true, subjectCoverage: true, crossPartContamination: true, unsupportedClaims: 0, sentenceFragments: 0, text: "" }, images: { topicRelevance: true, noUnexpectedLogo: true, noUnsupportedText: true, noTechnicalNumber: true, noProductImpersonation: true, mobileLegibility: true, bodyRequired: true, educationalValue: true, subjectCoverage: true } });
   assert.equal(result.eligible, true);
   assert.equal(evaluateAutoPublish({ topic: { topic: "TL과 TT 타이어 차이", content_type: "PARTS_GUIDE", part_type: "TIRE", normalized_scope: "GENERIC" }, evidenceStatus: "BLOCKED", duplicateStatus: "DISTINCT_CONTENT", qa: {}, images: {} }).eligible, false);
+});
+
+test("uses stored L1 when current classifier returns L2", () => {
+  const result = resolveExecutionClassification({ risk_level: "MEDIUM", automation_level: "L1" }, { riskLevel: "LOW", automationLevel: "L2" });
+  assert.deepEqual(result.execution, { riskLevel: "MEDIUM", automationLevel: "L1" });
+});
+
+test("uses matching stored L2 classification", () => {
+  const result = resolveExecutionClassification({ risk_level: "LOW", automation_level: "L2" }, { riskLevel: "LOW", automationLevel: "L2" });
+  assert.equal(result.status, "READY");
+  assert.equal(result.execution.automationLevel, "L2");
+});
+
+test("requires safety review when current classifier is more restrictive", () => {
+  const result = resolveExecutionClassification({ risk_level: "LOW", automation_level: "L2" }, { riskLevel: "MEDIUM", automationLevel: "L1" });
+  assert.equal(result.status, "SAFETY_REVIEW_REQUIRED");
+  assert.equal(result.execution.automationLevel, "L1");
+});
+
+test("keeps stored high-risk L1 when current classifier returns medium L1", () => {
+  const result = resolveExecutionClassification({ risk_level: "HIGH", automation_level: "L1" }, { riskLevel: "MEDIUM", automationLevel: "L1" });
+  assert.deepEqual(result.execution, { riskLevel: "HIGH", automationLevel: "L1" });
+});
+
+test("blocks execution when stored classification is missing", () => {
+  const result = resolveExecutionClassification({ risk_level: null, automation_level: null }, { riskLevel: "LOW", automationLevel: "L2" });
+  assert.equal(result.status, "BLOCKED");
+  assert.equal(result.execution, undefined);
 });

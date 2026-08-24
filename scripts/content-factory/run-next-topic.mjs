@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { classifyTopicRisk } from "./automation-policy.mjs";
+import { classifyTopicRisk, resolveExecutionClassification } from "./automation-policy.mjs";
 
 const execute = promisify(execFile);
 const contentFactoryDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -33,13 +33,18 @@ async function main() {
   const dryRun = args["dry-run"] === "true";
   const selected = (await runScript("topic-registry.mjs", ["--operation", "get-next-topic"])).result;
   if (!selected) return console.log(JSON.stringify({ status: "QUEUE_EMPTY" }, null, 2));
-  const classification = classifyTopicRisk(selected);
+  const runtimeClassification = classifyTopicRisk(selected);
+  const classificationDecision = resolveExecutionClassification(selected, runtimeClassification);
+  if (classificationDecision.status === "BLOCKED") {
+    return console.log(JSON.stringify({ status: "BLOCKED", reason: classificationDecision.reason, selected, classificationDecision }, null, 2));
+  }
+  const classification = classificationDecision.execution;
   const expectedFlow = classification.automationLevel === "L2"
     ? ["PLANNED", "GENERATING", "QA", "IMAGE_AUTO_GATE", "APPROVED", "PUBLISHED"]
     : ["PLANNED", "GENERATING", "QA", "IMAGE", "REVIEW_REQUIRED", "USER_APPROVAL", "PUBLISHED"];
-  if (dryRun) return console.log(JSON.stringify({ status: "DRY_RUN", mutation: "NONE", selected, classification, expectedFlow }, null, 2));
+  if (dryRun) return console.log(JSON.stringify({ status: "DRY_RUN", mutation: "NONE", selected, classification, runtimeClassification, classificationDecision, expectedFlow }, null, 2));
 
-  await runScript("topic-registry.mjs", ["--operation", "record-automation-attempt", "--topic-key", selected.topic_key, "--automation-level", classification.automationLevel, "--risk-level", classification.riskLevel]);
+  await runScript("topic-registry.mjs", ["--operation", "record-automation-attempt", "--topic-key", selected.topic_key]);
   await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", selected.topic_key, "--status", "GENERATING"]);
   let generation;
   try {

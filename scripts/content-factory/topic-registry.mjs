@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { classifyTopicRisk } from "./automation-policy.mjs";
+
 const projectDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const contentTypes = ["MAINTENANCE", "DIY", "PARTS_GUIDE", "MODEL_GUIDE"];
 const partTypes = ["TIRE", "BATTERY", "BRAKE"];
@@ -179,12 +181,23 @@ async function updateTopicStatus(args) {
 
 async function recordAutomationAttempt(args) {
   const topicKey = args["topic-key"];
-  const automationLevel = args["automation-level"]?.toUpperCase();
-  const riskLevel = args["risk-level"]?.toUpperCase();
-  if (!topicKey || !["L1", "L2"].includes(automationLevel) || !["LOW", "MEDIUM", "HIGH"].includes(riskLevel)) throw new Error("INVALID_AUTOMATION_ATTEMPT");
-  const updated = await managementQuery(`update public."16_content_topic" set automation_level=$2,risk_level=$3,attempt_count=attempt_count+1,last_error=null where topic_key=$1 and status='PLANNED' and attempt_count<2 returning content_topic_id,topic_key,automation_level,risk_level,attempt_count,last_error`, [topicKey, automationLevel, riskLevel], false);
+  if (!topicKey) throw new Error("INVALID_AUTOMATION_ATTEMPT");
+  const updated = await managementQuery(`update public."16_content_topic" set attempt_count=attempt_count+1,last_error=null where topic_key=$1 and status='PLANNED' and attempt_count<2 returning content_topic_id,topic_key,automation_level,risk_level,attempt_count,last_error`, [topicKey], false);
   if (updated.length !== 1) throw new Error("AUTOMATION_ATTEMPT_LIMIT_OR_INVALID_STATE");
   return { result: "RECORDED", topic: updated[0] };
+}
+
+async function classifyStoredTopic(args) {
+  const topicKey = args["topic-key"];
+  if (!topicKey) throw new Error("INVALID_TOPIC_INPUT");
+  const rows = await managementQuery(`select content_topic_id,topic_key,topic,content_type,part_type,normalized_subject,normalized_action,normalized_scope,risk_level,automation_level from public."16_content_topic" where topic_key=$1`, [topicKey]);
+  if (rows.length !== 1) throw new Error("TOPIC_NOT_FOUND");
+  const topic = rows[0];
+  const current = classifyTopicRisk(topic);
+  const previous = { riskLevel: topic.risk_level, automationLevel: topic.automation_level };
+  if (args.apply !== "true") return { result: "CLASSIFIED", dryRun: true, topicKey, previous, current };
+  const updated = await managementQuery(`update public."16_content_topic" set risk_level=$2,automation_level=$3 where content_topic_id=$1 returning content_topic_id,topic_key,risk_level,automation_level`, [topic.content_topic_id, current.riskLevel, current.automationLevel], false);
+  return { result: "RECLASSIFIED", dryRun: false, previous, topic: updated[0] };
 }
 
 async function recordAutomationError(args) {
@@ -205,7 +218,8 @@ async function main() {
   else if (args.operation === "update-topic-status") result = await updateTopicStatus(args);
   else if (args.operation === "record-automation-attempt") result = await recordAutomationAttempt(args);
   else if (args.operation === "record-automation-error") result = await recordAutomationError(args);
-  else throw new Error("--operation register-topic|get-next-topic|update-topic-status|record-automation-attempt|record-automation-error is required");
+  else if (args.operation === "classify-topic") result = await classifyStoredTopic(args);
+  else throw new Error("--operation register-topic|get-next-topic|update-topic-status|record-automation-attempt|record-automation-error|classify-topic is required");
   console.log(JSON.stringify(result, null, 2));
 }
 
