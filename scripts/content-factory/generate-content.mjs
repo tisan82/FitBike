@@ -165,6 +165,42 @@ function classifyDuplicate(requestIntent, contentKey, title, existingContents) {
   return best;
 }
 
+function preGenerationDecision(duplicateStatus) {
+  return duplicateStatus === "EXACT_DUPLICATE" ? "STOP" : "CONTINUE";
+}
+
+function contentTokens(value) {
+  return new Set(JSON.stringify(value).normalize("NFKC").toLowerCase().match(/[a-z0-9가-힣]{2,}/g) ?? []);
+}
+
+function tokenOverlap(left, right) {
+  const smaller = Math.min(left.size, right.size);
+  if (smaller === 0) return 0;
+  let shared = 0;
+  for (const token of left) if (right.has(token)) shared += 1;
+  return shared / smaller;
+}
+
+function classifyPostGenerationDuplicate(requestIntent, draft, existingContents) {
+  let best = { status: "CONTENT_DISTINCT", duplicateWith: null, reason: "Generated content does not substantially answer the same core question as published content." };
+  const generatedTokens = contentTokens({ title: draft.title, summary: draft.summary, body_blocks: draft.blocks });
+  for (const existing of existingContents) {
+    const existingIntent = normalizeIntent({ title: existing.title, summary: existing.summary ?? "", contentType: existing.content_type, targetPart: existing.part_types?.[0] ?? null, targetBikeModelKey: existing.model_keys?.[0] ?? null });
+    const sameEntity = requestIntent.scope === existingIntent.scope && requestIntent.targetPart === existingIntent.targetPart && requestIntent.targetBikeModelKey === existingIntent.targetBikeModelKey;
+    if (!sameEntity) continue;
+    const relationship = subjectRelationship(requestIntent.subject, existingIntent.subject, requestIntent.targetPart);
+    if (relationship === "DISTINCT") continue;
+    const overlap = tokenOverlap(generatedTokens, contentTokens({ title: existing.title, summary: existing.summary, body_blocks: existing.body_blocks }));
+    if (requestIntent.action === existingIntent.action && overlap >= 0.65) {
+      return { status: "CONTENT_DUPLICATE", duplicateWith: existing.content_key, reason: "Generated answer coverage substantially matches published content despite the declared subject difference." };
+    }
+    const coverage = relationship === "SAME" || hasCoreSubjectCoverage(requestIntent.subject, existing);
+    if (!coverage) continue;
+    if (overlap >= 0.25) best = { status: "CONTENT_OVERLAP_ACCEPTABLE", duplicateWith: existing.content_key, reason: "Published content touches the subject, but the generated content provides a distinct focused answer." };
+  }
+  return best;
+}
+
 function partLabel(targetPart) {
   return { TIRE: "타이어", BATTERY: "배터리", BRAKE: "브레이크" }[targetPart] ?? "부품";
 }
@@ -559,7 +595,7 @@ async function main() {
     group by c.content_id,c.content_key,c.title,c.summary,c.content_type,c.body_blocks;` : "CONTENT_INDEX";
   const existingContents = await readEvidence(indexQuery);
   const duplicate = classifyDuplicate(requestIntent, contentKey, topic, existingContents);
-  if (duplicate.status !== "DISTINCT_CONTENT") {
+  if (preGenerationDecision(duplicate.status) === "STOP") {
     await writeDuplicateReport(contentKey, requestIntent, duplicate);
     return;
   }
@@ -588,6 +624,7 @@ async function main() {
   else if (evidence.sources.length > 0) evidence.status = "VERIFIED_DB";
 
   const draft = selectStrategy({ topic, contentType, targetPart, intent: requestIntent, evidence });
+  const postGenerationDuplicate = classifyPostGenerationDuplicate(requestIntent, draft, existingContents);
   const plan = {
     topic,
     contentKey,
@@ -625,6 +662,7 @@ async function main() {
   const imagePlanValidity = typeof imagePlan.thumbnail.required === "boolean" && typeof imagePlan.hero.required === "boolean" && Array.isArray(imagePlan.bodyImages);
   const evidenceComplete = ["VERIFIED_DB", "NOT_REQUIRED"].includes(evidence.status);
   const qaIssues = [
+    ...(postGenerationDuplicate.status === "CONTENT_DUPLICATE" ? [`Post-generation duplicate detected: ${postGenerationDuplicate.duplicateWith}`] : []),
     ...blockIssues,
     ...claimIssues,
     ...(semanticDuplication.pass ? [] : [`Semantic duplication detected (${semanticDuplication.duplicatePairs})`]),
@@ -647,6 +685,7 @@ async function main() {
     duplicateStatus: duplicate.status,
     duplicateWith: duplicate.duplicateWith,
     duplicateReason: duplicate.reason,
+    postGenerationDuplicate,
     informationDensity,
     semanticDuplication: semanticDuplication.pass,
     proceduralCompleteness: proceduralCompleteness.pass,
@@ -686,4 +725,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 
-export { classifyDuplicate, normalizeIntent, subjectRelationship };
+export { classifyDuplicate, classifyPostGenerationDuplicate, normalizeIntent, preGenerationDecision, subjectRelationship };
