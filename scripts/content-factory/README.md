@@ -98,7 +98,7 @@ Auto-publish requires `DISTINCT_CONTENT`, `NOT_REQUIRED` evidence, `GOOD` inform
 
 Automatic attempts are capped at two. A failed run records `last_error`; after two failures the topic remains `BLOCKED` for human action. Publish failures never advance a topic to `PUBLISHED`. Registry rows store only `automation_level`, `risk_level`, `attempt_count`, and `last_error`; detailed prompts and run artifacts remain in ignored `content-work/`.
 
-`run-next-topic.mjs` processes at most one row. Its default dry-run selects and classifies the next topic without generation or mutation:
+`run-next-topic.mjs` processes at most one row. Dry-run selects and classifies the next topic without generation or mutation:
 
 ```bash
 node scripts/content-factory/run-next-topic.mjs --dry-run true

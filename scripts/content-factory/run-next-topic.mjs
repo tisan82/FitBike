@@ -30,7 +30,7 @@ function generationArguments(topic) {
 
 async function main() {
   const args = parseArguments(process.argv.slice(2));
-  const dryRun = args["dry-run"] !== "false";
+  const dryRun = args["dry-run"] === "true";
   const selected = (await runScript("topic-registry.mjs", ["--operation", "get-next-topic"])).result;
   if (!selected) return console.log(JSON.stringify({ status: "QUEUE_EMPTY" }, null, 2));
   const classification = classifyTopicRisk(selected);
