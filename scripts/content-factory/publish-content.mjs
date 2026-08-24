@@ -37,19 +37,49 @@ function includesAny(text, terms) {
   return terms.some((term) => text.includes(term));
 }
 
+function normalizeSubject(text, partType) {
+  const rules = {
+    TIRE: [
+      ["TIRE_PRESSURE", ["공기압", "tire pressure"]],
+      ["TIRE_WEAR", ["마모", "tread wear"]],
+      ["TIRE_CRACK", ["균열", "갈라짐", "crack"]],
+      ["TIRE_POSITION", ["앞·뒤", "앞뒤", "front/rear", "front rear"]],
+      ["TIRE_TUBE_TYPE", ["tl", "tt", "튜브리스", "튜브 타입", "tube type"]],
+      ["TIRE_LOAD_INDEX", ["하중지수", "하중 지수", "load index"]],
+      ["TIRE_SPEED_RATING", ["속도등급", "속도 등급", "speed rating"]],
+      ["TIRE_CONSTRUCTION", ["레디얼", "바이어스", "radial", "bias"]],
+      ["TIRE_SIZE", ["규격", "사이즈", "표기", "size"]]
+    ],
+    BATTERY: [
+      ["BATTERY_TERMINAL", ["단자", "terminal"]],
+      ["BATTERY_DIMENSION", ["장착 공간", "크기", "치수", "dimension"]],
+      ["BATTERY_CAPACITY", ["용량", "capacity", "ah"]],
+      ["BATTERY_CONDITION", ["외관", "변형", "손상", "오염", "condition"]]
+    ],
+    BRAKE: [
+      ["BRAKE_PAD_WEAR", ["패드 마모", "pad wear"]],
+      ["BRAKE_PAD_POSITION", ["앞·뒤", "앞뒤", "front/rear", "front rear"]],
+      ["BRAKE_PAD_STRUCTURE", ["구조", "역할", "structure"]],
+      ["BRAKE_PAD_SIZE", ["패드 규격", "패드 크기", "pad size"]]
+    ]
+  };
+  return rules[partType]?.find(([, terms]) => includesAny(text, terms))?.[0] ?? partType ?? "GENERAL";
+}
+
 function normalizeIntent({ title, summary = "", contentType, targetPart = null, targetBikeModelKey = null }) {
   const text = `${title} ${summary}`.normalize("NFKC").toLowerCase();
   const normalizedPart = targetPart
     ?? (includesAny(text, ["타이어", "tire"]) ? "TIRE" : null)
     ?? (includesAny(text, ["배터리", "battery"]) ? "BATTERY" : null)
     ?? (includesAny(text, ["브레이크", "brake"]) ? "BRAKE" : null);
-  let subject = normalizedPart ?? "GENERAL";
-  if (normalizedPart === "TIRE" && includesAny(text, ["규격", "사이즈", "표기", "size"])) subject = "TIRE_SIZE";
+  const subject = normalizeSubject(text, normalizedPart);
   let action = "UNDERSTAND";
-  if (includesAny(text, ["교체", "교환", "replace"])) action = "REPLACE";
+  if (includesAny(text, ["교체 후", "교환 후", "after replacement", "post-replacement"])) action = "POST_REPLACEMENT_CHECK";
+  else if (includesAny(text, ["교체", "교환", "replace"])) action = "REPLACE";
   else if (includesAny(text, ["점검", "진단", "상태 확인", "inspect"])) action = "INSPECT";
   else if (includesAny(text, ["선택", "고르는", "choose", "select"])) action = "SELECT";
   else if (includesAny(text, ["관리", "유지", "maintenance"])) action = "MAINTAIN";
+  else if (contentType === "MAINTENANCE" && includesAny(text, ["확인 방법", "확인하는 법", "how to check"])) action = "INSPECT";
   const scope = targetBikeModelKey ? "MODEL" : "GENERIC";
   return { subject, action, contentType, targetPart: normalizedPart, targetBikeModelKey, scope, searchIntent: `${scope}:${subject}:${action}` };
 }
