@@ -19,6 +19,7 @@ The public implementation reads content and its bike-model relations. Database m
 
 - `/contents`: published content directory with content-type filtering
 - `/contents/[contentKey]`: published article detail
+- `/today/battery-check-before-replace`: permanent redirect to `/contents/battery-check-before-replace`
 
 ## Content Types
 
@@ -44,6 +45,7 @@ Public content must satisfy all of the following: `is_active = true`, `published
 - Missing, inactive, and unpublished content handled with Next.js `notFound()`
 - Up to three published guides on a related Bike Model Detail page
 - Related active bike cards on content detail, linked through the newest active model-year route
+- Generic part-category relations may be stored without a specific product target; the migrated battery check article uses `BATTERY` / `CATEGORY`.
 
 ## Deferred Scope
 
