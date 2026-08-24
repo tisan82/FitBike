@@ -84,6 +84,28 @@ The publish command requires `publish-approval.json`, rechecks Production duplic
 
 Image source priority is `APPROVED_BRAND_ASSET → APPROVED_GENERIC_ASSET → GENERATED_GENERIC → IMAGE_REVIEW_REQUIRED`. Approved, role-suitable Poweroad assets are preferred for battery content and MAXXIS assets for tire content. Brand availability never overrides content suitability, and real products are not recreated with generation.
 
+## Automation policy v1
+
+Automation defaults to Level 1 (`L1`): the queue, duplicate/evidence checks, generation, QA, and image preparation are automated, while a person approves publishing. Level 2 (`L2`) is conditional auto-publish for low-risk `MAINTENANCE` and `PARTS_GUIDE` topics only after every text, evidence, duplicate, and image gate passes. Level 3 is disabled.
+
+Risk is fail-closed:
+
+- `LOW`: generic explanatory or visual-inspection content without model data, technical numbers, or safety-critical work; eligible for L2.
+- `MEDIUM`: model guides, pressure/diagnostic/replacement-timing topics, battery inspection, and brake maintenance; L1.
+- `HIGH`: DIY, disassembly, wheel removal, electrical work, torque, or other safety-critical procedures; L1 with strict human review.
+
+Auto-publish requires `DISTINCT_CONTENT`, `NOT_REQUIRED` evidence, `GOOD` information density, semantic duplication/procedure/priority/subject/cross-part checks passing, zero unsupported claims and sentence fragments, and all image checks passing. Technical numeric, performance, or safety-critical claims force `REVIEW_REQUIRED`. Exact duplicates become `DUPLICATE`; near duplicates become `REVIEW_REQUIRED`. Generated generic images must have no logo, unsupported text or number, product impersonation, or mobile-legibility issue. Product/model likeness, potentially misleading technical diagrams or work posture, complex annotations, and generated text always require human review.
+
+Automatic attempts are capped at two. A failed run records `last_error`; after two failures the topic remains `BLOCKED` for human action. Publish failures never advance a topic to `PUBLISHED`. Registry rows store only `automation_level`, `risk_level`, `attempt_count`, and `last_error`; detailed prompts and run artifacts remain in ignored `content-work/`.
+
+`run-next-topic.mjs` processes at most one row. Its default dry-run selects and classifies the next topic without generation or mutation:
+
+```bash
+node scripts/content-factory/run-next-topic.mjs --dry-run true
+```
+
+Content/topic/image execution remains runtime data and is not committed. Only Factory, schema, and policy changes belong in Git.
+
 ## System and content ownership
 
 - GitHub stores application and Factory code, rules, block and database schema migrations, and operating documentation.

@@ -153,7 +153,7 @@ async function registerTopic(args) {
 }
 
 async function getNextTopic() {
-  const rows = await managementQuery(`select content_topic_id,topic_key,topic,content_type,part_type,bike_model_id,normalized_subject,normalized_action,normalized_scope,status,priority,content_id,created_at from public."16_content_topic" where status='PLANNED' order by priority asc,created_at asc,content_topic_id asc limit 1`);
+  const rows = await managementQuery(`select t.content_topic_id,t.topic_key,t.topic,t.content_type,t.part_type,t.bike_model_id,b.model_key as bike_model_key,t.normalized_subject,t.normalized_action,t.normalized_scope,t.status,t.priority,t.automation_level,t.risk_level,t.attempt_count,t.last_error,t.content_id,t.created_at from public."16_content_topic" t left join public."02_bike_model" b on b.bike_model_id=t.bike_model_id where t.status='PLANNED' order by t.priority asc,t.created_at asc,t.content_topic_id asc limit 1`);
   return { result: rows[0] ?? null };
 }
 
@@ -177,6 +177,25 @@ async function updateTopicStatus(args) {
   return { result: "UPDATED", topic: updated[0] };
 }
 
+async function recordAutomationAttempt(args) {
+  const topicKey = args["topic-key"];
+  const automationLevel = args["automation-level"]?.toUpperCase();
+  const riskLevel = args["risk-level"]?.toUpperCase();
+  if (!topicKey || !["L1", "L2"].includes(automationLevel) || !["LOW", "MEDIUM", "HIGH"].includes(riskLevel)) throw new Error("INVALID_AUTOMATION_ATTEMPT");
+  const updated = await managementQuery(`update public."16_content_topic" set automation_level=$2,risk_level=$3,attempt_count=attempt_count+1,last_error=null where topic_key=$1 and status='PLANNED' and attempt_count<2 returning content_topic_id,topic_key,automation_level,risk_level,attempt_count,last_error`, [topicKey, automationLevel, riskLevel], false);
+  if (updated.length !== 1) throw new Error("AUTOMATION_ATTEMPT_LIMIT_OR_INVALID_STATE");
+  return { result: "RECORDED", topic: updated[0] };
+}
+
+async function recordAutomationError(args) {
+  const topicKey = args["topic-key"];
+  const error = args.error?.slice(0, 1000);
+  if (!topicKey || !error) throw new Error("INVALID_AUTOMATION_ERROR");
+  const updated = await managementQuery(`update public."16_content_topic" set last_error=$2 where topic_key=$1 returning content_topic_id,topic_key,attempt_count,last_error`, [topicKey, error], false);
+  if (updated.length !== 1) throw new Error("TOPIC_NOT_FOUND");
+  return { result: "RECORDED", topic: updated[0] };
+}
+
 async function main() {
   await loadLocalEnvironment();
   const args = parseArguments(process.argv.slice(2));
@@ -184,7 +203,9 @@ async function main() {
   if (args.operation === "register-topic") result = await registerTopic(args);
   else if (args.operation === "get-next-topic") result = await getNextTopic();
   else if (args.operation === "update-topic-status") result = await updateTopicStatus(args);
-  else throw new Error("--operation register-topic|get-next-topic|update-topic-status is required");
+  else if (args.operation === "record-automation-attempt") result = await recordAutomationAttempt(args);
+  else if (args.operation === "record-automation-error") result = await recordAutomationError(args);
+  else throw new Error("--operation register-topic|get-next-topic|update-topic-status|record-automation-attempt|record-automation-error is required");
   console.log(JSON.stringify(result, null, 2));
 }
 
