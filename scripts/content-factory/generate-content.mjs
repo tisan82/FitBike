@@ -333,7 +333,87 @@ function diyDraft(topic, targetPart) {
   };
 }
 
+const understandSubjectProfiles = {
+  TIRE_SIZE: {
+    label: "타이어 규격 표기",
+    question: "타이어 규격 표기는 무엇을 뜻하나요?",
+    definition: "타이어 규격 표기는 크기와 구조, 적용 조건을 구분해 적은 식별 정보입니다.",
+    identify: ["타이어 옆면에서 전체 표기를 찾습니다.", "표기의 순서와 구분 기호를 유지한 채 각 항목을 나눕니다."],
+    interpret: "폭·편평비·휠 지름처럼 서로 다른 의미의 항목을 같은 위치끼리 비교합니다.",
+    practical: "전체 표기를 기록한 뒤 바이크 모델과 연식의 공식 규격과 비교합니다.",
+    summary: "일부 숫자만 같다고 호환을 판단하지 말고 전체 규격과 공식 기준을 함께 확인합니다.",
+    coverage: [/규격 표기|전체 표기/, /폭|편평비|휠 지름/, /공식 규격|공식 기준/],
+    adjacent: [/FRONT|REAR|앞·뒤 장착/, /TL|TT|튜브리스/, /하중지수/, /속도등급/]
+  },
+  TIRE_POSITION: {
+    label: "앞·뒤 타이어 장착 위치",
+    question: "앞·뒤 타이어는 어떻게 구분하나요?",
+    definition: "FRONT와 REAR는 타이어가 의도된 앞 또는 뒤 장착 위치를 나타내는 구분입니다.",
+    identify: ["타이어 옆면에서 FRONT 또는 REAR 같은 장착 위치 표기를 확인합니다.", "현재 바이크의 앞·뒤 타이어 규격을 차량 제원에서 각각 확인합니다."],
+    interpret: "외형이나 트레드가 비슷해 보여도 위치 표기와 차량 제원이 다르면 같은 위치용이라고 판단하지 않습니다.",
+    practical: "제품의 옆면 표기와 바이크 모델·연식의 앞·뒤 규격을 함께 대조합니다.",
+    summary: "앞·뒤 위치는 외형으로 추정하지 말고 타이어 표기와 차량의 공식 제원으로 확인합니다.",
+    coverage: [/FRONT|REAR/, /앞|뒤|장착 위치/, /옆면.*표기|표기.*옆면/, /차량 제원|공식 제원/],
+    adjacent: [/폭|편평비|휠 지름/, /하중지수/, /속도등급/, /TL|TT|튜브리스/]
+  },
+  TIRE_TUBE_TYPE: {
+    label: "TL과 TT 타이어 형식",
+    question: "TL과 TT는 무엇이 다른가요?",
+    definition: "TL과 TT는 타이어가 공기를 유지하는 구조와 사용하는 구성 방식을 구분하는 표기입니다.",
+    identify: ["타이어 옆면에서 TL 또는 TT 표기를 찾습니다.", "현재 휠과 타이어가 요구하는 튜브 사용 조건을 공식 안내에서 확인합니다."],
+    interpret: "TL은 튜브리스 형식, TT는 튜브 사용을 전제로 한 형식을 뜻하므로 서로 같은 조건으로 취급하지 않습니다.",
+    practical: "현재 장착 상태와 제품 표기, 휠의 사용 조건을 함께 비교합니다.",
+    summary: "외형이 비슷해도 TL과 TT 표기 및 사용 조건을 확인한 뒤 적용 여부를 판단합니다.",
+    coverage: [/TL/, /TT/, /튜브리스|튜브 사용/, /휠.*사용 조건|사용 조건/],
+    adjacent: [/FRONT|REAR|앞·뒤 장착/, /폭|편평비|휠 지름/, /하중지수/, /속도등급/]
+  },
+  TIRE_LOAD_INDEX: {
+    label: "타이어 하중지수",
+    question: "타이어 하중지수는 어떻게 이해하나요?",
+    definition: "하중지수는 타이어 표기에서 허용 하중 조건을 확인하기 위한 코드입니다.",
+    identify: ["타이어 옆면의 규격 표기에서 하중지수 위치를 찾습니다.", "코드의 의미는 제조사 또는 공인 표에서 확인합니다."],
+    interpret: "코드 숫자를 무게 값으로 그대로 읽지 않고 대응 표와 차량의 요구 조건을 함께 봅니다.",
+    practical: "현재 제품의 하중지수를 바이크 모델·연식의 공식 요구 조건과 비교합니다.",
+    summary: "하중지수는 임의로 환산하지 말고 공식 대응 정보와 차량 기준으로 해석합니다.",
+    coverage: [/하중지수/, /코드/, /대응 표|공인 표/, /요구 조건|차량 기준/],
+    adjacent: [/FRONT|REAR|앞·뒤 장착/, /TL|TT|튜브리스/, /속도등급/, /편평비|휠 지름/]
+  },
+  TIRE_SPEED_RATING: {
+    label: "타이어 속도등급",
+    question: "타이어 속도등급은 어떻게 이해하나요?",
+    definition: "속도등급은 타이어 표기에서 사용 조건을 확인하기 위한 등급 코드입니다.",
+    identify: ["타이어 옆면의 규격 표기에서 속도등급 위치를 찾습니다.", "등급의 의미는 제조사 또는 공인 표에서 확인합니다."],
+    interpret: "등급 문자를 성능 순위로 단정하지 않고 대응 표와 차량의 요구 조건을 함께 봅니다.",
+    practical: "현재 제품의 속도등급을 바이크 모델·연식의 공식 요구 조건과 비교합니다.",
+    summary: "속도등급은 임의로 해석하지 말고 공식 대응 정보와 차량 기준으로 확인합니다.",
+    coverage: [/속도등급/, /등급 코드|등급 문자/, /대응 표|공인 표/, /요구 조건|차량 기준/],
+    adjacent: [/FRONT|REAR|앞·뒤 장착/, /TL|TT|튜브리스/, /하중지수/, /편평비|휠 지름/]
+  }
+};
+
+function understandPartsGuideDraft(topic, profile) {
+  return {
+    title: topic,
+    summary: `${profile.label}의 의미와 확인 위치, 해석 방법을 구분해 설명합니다.`,
+    blocks: [
+      { type: "heading", level: 2, text: profile.question },
+      { type: "paragraph", text: profile.definition },
+      { type: "heading", level: 2, text: "어디에서 확인하나요?" },
+      { type: "bullet_list", items: profile.identify },
+      { type: "heading", level: 2, text: "차이를 어떻게 해석하나요?" },
+      { type: "paragraph", text: profile.interpret },
+      { type: "heading", level: 2, text: "실제 확인에 적용하기" },
+      { type: "paragraph", text: profile.practical },
+      { type: "heading", level: 2, text: "확인 결과 정리" },
+      { type: "paragraph", text: profile.summary }
+    ],
+    subjectProfile: profile
+  };
+}
+
 function partsGuideDraft(topic, targetPart, intent) {
+  const understandProfile = intent.action === "UNDERSTAND" ? understandSubjectProfiles[intent.subject] : null;
+  if (understandProfile) return understandPartsGuideDraft(topic, understandProfile);
   const part = partLabel(targetPart);
   const subject = intent.subject === "TIRE_SIZE" ? "타이어 규격 표기" : `${part}의 규격과 표기`;
   return {
@@ -472,6 +552,25 @@ function checkSubjectCoverage(blocks, profile) {
   const text = blocks.map(blockText).join(" ");
   const dimensions = profile.coverage.map((pattern) => ({ pattern: pattern.source, present: pattern.test(text) }));
   return { pass: dimensions.every((dimension) => dimension.present), dimensions };
+}
+
+function checkSubjectDrift(blocks, profile) {
+  if (!profile?.adjacent) return { pass: true, adjacentMatches: [] };
+  const text = blocks.map(blockText).join(" ");
+  const adjacentMatches = profile.adjacent.filter((pattern) => pattern.test(text)).map((pattern) => pattern.source);
+  return { pass: adjacentMatches.length <= 1, adjacentMatches };
+}
+
+function checkQuestionAnswerAlignment(draft, intent) {
+  const titleSubject = normalizeSubject(draft.title.normalize("NFKC").toLowerCase(), intent.targetPart);
+  const firstHeading = draft.blocks.find((block) => block.type === "heading")?.text ?? "";
+  return titleSubject === intent.subject && /\?$|나요\?$|하나요\?$/.test(firstHeading);
+}
+
+function countSentenceFragments(blocks) {
+  return blocks.filter((block) => ["paragraph", "step", "tip", "warning"].includes(block.type))
+    .map((block) => block.text ?? block.body ?? "")
+    .filter((text) => text && !/[.!?]$/.test(text.trim())).length;
 }
 
 function checkCrossPartContamination(blocks, targetPart) {
@@ -654,10 +753,13 @@ async function main() {
   const proceduralRequired = requiresProcedure(contentType, requestIntent.action);
   const proceduralCompleteness = checkProceduralCompleteness(draft.blocks, proceduralRequired);
   const subjectCoverage = checkSubjectCoverage(draft.blocks, draft.subjectProfile);
+  const subjectDrift = checkSubjectDrift(draft.blocks, draft.subjectProfile);
+  const questionAnswerAlignment = checkQuestionAnswerAlignment(draft, requestIntent);
   const crossPartContamination = checkCrossPartContamination(draft.blocks, targetPart);
   const informationDensity = evaluateInformationDensity(draft.blocks);
   const informationPriority = checkInformationPriority(draft.blocks) && subjectCoverage.pass;
   const claimIssues = findUnsupportedClaims(draft.blocks, rules.prohibitedClaims, evidence.status);
+  const sentenceFragments = countSentenceFragments(draft.blocks);
   const relationValidity = relations.parts.every((part) => rules.validPartTypes.includes(part.partType) && part.scopeType === "CATEGORY") && (targetBikeModelKey ? relations.bikeModels.length === 1 : true);
   const imagePlanValidity = typeof imagePlan.thumbnail.required === "boolean" && typeof imagePlan.hero.required === "boolean" && Array.isArray(imagePlan.bodyImages);
   const evidenceComplete = ["VERIFIED_DB", "NOT_REQUIRED"].includes(evidence.status);
@@ -668,6 +770,9 @@ async function main() {
     ...(semanticDuplication.pass ? [] : [`Semantic duplication detected (${semanticDuplication.duplicatePairs})`]),
     ...(proceduralCompleteness.pass ? [] : ["Procedural flow is incomplete"]),
     ...(subjectCoverage.pass ? [] : ["Normalized subject is not sufficiently covered"]),
+    ...(subjectDrift.pass ? [] : [`Adjacent subject drift detected (${subjectDrift.adjacentMatches.join(", ")})`]),
+    ...(questionAnswerAlignment ? [] : ["Question and answer are not aligned with the normalized subject"]),
+    ...(sentenceFragments === 0 ? [] : [`Sentence fragments detected (${sentenceFragments})`]),
     ...(crossPartContamination.pass ? [] : [`Cross-part contamination detected (${crossPartContamination.matches.join(", ")})`]),
     ...(informationDensity === "GOOD" ? [] : [`Information density is ${informationDensity}`]),
     ...(informationPriority ? [] : ["Supporting information outweighs the core procedure"]),
@@ -693,11 +798,15 @@ async function main() {
     proceduralStages: proceduralCompleteness.stages,
     subjectCoverage: subjectCoverage.pass,
     subjectCoverageDimensions: subjectCoverage.dimensions,
+    subjectDrift: subjectDrift.pass,
+    subjectDriftMatches: subjectDrift.adjacentMatches,
+    questionAnswerAlignment,
     crossPartContamination: crossPartContamination.pass,
     crossPartContaminationMatches: crossPartContamination.matches,
     informationPriority,
     evidenceComplete,
     unsupportedClaims: claimIssues.length,
+    sentenceFragments,
     relationValidity,
     imagePlanValidity
   };
@@ -725,4 +834,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 
-export { classifyDuplicate, classifyPostGenerationDuplicate, normalizeIntent, preGenerationDecision, subjectRelationship };
+export { classifyDuplicate, classifyPostGenerationDuplicate, normalizeIntent, partsGuideDraft, preGenerationDecision, subjectRelationship, understandSubjectProfiles };
