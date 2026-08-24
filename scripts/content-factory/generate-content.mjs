@@ -147,27 +147,109 @@ function partLabel(targetPart) {
   return { TIRE: "타이어", BATTERY: "배터리", BRAKE: "브레이크" }[targetPart] ?? "부품";
 }
 
-function maintenanceDraft(topic, targetPart) {
+const subjectProfiles = {
+  TIRE_WEAR: {
+    focus: "접지면과 트레드의 마모 상태",
+    locate: ["앞·뒤 타이어의 접지면과 트레드", "각 타이어 둘레의 여러 위치"],
+    observe: ["트레드가 한쪽이나 특정 구간에서 더 많이 닳아 보이는지", "표면에 편마모, 뜯김 또는 다른 눈에 띄는 손상이 있는지"],
+    compare: "앞·뒤 타이어와 각 타이어의 여러 위치를 비교해 마모 분포가 고른지 확인합니다.",
+    evaluate: "마모가 한쪽에 집중되거나 손상이 함께 보이면 정상이라고 단정하지 말고 확인한 위치와 형태를 구분합니다.",
+    followUp: "이상 마모가 의심되면 임의로 마모 한계나 남은 수명을 추정하지 말고 제조사 안내 또는 전문 점검을 통해 교체 필요 여부를 판단합니다.",
+    coverage: [/접지면|트레드/, /마모|편마모/, /앞·뒤|앞뒤|여러 위치|둘레/, /전문 점검|교체 필요|후속 점검/]
+  },
+  TIRE_PRESSURE: {
+    focus: "앞·뒤 타이어의 공기압 상태",
+    locate: ["앞·뒤 타이어의 공기 주입구", "공기압을 확인할 수 있는 측정 위치"],
+    observe: ["측정 준비 상태와 주입구 주변에 눈에 띄는 손상이 없는지", "승인된 측정 도구로 확인한 값이 현재 모델의 공식 기준과 비교 가능한지"],
+    compare: "앞·뒤 타이어를 구분하고 측정 결과를 해당 모델과 운행 조건의 제조사 기준과 각각 비교합니다.",
+    evaluate: "근거가 없는 수치를 적용하지 말고 측정 조건이나 공식 기준을 확인할 수 없는 결과는 확정값으로 판단하지 않습니다.",
+    followUp: "차이가 확인되거나 반복해서 상태가 달라지면 원인을 임의로 단정하지 말고 공식 안내에 따른 추가 점검을 진행합니다.",
+    coverage: [/공기압/, /앞·뒤|앞뒤/, /측정/, /공식 기준|제조사 기준/, /추가 점검/]
+  },
+  TIRE_CRACK: {
+    focus: "타이어 표면과 옆면의 균열 상태",
+    locate: ["접지면과 트레드 홈 주변", "타이어 양쪽 옆면과 둘레의 여러 위치"],
+    observe: ["표면이 갈라지거나 선 모양의 균열이 이어지는지", "균열 주변에 변형, 뜯김 또는 다른 손상이 함께 보이는지"],
+    compare: "앞·뒤 타이어와 둘레의 여러 위치를 비교해 균열의 위치와 퍼진 범위를 구분합니다.",
+    evaluate: "균열이 보이면 깊이나 안전성을 눈으로만 단정하지 말고 함께 나타난 변화를 기록합니다.",
+    followUp: "균열이나 변형이 의심되면 운행 가능 여부를 임의로 판단하지 말고 제조사 안내 또는 전문 점검을 확인합니다.",
+    coverage: [/접지면|옆면/, /균열|갈라짐/, /앞·뒤|앞뒤|여러 위치|둘레/, /전문 점검|제조사 안내/]
+  },
+  BATTERY_CONDITION: {
+    focus: "배터리 케이스와 주변의 외관 상태",
+    locate: ["배터리 케이스의 각 면", "단자 주변과 고정 부위"],
+    observe: ["케이스에 변형, 손상 또는 오염이 있는지", "단자 주변에 부식이나 이탈처럼 눈에 띄는 변화가 있는지"],
+    compare: "케이스 각 면과 연결·고정 부위를 순서대로 비교해 변화가 한 위치에 집중되는지 확인합니다.",
+    evaluate: "외관이나 연결 상태에 이상이 보이면 성능이나 수명을 외관만으로 단정하지 않습니다.",
+    followUp: "변형, 손상 또는 연결 이상이 의심되면 현재 상태를 유지하고 제조사 안내 또는 전문 점검을 확인합니다.",
+    coverage: [/케이스|외관/, /단자|고정 부위/, /변형|손상|오염|부식/, /전문 점검|제조사 안내/]
+  },
+  BATTERY_TERMINAL: {
+    focus: "배터리 단자와 연결부 상태",
+    locate: ["양쪽 단자와 단자 표시", "케이블이 연결된 체결 부위"],
+    observe: ["단자 방향과 연결 위치를 구분할 수 있는지", "부식, 오염, 이탈 또는 손상이 보이는지"],
+    compare: "현재 단자 방향과 연결 상태를 제품 표기 및 제조사 안내와 비교합니다.",
+    evaluate: "방향이나 연결 상태가 불명확하면 임의로 분리하거나 연결하지 않습니다.",
+    followUp: "이상이나 불일치가 의심되면 작업을 진행하지 말고 공식 절차 또는 전문 점검을 확인합니다.",
+    coverage: [/단자/, /방향|연결 위치/, /부식|오염|이탈|손상/, /공식 절차|전문 점검/]
+  },
+  BATTERY_DIMENSION: {
+    focus: "배터리 장착 공간과 외형 조건",
+    locate: ["배터리가 놓이는 장착 공간", "고정부와 케이블이 지나가는 주변 공간"],
+    observe: ["현재 배터리와 공간 사이의 간섭이나 눌림이 보이는지", "고정 상태와 단자 주변 공간이 공식 안내와 비교 가능한지"],
+    compare: "현재 제품의 외형 정보와 장착 공간 조건을 모델·연식별 공식 기준과 항목별로 비교합니다.",
+    evaluate: "공간이 비슷해 보인다는 이유만으로 장착 가능 여부를 확정하지 않습니다.",
+    followUp: "외형 조건이나 고정 방식이 불명확하면 제품 규격과 제조사 안내를 추가로 확인합니다.",
+    coverage: [/장착 공간/, /간섭|눌림|주변 공간/, /외형|고정/, /제품 규격|제조사 안내/]
+  },
+  BRAKE_PAD_WEAR: {
+    focus: "브레이크 패드 마찰재의 마모 상태",
+    locate: ["확인 가능한 패드 마찰재 부분", "좌우 또는 안쪽·바깥쪽 패드 위치"],
+    observe: ["마찰재가 위치별로 다르게 닳아 보이는지", "깨짐, 뜯김 또는 비정상적인 표면 변화가 있는지"],
+    compare: "확인 가능한 좌우 패드와 각 위치를 비교해 남은 마찰재와 마모 분포의 차이를 구분합니다.",
+    evaluate: "보이는 일부만으로 안전성이나 남은 수명을 단정하지 말고 확인이 어려운 위치를 구분합니다.",
+    followUp: "마모 차이 또는 손상이 의심되면 제조사 점검 절차나 전문 점검을 통해 교체 필요 여부를 판단합니다.",
+    coverage: [/마찰재/, /마모|닳아/, /좌우|안쪽·바깥쪽|각 위치/, /전문 점검|교체 필요/]
+  }
+};
+
+function genericSubjectProfile(targetPart) {
   const part = partLabel(targetPart);
   return {
+    focus: `${part}에서 확인 가능한 상태`,
+    locate: [`${part}의 확인 가능한 표면`, "주변에서 안전하게 볼 수 있는 위치"],
+    observe: ["눈에 띄는 변형이나 손상이 있는지", "위치별로 상태 차이가 보이는지"],
+    compare: "확인 가능한 여러 위치를 비교하고 차이가 보이는 부분을 구분합니다.",
+    evaluate: "확인한 상태만으로 수명이나 성능을 단정하지 않습니다.",
+    followUp: "이상이 의심되거나 확인이 어려우면 제조사 안내 또는 전문 점검을 확인합니다.",
+    coverage: [new RegExp(part), /여러 위치|위치별/, /변형|손상/, /전문 점검|제조사 안내/]
+  };
+}
+
+function maintenanceDraft(topic, targetPart, intent) {
+  const part = partLabel(targetPart);
+  const profile = subjectProfiles[intent.subject] ?? genericSubjectProfile(targetPart);
+  return {
     title: topic,
-    summary: `${part}의 외관과 연결 상태, 장착 정보를 순서대로 확인하고 후속 점검 여부를 판단하는 방법을 안내합니다.`,
+    summary: `${profile.focus}를 위치별로 관찰하고 비교해 후속 점검이 필요한지 판단하는 방법을 안내합니다.`,
     blocks: [
       { type: "heading", level: 2, text: "무엇을 확인하나요?" },
-      { type: "paragraph", text: `${part} 점검에서는 눈에 보이는 상태, 주변 연결부, 현재 장착된 부품의 표기를 차례로 확인합니다. 확인한 내용은 공식 안내와 비교해 다음 조치가 필요한지 판단하는 데 사용합니다.` },
+      { type: "paragraph", text: `${part} 점검에서는 ${profile.focus}를 확인합니다. 한 위치만 보지 않고 확인 가능한 범위를 나누어 관찰한 뒤 차이를 비교합니다.` },
       { type: "heading", level: 2, text: "점검 전 준비" },
-      { type: "bullet_list", items: ["바이크 모델과 연식 확인", `${part}에 접근할 수 있는 위치 확인`, "차량 매뉴얼 또는 제조사 공식 안내 준비"] },
+      { type: "bullet_list", items: ["바이크가 움직이지 않도록 안전한 상태에서 확인", `${part}의 확인 가능한 범위를 먼저 파악`, "차량 매뉴얼 또는 제조사 공식 안내 준비"] },
+      { type: "heading", level: 2, text: "확인할 위치 찾기" },
+      { type: "bullet_list", items: profile.locate },
       { type: "heading", level: 2, text: "상태 확인 순서" },
-      { type: "step", number: 1, title: "외관을 확인합니다", body: `${part}와 주변에서 변형, 손상, 오염처럼 눈으로 구분할 수 있는 변화가 있는지 살펴봅니다.` },
-      { type: "step", number: 2, title: "연결 상태를 확인합니다", body: "단자나 체결부처럼 부품과 바이크가 연결되는 부분이 눈에 띄게 이탈하거나 손상되지 않았는지 확인합니다." },
-      { type: "step", number: 3, title: "장착 정보를 확인합니다", body: `현재 장착된 ${part}의 라벨이나 표기에서 식별 가능한 정보를 확인합니다.` },
-      { type: "step", number: 4, title: "공식 안내와 비교합니다", body: "확인한 정보와 상태를 현재 바이크의 매뉴얼 또는 제조사 안내와 비교합니다." },
+      ...profile.observe.map((body, index) => ({ type: "step", number: index + 1, title: `${index + 1}차 관찰 항목을 확인합니다`, body })),
+      { type: "heading", level: 2, text: "위치별 상태 비교" },
+      { type: "paragraph", text: profile.compare },
       { type: "heading", level: 2, text: "점검 결과 판단" },
-      { type: "paragraph", text: "외관이나 연결부에서 이상이 보이거나 장착 정보가 공식 안내와 일치하는지 판단하기 어렵다면 임의로 결론 내리지 않습니다. 확인한 항목을 구분해 추가 점검이 필요한 부분을 정리합니다." },
+      { type: "paragraph", text: profile.evaluate },
       { type: "heading", level: 2, text: "확인 후 조치" },
-      { type: "paragraph", text: "점검한 위치를 원래 상태로 정리하고 빠뜨린 항목이 없는지 다시 확인합니다. 손상이나 연결 이상이 의심되면 해당 상태를 유지한 채 공식 정비 안내를 확인합니다." },
+      { type: "paragraph", text: profile.followUp },
       { type: "warning", title: "수치나 교체 시기를 추정하지 마세요", body: `측정 근거 없이 ${part}의 수명, 성능 또는 교체 시기를 단정하지 말고 실제 제품 표기와 제조사 기준을 확인하세요.` }
-    ]
+    ],
+    subjectProfile: profile
   };
 }
 
@@ -256,7 +338,7 @@ function modelGuideDraft(topic, targetPart, intent, evidence) {
 }
 
 function selectStrategy(input) {
-  if (input.contentType === "MAINTENANCE") return maintenanceDraft(input.topic, input.targetPart);
+  if (input.contentType === "MAINTENANCE") return maintenanceDraft(input.topic, input.targetPart, input.intent);
   if (input.contentType === "DIY") return diyDraft(input.topic, input.targetPart);
   if (input.contentType === "PARTS_GUIDE") return partsGuideDraft(input.topic, input.targetPart, input.intent);
   return modelGuideDraft(input.topic, input.targetPart, input.intent, input.evidence);
@@ -317,12 +399,32 @@ function checkProceduralCompleteness(blocks, required) {
   if (!required) return { pass: true, required, stages: [] };
   const text = blocks.map(blockText).join(" ");
   const stages = [
-    { name: "PREPARE", present: /준비|시작.*전|연식.*확인/.test(text) },
-    { name: "CHECK", present: /상태|외관|측정|점검|표기.*확인/.test(text) },
+    { name: "PREPARE", present: /준비|시작.*전|안전한 상태|연식.*확인/.test(text) },
+    { name: "LOCATE", present: /확인할 위치|확인 가능한 범위|접근할 수 있는 위치|장착 위치/.test(text) },
+    { name: "OBSERVE", present: /관찰|살펴|상태 확인|측정|변화가 있는지|닳아 보이는지/.test(text) },
+    { name: "COMPARE", present: /비교|차이/.test(text) },
     { name: "EVALUATE", present: /비교|판단/.test(text) },
     { name: "FOLLOW_UP", present: /다시 확인|추가.*확인|확인 후|후속|조치/.test(text) }
   ];
   return { pass: stages.every((stage) => stage.present), required, stages };
+}
+
+function checkSubjectCoverage(blocks, profile) {
+  if (!profile) return { pass: true, dimensions: [] };
+  const text = blocks.map(blockText).join(" ");
+  const dimensions = profile.coverage.map((pattern) => ({ pattern: pattern.source, present: pattern.test(text) }));
+  return { pass: dimensions.every((dimension) => dimension.present), dimensions };
+}
+
+function checkCrossPartContamination(blocks, targetPart) {
+  const text = blocks.map(blockText).join(" ").toLowerCase();
+  const forbidden = {
+    TIRE: [/배터리/, /단자/, /전기.{0,8}커넥터/, /마찰재/, /브레이크 패드/],
+    BATTERY: [/트레드/, /접지면/, /타이어.{0,8}마모/, /마찰재/, /브레이크 패드/],
+    BRAKE: [/배터리/, /단자 방향/, /트레드/, /접지면/, /타이어.{0,8}마모/]
+  }[targetPart] ?? [];
+  const matches = forbidden.filter((pattern) => pattern.test(text)).map((pattern) => pattern.source);
+  return { pass: matches.length === 0, matches };
 }
 
 function evaluateInformationDensity(blocks) {
@@ -492,8 +594,10 @@ async function main() {
   const semanticDuplication = checkSemanticDuplication(draft.blocks);
   const proceduralRequired = requiresProcedure(contentType, requestIntent.action);
   const proceduralCompleteness = checkProceduralCompleteness(draft.blocks, proceduralRequired);
+  const subjectCoverage = checkSubjectCoverage(draft.blocks, draft.subjectProfile);
+  const crossPartContamination = checkCrossPartContamination(draft.blocks, targetPart);
   const informationDensity = evaluateInformationDensity(draft.blocks);
-  const informationPriority = checkInformationPriority(draft.blocks);
+  const informationPriority = checkInformationPriority(draft.blocks) && subjectCoverage.pass;
   const claimIssues = findUnsupportedClaims(draft.blocks, rules.prohibitedClaims, evidence.status);
   const relationValidity = relations.parts.every((part) => rules.validPartTypes.includes(part.partType) && part.scopeType === "CATEGORY") && (targetBikeModelKey ? relations.bikeModels.length === 1 : true);
   const imagePlanValidity = typeof imagePlan.thumbnail.required === "boolean" && typeof imagePlan.hero.required === "boolean" && Array.isArray(imagePlan.bodyImages);
@@ -503,6 +607,8 @@ async function main() {
     ...claimIssues,
     ...(semanticDuplication.pass ? [] : [`Semantic duplication detected (${semanticDuplication.duplicatePairs})`]),
     ...(proceduralCompleteness.pass ? [] : ["Procedural flow is incomplete"]),
+    ...(subjectCoverage.pass ? [] : ["Normalized subject is not sufficiently covered"]),
+    ...(crossPartContamination.pass ? [] : [`Cross-part contamination detected (${crossPartContamination.matches.join(", ")})`]),
     ...(informationDensity === "GOOD" ? [] : [`Information density is ${informationDensity}`]),
     ...(informationPriority ? [] : ["Supporting information outweighs the core procedure"]),
     ...(relationValidity ? [] : ["Relations are invalid"]),
@@ -523,6 +629,11 @@ async function main() {
     semanticDuplication: semanticDuplication.pass,
     proceduralCompleteness: proceduralCompleteness.pass,
     proceduralCompletenessRequired: proceduralRequired,
+    proceduralStages: proceduralCompleteness.stages,
+    subjectCoverage: subjectCoverage.pass,
+    subjectCoverageDimensions: subjectCoverage.dimensions,
+    crossPartContamination: crossPartContamination.pass,
+    crossPartContaminationMatches: crossPartContamination.matches,
     informationPriority,
     evidenceComplete,
     unsupportedClaims: claimIssues.length,
