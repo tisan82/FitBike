@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "assets": {
+    "thumbnail": {
+      "width": 1200,
+      "height": 675,
+      "aspectRatio": "16:9",
+      "format": "webp",
+      "colourspace": "srgb",
+      "fileName": "thumbnail-candidate.webp"
+    },
+    "hero": {
+      "width": 1600,
+      "height": 900,
+      "aspectRatio": "16:9",
+      "format": "webp",
+      "colourspace": "srgb",
+      "fileName": "hero-candidate.webp"
+    },
+    "body": {
+      "width": 1200,
+      "height": 900,
+      "aspectRatio": "4:3",
+      "format": "webp",
+      "colourspace": "srgb",
+      "fileNamePattern": "body-{index}-candidate.webp"
+    }
+  },
+  "textPolicy": {
+    "default": "NONE",
+    "allowed": ["short label", "simple number", "necessary annotation"],
+    "prohibited": ["long headline", "body copy", "supporting copy", "feature chips"]
+  },
+  "generation": {
+    "prohibited": ["brand logo", "watermark", "invented product number", "unsupported technical value", "advertising layout"],
+    "modelGuide": {
+      "preferExistingBikeAsset": true,
+      "generatedRealModelReplica": false,
+      "fallback": ["GENERIC_CONTEXT_IMAGE", "IMAGE_REVIEW_REQUIRED"]
+    },
+    "product": {
+      "preferApprovedProductAsset": true,
+      "generatedProductReplica": false,
+      "genericEducationalVisual": true
+    }
+  },
+  "qa": {
+    "minimumBytes": 1,
+    "requireExactDimensions": true,
+    "requireSrgb": true,
+    "requireVisualReview": true
+  }
+}
