@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "validContentTypes": ["MAINTENANCE", "DIY", "PARTS_GUIDE", "MODEL_GUIDE"],
+  "validPartTypes": ["TIRE", "BATTERY", "BRAKE"],
+  "validBlockTypes": ["heading", "paragraph", "image", "bullet_list", "numbered_list", "step", "tip", "warning", "table"],
+  "prohibitedClaims": ["추천", "Best", "최고", "무조건", "완벽", "압도적", "탁월한", "최고의 선택"],
+  "sectionRange": { "minimum": 4, "maximum": 7 },
+  "slugTerms": {
+    "오토바이": "motorcycle",
+    "바이크": "motorcycle",
+    "타이어": "tire",
+    "배터리": "battery",
+    "브레이크": "brake",
+    "공기압": "pressure",
+    "교체": "replacement",
+    "규격": "specification",
+    "점검": "inspection",
+    "확인": "check",
+    "관리": "maintenance",
+    "방법": ""
+  }
+}

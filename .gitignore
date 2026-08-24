@@ -46,3 +46,6 @@ next-env.d.ts
 # local tire image sources and generated upload assets
 /assets-source/tire-models/**/original/
 /assets-source/tire-models/**/upload/
+
+# Content Factory review artifacts
+/content-work/

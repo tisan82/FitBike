@@ -1,0 +1,18 @@
+{
+  "MAINTENANCE": {
+    "intent": "점검, 관리, 교체 전 확인 정보를 설명한다.",
+    "images": { "thumbnail": true, "hero": false, "bodyVisualPreferred": false }
+  },
+  "DIY": {
+    "intent": "사용자가 직접 수행하는 교체 또는 작업 절차를 설명한다.",
+    "images": { "thumbnail": true, "hero": true, "bodyVisualPreferred": true }
+  },
+  "PARTS_GUIDE": {
+    "intent": "부품, 규격, 구조를 이해할 수 있도록 설명한다.",
+    "images": { "thumbnail": true, "hero": false, "bodyVisualPreferred": true }
+  },
+  "MODEL_GUIDE": {
+    "intent": "검증된 특정 바이크 모델 데이터를 기반으로 정보를 설명한다.",
+    "images": { "thumbnail": true, "hero": true, "bodyVisualPreferred": false }
+  }
+}
