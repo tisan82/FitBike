@@ -98,13 +98,68 @@ function sameJson(left, right) {
 
 function validateApproval(contentDirectory, packageWithImages, approval) {
   if (packageWithImages.qa.status !== "READY_FOR_REVIEW" || approval.status !== "APPROVED" || approval.text?.status !== "APPROVED") throw new Error("PUBLISH_BLOCKED_APPROVAL_MISSING");
-  const requiredAssets = packageWithImages.imageCandidates.assets.filter((asset) => asset.status === "PASS");
   if (packageWithImages.imageCandidates.status !== "READY_FOR_VISUAL_REVIEW") throw new Error("PUBLISH_BLOCKED_REQUIRED_IMAGE_MISSING");
+  const requiredIds = [
+    ...(packageWithImages.images.thumbnail?.required ? ["thumbnail"] : []),
+    ...(packageWithImages.images.hero?.required ? ["hero"] : []),
+    ...packageWithImages.images.bodyImages.flatMap((plan, index) => plan.required ? [`body-${String(index + 1).padStart(2, "0")}`] : [])
+  ];
+  const requiredAssets = packageWithImages.imageCandidates.assets.filter((asset) => requiredIds.includes(asset.id) && asset.status === "PASS");
+  if (requiredAssets.length !== requiredIds.length || requiredIds.some((id) => requiredAssets.filter((asset) => asset.id === id).length !== 1)) throw new Error("PUBLISH_BLOCKED_REQUIRED_IMAGE_MISSING");
   for (const asset of requiredAssets) {
     const approved = approval.images.find((item) => item.id === asset.id && item.status === "APPROVED" && item.file === asset.file);
     if (!approved || !existsSync(path.join(contentDirectory, asset.file))) throw new Error("PUBLISH_BLOCKED_APPROVAL_MISSING");
+    if (asset.type === "body" && (typeof approved.alt !== "string" || approved.alt.trim().length === 0)) throw new Error("PUBLISH_BLOCKED_BODY_IMAGE_ALT_MISSING");
   }
   return requiredAssets.map((asset) => ({ ...asset, approval: approval.images.find((item) => item.id === asset.id) }));
+}
+
+function productionImagePath(contentKey, asset) {
+  if (asset.type === "thumbnail") return `contents/${contentKey}/thumbnail.webp`;
+  if (asset.type === "hero") return `contents/${contentKey}/hero.webp`;
+  if (asset.type === "body" && /^body-\d{2}$/.test(asset.id)) return `contents/${contentKey}/${asset.id}.webp`;
+  throw new Error("PUBLISH_BLOCKED_IMAGE_ROLE_INVALID");
+}
+
+function meaningfulTokens(text) {
+  const ignored = new Set(["이미지", "시각", "자료", "일반적인", "보여주는", "텍스트", "수치", "없이", "교육용", "개념", "purpose", "visual"]);
+  return [...new Set(text.normalize("NFKC").toLowerCase().match(/[가-힣a-z0-9]+/g) ?? [])].filter((token) => token.length >= 2 && !ignored.has(token));
+}
+
+function findBodyPlacement(blocks, plan) {
+  if (Number.isInteger(plan.afterBlock) && plan.afterBlock >= 0 && plan.afterBlock < blocks.length) return plan.afterBlock + 1;
+  const headings = blocks.map((block, index) => block.type === "heading" ? { index, text: block.text } : null).filter(Boolean);
+  if (typeof plan.targetSection === "string") {
+    const target = headings.find((heading) => heading.text.includes(plan.targetSection) || plan.targetSection.includes(heading.text));
+    if (target) return headings.find((heading) => heading.index > target.index)?.index ?? blocks.length;
+  }
+  const tokens = meaningfulTokens(`${plan.description ?? ""} ${plan.purpose ?? ""}`);
+  let best = { score: -1, end: blocks.length };
+  for (let index = 0; index < headings.length; index += 1) {
+    const start = headings[index].index;
+    const end = headings[index + 1]?.index ?? blocks.length;
+    const sectionText = blocks.slice(start, end).map((block) => [block.text, block.title, block.body, ...(block.items ?? [])].filter(Boolean).join(" ")).join(" ").normalize("NFKC").toLowerCase();
+    const score = tokens.filter((token) => sectionText.includes(token)).length;
+    if (score >= best.score) best = { score, end };
+  }
+  return best.end;
+}
+
+function integrateBodyImages(content, imagePlan, approvedAssets) {
+  const bodyAssets = approvedAssets.filter((asset) => asset.type === "body").sort((left, right) => left.id.localeCompare(right.id));
+  if (bodyAssets.length !== imagePlan.bodyImages.filter((plan) => plan.required).length) throw new Error("PUBLISH_BLOCKED_BODY_IMAGE_COUNT_MISMATCH");
+  const insertions = bodyAssets.map((asset) => {
+    const index = Number(asset.id.slice("body-".length)) - 1;
+    const plan = imagePlan.bodyImages[index];
+    if (!plan?.required) throw new Error("PUBLISH_BLOCKED_BODY_IMAGE_PLAN_MISMATCH");
+    const block = { type: "image", storagePath: productionImagePath(content.contentKey, asset), alt: asset.approval.alt.trim() };
+    if (typeof asset.approval.caption === "string" && asset.approval.caption.trim()) block.caption = asset.approval.caption.trim();
+    return { position: findBodyPlacement(content.bodyBlocks, plan), block };
+  });
+  const bodyBlocks = [...content.bodyBlocks];
+  for (const insertion of insertions.sort((left, right) => right.position - left.position)) bodyBlocks.splice(insertion.position, 0, insertion.block);
+  if (bodyBlocks.filter((block) => block.type === "image").length !== bodyAssets.length) throw new Error("PUBLISH_BLOCKED_BODY_IMAGE_COUNT_MISMATCH");
+  return { ...content, bodyBlocks };
 }
 
 function validateRelations(relations) {
@@ -165,7 +220,7 @@ function mapExistingIntent(row) {
   return normalizeIntent({ title: row.title, summary: row.summary, contentType: row.content_type, targetPart: row.part_types?.[0] ?? null, targetBikeModelKey: row.model_keys?.[0] ?? null });
 }
 
-async function duplicatePreflight(readDb, content, relations, normalizedIntent) {
+async function duplicatePreflight(readDb, content, relations, normalizedIntent, productionAssets) {
   const rows = await readDb(`
     select c.content_id,c.content_key,c.title,c.summary,c.content_type,c.thumbnail_image_storage_path,c.hero_image_storage_path,c.body_blocks,c.is_active,c.published_at,
       coalesce(array_agg(distinct p.part_type) filter (where p.part_type is not null), '{}') as part_types,
@@ -180,11 +235,13 @@ async function duplicatePreflight(readDb, content, relations, normalizedIntent) 
   if (exact) {
     const expectedParts = relations.parts.map((part) => part.partType).sort();
     const actualParts = [...new Set(exact.part_types ?? [])].sort();
+    const expectedThumbnail = productionAssets.find((asset) => asset.type === "thumbnail")?.objectPath ?? null;
+    const expectedHero = productionAssets.find((asset) => asset.type === "hero")?.objectPath ?? null;
     const equivalent = exact.title === content.title
       && exact.summary === content.summary
       && exact.content_type === content.contentType
-      && exact.thumbnail_image_storage_path === `contents/${content.contentKey}/thumbnail.webp`
-      && exact.hero_image_storage_path === null
+      && exact.thumbnail_image_storage_path === expectedThumbnail
+      && exact.hero_image_storage_path === expectedHero
       && sameJson(exact.body_blocks, content.bodyBlocks)
       && exact.is_active
       && exact.published_at
@@ -231,6 +288,9 @@ async function main() {
   const plan = await readJson(path.join(contentDirectory, "plan.json"));
   const approval = await readJson(path.join(contentDirectory, "publish-approval.json"));
   const approvedAssets = validateApproval(contentDirectory, packageWithImages, approval);
+  const productionAssets = approvedAssets.map((asset) => ({ ...asset, objectPath: productionImagePath(packageWithImages.content.contentKey, asset), localPath: path.join(contentDirectory, asset.file) }));
+  if (new Set(productionAssets.map((asset) => asset.objectPath)).size !== productionAssets.length) throw new Error("PUBLISH_BLOCKED_STORAGE_PATH_CONFLICT");
+  const publishContent = integrateBodyImages(packageWithImages.content, packageWithImages.images, productionAssets);
   validateRelations(relations);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -241,20 +301,20 @@ async function main() {
   const serviceClient = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const storage = serviceClient.storage;
   const readDb = (query, parameters = []) => queryDatabase(projectRef, accessToken, query, parameters, true);
-  const normalizedIntent = plan.normalizedIntent ?? normalizeIntent({ title: packageWithImages.content.title, summary: packageWithImages.content.summary, contentType: packageWithImages.content.contentType, targetPart: relations.parts[0]?.partType ?? null, targetBikeModelKey: relations.bikeModels[0]?.modelKey ?? null });
-  const duplicate = await duplicatePreflight(readDb, packageWithImages.content, relations, normalizedIntent);
+  const normalizedIntent = plan.normalizedIntent ?? normalizeIntent({ title: publishContent.title, summary: publishContent.summary, contentType: publishContent.contentType, targetPart: relations.parts[0]?.partType ?? null, targetBikeModelKey: relations.bikeModels[0]?.modelKey ?? null });
+  const duplicate = await duplicatePreflight(readDb, publishContent, relations, normalizedIntent, productionAssets);
   if (duplicate.status === "PUBLISH_BLOCKED_DUPLICATE") throw new Error(`PUBLISH_BLOCKED_DUPLICATE:${duplicate.duplicateWith}`);
   if (duplicate.status === "PARTIAL_STATE") throw new Error("PARTIAL_STATE");
-  const registryTopic = await validateRegistryTopic(readDb, approval.topicKey, packageWithImages.content, duplicate.status);
+  const registryTopic = await validateRegistryTopic(readDb, approval.topicKey, publishContent, duplicate.status);
 
-  const thumbnail = approvedAssets.find((asset) => asset.type === "thumbnail");
-  if (!thumbnail) throw new Error("PUBLISH_BLOCKED_REQUIRED_IMAGE_MISSING");
   const bucketName = "content-assets";
-  const objectPath = `contents/${packageWithImages.content.contentKey}/thumbnail.webp`;
-  const localImagePath = path.join(contentDirectory, thumbnail.file);
-  const storagePreflight = await inspectStorage(storage, bucketName, objectPath, localImagePath);
-  if (storagePreflight.objectStatus === "CONFLICT") throw new Error("PUBLISH_BLOCKED_ASSET_CONFLICT");
-  const preflight = { status: "PASS", approval: "PASS", duplicate: duplicate.status, registry: { topicKey: registryTopic.topic_key, status: registryTopic.status }, storage: storagePreflight, contentKey: packageWithImages.content.contentKey, objectPath };
+  const storageAssets = [];
+  for (const asset of productionAssets) {
+    const inspection = await inspectStorage(storage, bucketName, asset.objectPath, asset.localPath);
+    if (inspection.objectStatus === "CONFLICT") throw new Error(`PUBLISH_BLOCKED_ASSET_CONFLICT:${asset.objectPath}`);
+    storageAssets.push({ id: asset.id, type: asset.type, objectPath: asset.objectPath, ...inspection });
+  }
+  const preflight = { status: "PASS", approval: "PASS", duplicate: duplicate.status, registry: { topicKey: registryTopic.topic_key, status: registryTopic.status }, storage: { assets: storageAssets }, contentKey: publishContent.contentKey };
   if (args.mode === "preflight") {
     await writeFile(path.join(contentDirectory, "publish-preflight.json"), `${JSON.stringify(preflight, null, 2)}\n`, "utf8");
     console.log(JSON.stringify(preflight, null, 2));
@@ -262,18 +322,23 @@ async function main() {
   }
 
   let bucketCreated = false;
-  let upload = storagePreflight.objectStatus === "REUSE" ? "REUSED" : "UPLOADED";
-  if (!storagePreflight.bucketExists) {
+  const uploads = [];
+  if (storageAssets.some((asset) => !asset.bucketExists)) {
     const { error } = await storage.createBucket(bucketName, { public: true, allowedMimeTypes: ["image/webp"] });
     if (error) throw new Error("STORAGE_BUCKET_CREATE_FAILED");
     bucketCreated = true;
   }
-  if (storagePreflight.objectStatus === "ABSENT") {
-    const { error } = await storage.from(bucketName).upload(objectPath, await readFile(localImagePath), { contentType: "image/webp", upsert: false });
-    if (error) throw new Error("STORAGE_UPLOAD_FAILED");
+  for (const asset of productionAssets) {
+    const before = storageAssets.find((stored) => stored.id === asset.id);
+    const upload = before.objectStatus === "REUSE" ? "REUSED" : "UPLOADED";
+    if (before.objectStatus === "ABSENT") {
+      const { error } = await storage.from(bucketName).upload(asset.objectPath, await readFile(asset.localPath), { contentType: "image/webp", upsert: false });
+      if (error) throw new Error(`STORAGE_UPLOAD_FAILED:${asset.objectPath}`);
+    }
+    const verified = await inspectStorage(storage, bucketName, asset.objectPath, asset.localPath);
+    if (verified.objectStatus !== "REUSE" || verified.httpStatus !== 200 || verified.mimeType !== "image/webp") throw new Error(`STORAGE_VERIFY_FAILED:${asset.objectPath}`);
+    uploads.push({ id: asset.id, type: asset.type, objectPath: asset.objectPath, upload, verified: true });
   }
-  const storageVerified = await inspectStorage(storage, bucketName, objectPath, localImagePath);
-  if (storageVerified.objectStatus !== "REUSE" || storageVerified.httpStatus !== 200 || storageVerified.mimeType !== "image/webp") throw new Error("STORAGE_VERIFY_FAILED");
 
   let dbStatus = duplicate.status;
   let storageOrphan = duplicate.status !== "ALREADY_PUBLISHED";
@@ -282,34 +347,35 @@ async function main() {
       const publishStatement = `
         with inserted_content as (
           insert into public."12_content" (content_key,title,summary,content_type,thumbnail_image_storage_path,hero_image_storage_path,body_blocks,is_active,published_at)
-          values ($1,$2,$3,$4,$5,null,$6::jsonb,true,$7::timestamptz)
+          values ($1,$2,$3,$4,$5,$6,$7::jsonb,true,$8::timestamptz)
           returning content_id
         ), inserted_bike_models as (
           insert into public."13_content_bike_model" (content_id,bike_model_id)
           select inserted_content.content_id, relation_id
-          from inserted_content cross join unnest($8::bigint[]) as relation_id
+          from inserted_content cross join unnest($9::bigint[]) as relation_id
         ), inserted_bike_years as (
           insert into public."14_content_bike_model_year" (content_id,bike_model_year_id)
           select inserted_content.content_id, relation_id
-          from inserted_content cross join unnest($9::bigint[]) as relation_id
+          from inserted_content cross join unnest($10::bigint[]) as relation_id
         ), inserted_parts as (
           insert into public."15_content_part_link" (content_id,part_type,scope_type,display_order,is_active)
           select inserted_content.content_id, relation.part_type, relation.scope_type, relation.display_order, true
-          from inserted_content cross join jsonb_to_recordset($10::jsonb) as relation(part_type text,scope_type text,display_order integer)
+          from inserted_content cross join jsonb_to_recordset($11::jsonb) as relation(part_type text,scope_type text,display_order integer)
         ), published_topic as (
           update public."16_content_topic"
           set status='PUBLISHED',content_id=(select content_id from inserted_content)
-          where topic_key=$11 and status='APPROVED' and content_id is null
+          where topic_key=$12 and status='APPROVED' and content_id is null
           returning content_topic_id
         )
         select content_id,(select count(*) from published_topic) as published_topic_count from inserted_content;`;
       const inserted = await queryDatabase(projectRef, accessToken, publishStatement, [
-        packageWithImages.content.contentKey,
-        packageWithImages.content.title,
-        packageWithImages.content.summary,
-        packageWithImages.content.contentType,
-        objectPath,
-        JSON.stringify(packageWithImages.content.bodyBlocks),
+        publishContent.contentKey,
+        publishContent.title,
+        publishContent.summary,
+        publishContent.contentType,
+        productionAssets.find((asset) => asset.type === "thumbnail")?.objectPath ?? null,
+        productionAssets.find((asset) => asset.type === "hero")?.objectPath ?? null,
+        JSON.stringify(publishContent.bodyBlocks),
         new Date().toISOString(),
         relations.bikeModels.map((relation) => relation.bikeModelId),
         relations.bikeModelYears.map((relation) => relation.bikeModelYearId),
@@ -322,15 +388,18 @@ async function main() {
   } catch (error) {
     throw new Error(`${error instanceof Error ? error.message : "DB_WRITE_FAILED"};STORAGE_ORPHAN=${storageOrphan}`);
   }
-  const verifiedRow = await verifyPublished(readDb, packageWithImages.content.contentKey, relations.parts[0]);
+  const verifiedRow = await verifyPublished(readDb, publishContent.contentKey, relations.parts[0]);
   storageOrphan = false;
-  const publicUrl = storage.from(bucketName).getPublicUrl(objectPath).data.publicUrl;
-  const result = { status: "PUBLISHED", contentKey: packageWithImages.content.contentKey, approval: "PASS", duplicateSafety: "PASS", idempotency: duplicate.status, storage: { bucket: bucketName, bucketCreated, objectPath, upload, verified: true, publicUrl }, database: { content: dbStatus, partRelation: "VERIFIED", contentId: verifiedRow.content_id }, storageOrphan };
+  const result = { status: "PUBLISHED", contentKey: publishContent.contentKey, approval: "PASS", duplicateSafety: "PASS", idempotency: duplicate.status, storage: { bucket: bucketName, bucketCreated, assets: uploads }, database: { content: dbStatus, partRelation: "VERIFIED", contentId: verifiedRow.content_id, bodyImageBlocks: publishContent.bodyBlocks.filter((block) => block.type === "image").length }, storageOrphan };
   await writeFile(path.join(contentDirectory, "publish-result.json"), `${JSON.stringify(result, null, 2)}\n`, "utf8");
   console.log(JSON.stringify(result, null, 2));
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}
+
+export { findBodyPlacement, integrateBodyImages, productionImagePath, validateApproval };
