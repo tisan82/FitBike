@@ -79,12 +79,14 @@ function normalizeSubject(text, partType) {
 }
 
 function normalizeIntent({ title, summary = "", contentType, targetPart = null, targetBikeModelKey = null }) {
+  const titleText = title.normalize("NFKC").toLowerCase();
   const text = `${title} ${summary}`.normalize("NFKC").toLowerCase();
   const normalizedPart = targetPart
     ?? (includesAny(text, ["타이어", "tire"]) ? "TIRE" : null)
     ?? (includesAny(text, ["배터리", "battery"]) ? "BATTERY" : null)
     ?? (includesAny(text, ["브레이크", "brake"]) ? "BRAKE" : null);
-  const subject = normalizeSubject(text, normalizedPart);
+  const titleSubject = normalizeSubject(titleText, normalizedPart);
+  const subject = titleSubject === normalizedPart ? normalizeSubject(text, normalizedPart) : titleSubject;
 
   let action = "UNDERSTAND";
   if (includesAny(text, ["교체 후", "교환 후", "after replacement", "post-replacement"])) action = "POST_REPLACEMENT_CHECK";
@@ -105,6 +107,26 @@ function normalizeIntent({ title, summary = "", contentType, targetPart = null, 
     scope,
     searchIntent: `${scope}:${subject}:${action}`
   };
+}
+
+function subjectRelationship(requestSubject, existingSubject, partType) {
+  if (requestSubject === existingSubject) return "SAME";
+  if (!partType) return "DISTINCT";
+  const prefix = `${partType}_`;
+  const requestSpecific = requestSubject.startsWith(prefix);
+  const existingSpecific = existingSubject.startsWith(prefix);
+  if ((requestSubject === partType && existingSpecific) || (existingSubject === partType && requestSpecific)) return "PARENT_CHILD";
+  if (requestSpecific && existingSpecific) return "RELATED";
+  return "DISTINCT";
+}
+
+function hasCoreSubjectCoverage(subject, existing) {
+  const blocks = Array.isArray(existing.body_blocks) ? existing.body_blocks : [];
+  const coveredBlocks = blocks.filter((block) => {
+    const blockText = [block.title, block.text, block.body, ...(block.items ?? []), ...((block.rows ?? []).flat())].filter(Boolean).join(" ");
+    return normalizeSubject(blockText.normalize("NFKC").toLowerCase(), existing.part_types?.[0] ?? null) === subject;
+  });
+  return coveredBlocks.length >= 2;
 }
 
 function classifyDuplicate(requestIntent, contentKey, title, existingContents) {
@@ -130,13 +152,13 @@ function classifyDuplicate(requestIntent, contentKey, title, existingContents) {
         reason: exactKeyOrTitle ? "The content key or normalized title already exists." : "Subject, action, scope, type, part, and bike resolve to the same intent."
       };
     }
-    const relatedSubject = requestIntent.subject === existingIntent.subject
-      || (requestIntent.targetPart && requestIntent.targetPart === existingIntent.targetPart);
-    if (sameEntity && relatedSubject && requestIntent.action === existingIntent.action) {
+    const relationship = subjectRelationship(requestIntent.subject, existingIntent.subject, requestIntent.targetPart);
+    const coverageRequired = relationship === "PARENT_CHILD" || relationship === "RELATED";
+    if (sameEntity && requestIntent.action === existingIntent.action && (relationship === "SAME" || coverageRequired && hasCoreSubjectCoverage(requestIntent.subject, existing))) {
       best = {
         status: "NEAR_DUPLICATE",
         duplicateWith: existing.content_key,
-        reason: "The target entity and action match while the subject or content type differs."
+        reason: relationship === "SAME" ? "The normalized subject, action, and target match while the content type differs." : `The ${relationship.toLowerCase()} subject is substantially covered by the existing content.`
       };
     }
   }
@@ -526,7 +548,7 @@ async function main() {
   const requestIntent = normalizeIntent({ title: topic, contentType, targetPart, targetBikeModelKey });
   const readEvidence = await createEvidenceReader();
   const indexQuery = process.env.SUPABASE_ACCESS_TOKEN ? `
-    select c.content_id,c.content_key,c.title,c.summary,c.content_type,
+    select c.content_id,c.content_key,c.title,c.summary,c.content_type,c.body_blocks,
       coalesce(array_agg(distinct p.part_type) filter (where p.part_type is not null), '{}') as part_types,
       coalesce(array_agg(distinct b.model_key) filter (where b.model_key is not null), '{}') as model_keys
     from public."12_content" c
@@ -534,7 +556,7 @@ async function main() {
     left join public."13_content_bike_model" cb on cb.content_id=c.content_id
     left join public."02_bike_model" b on b.bike_model_id=cb.bike_model_id
     where c.is_active=true
-    group by c.content_id,c.content_key,c.title,c.summary,c.content_type;` : "CONTENT_INDEX";
+    group by c.content_id,c.content_key,c.title,c.summary,c.content_type,c.body_blocks;` : "CONTENT_INDEX";
   const existingContents = await readEvidence(indexQuery);
   const duplicate = classifyDuplicate(requestIntent, contentKey, topic, existingContents);
   if (duplicate.status !== "DISTINCT_CONTENT") {
@@ -657,7 +679,11 @@ async function main() {
   console.log(JSON.stringify({ status, contentKey, outputDirectory, outputFiles: Object.keys(outputs).length, evidenceStatus: evidence.status }, null, 2));
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}
+
+export { classifyDuplicate, normalizeIntent, subjectRelationship };
