@@ -59,4 +59,13 @@ Review evidence against every factual claim, edit copy if needed, approve relati
 
 ## Publish Deferred
 
-There is no publish script, database mutation, Storage upload, scheduler, queue, or batch generation in v1.
+Approved packages use the final operating flow: `SOURCE / TOPIC → GENERATE → QA → IMAGE → REVIEW → APPROVE → PUBLISH`. Publishing is a separate explicit command and never follows `READY_FOR_REVIEW` automatically.
+
+```bash
+node scripts/content-factory/publish-content.mjs --content-dir content-work/{content-key} --mode preflight
+node scripts/content-factory/publish-content.mjs --content-dir content-work/{content-key} --mode publish
+```
+
+The publish command requires `publish-approval.json`, rechecks Production duplicates and Storage conflicts, verifies every required approved image, uploads without overwrite, then inserts content and relations in one database transaction. Re-running an equivalent published package returns `ALREADY_PUBLISHED` instead of inserting duplicates.
+
+Image source priority is `APPROVED_BRAND_ASSET → APPROVED_GENERIC_ASSET → GENERATED_GENERIC → IMAGE_REVIEW_REQUIRED`. Approved, role-suitable Poweroad assets are preferred for battery content and MAXXIS assets for tire content. Brand availability never overrides content suitability, and real products are not recreated with generation.

@@ -42,4 +42,8 @@ Candidates are written under `content-work/{content-key}/images/`. The pipeline 
 - Model guides reuse existing approved bike assets first. Real model replicas are not generated.
 - Specific products reuse approved product assets first. Only generic educational visuals may be generated.
 
+## Source priority
+
+Use the first asset that is both approved and suitable for the content role: `APPROVED_BRAND_ASSET → APPROVED_GENERIC_ASSET → GENERATED_GENERIC → IMAGE_REVIEW_REQUIRED`. Approved Poweroad assets are preferred for battery content and approved MAXXIS assets for tire content, but brand availability never overrides role suitability. Do not recreate a real product with generation. Image review and publish approval record `sourceType` explicitly.
+
 Technical QA checks file existence, format, exact dimensions, nonzero size, sRGB colourspace, and decodability. Visual QA checks text overload, unexpected logos, unsupported technical claims, and role alignment before `READY_FOR_VISUAL_REVIEW`.
