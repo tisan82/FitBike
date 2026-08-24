@@ -1,4 +1,4 @@
-# FitBike Content Factory v1
+# FitBike Content Factory v1.1
 
 ## Purpose
 
@@ -32,9 +32,17 @@ All seven files are JSON and are intermediate review artifacts. `content-work/` 
 
 ## QA Status
 
-- `READY_FOR_REVIEW`: evidence is complete or not required, schemas and relations are valid, and no unsupported claim was found.
+- `READY_FOR_REVIEW`: evidence is complete or not required, schemas and relations are valid, no unsupported claim was found, semantic duplication and incomplete procedures are absent, information priority passes, and information density is `GOOD`.
 - `REVIEW_REQUIRED`: the package is structurally valid but copy or relation judgment remains.
 - `BLOCKED_EVIDENCE`: required internal evidence is missing.
+
+## Quality Rules
+
+- Do not repeat the same semantic theme as a separate section after it has already been explained. A short reference inside a required procedure is allowed.
+- Maintenance and DIY procedures must cover preparation, checking, evaluation, and follow-up without ending midway through the task.
+- Each major section needs enough explanation to help the reader act; heading-heavy, explanation-light output is `TOO_LIGHT` and cannot be ready for review.
+- Core information and the actual procedure take priority over warnings and optional tips.
+- `NOT_REQUIRED` content cannot introduce exact pressure or temperature values, model-specific specifications, or performance claims without evidence.
 
 ## Review Flow
 
