@@ -22,7 +22,7 @@ Production origin은 `https://fitbike.co.kr`이며 공통 site config에서 관�
 
 ## Sitemap Policy
 
-Sitemap은 `/`, `/bike-selector`, `/tire-models/maxxis`, `/contents`, 활성 Model-Year URL과 공개 Content Detail URL을 포함한다. Model-Year와 Content는 실제 `updated_at`을 `lastModified`로 사용하며 요청 시각을 임의로 사용하지 않는다. 현재 규모에서는 단일 sitemap을 사용하고 존재하지 않거나 비활성인 ID를 생성하지 않는다.
+Sitemap은 `/`, `/bike-selector`, `/tire-models/maxxis`, `/contents`, 활성 Model-Year URL과 공개 Content Detail URL을 포함한다. Model-Year와 Content는 실제 `updated_at`을 `lastModified`로 사용하며 요청 시각을 임의로 사용하지 않는다. 현재 규모에서는 단일 sitemap을 사용하고 존재하지 않거나 비활성인 ID를 생성하지 않는다. `/sitemap.xml`은 Runtime DB 결과를 300초 CDN response cache로 제공한다.
 
 ## Robots Policy
 

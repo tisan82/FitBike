@@ -36,7 +36,7 @@ The supported `body_blocks` union is limited to `heading`, `paragraph`, `image`,
 
 Public content must satisfy all of the following: `is_active = true`, `published_at IS NOT NULL`, and `published_at <= now()`. The directory order is `published_at DESC`, then `content_id DESC`.
 
-`/contents`, Home's recent-guide gate, and the content sitemap use five-minute ISR so runtime publishing is reflected without disabling the route cache globally.
+`/contents` and Home's recent-guide gate use five-minute ISR. `/sitemap.xml` uses a dynamic Route Handler with a five-minute CDN response cache so runtime publishing is reflected without disabling caching globally; the metadata sitemap convention is not used because its Production output was observed remaining bound to the deployment artifact.
 
 ## Current Scope
 
