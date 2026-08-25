@@ -108,6 +108,11 @@ Header → Content → Primary Action → Bottom Navigation(필요 시)
 
 Fitment/specification 정보는 상업적 프로모션보다 우선한다.
 
+Home은 공개된 최신 정보 콘텐츠 일부를 보여주는 `바이크 관리 가이드` Gate와
+`/contents` 전체 보기 CTA를 제공한다. Home에 전체 콘텐츠를 나열하거나 추천·인기
+순위를 만들지 않는다. 각 Guide card는 `/contents/{contentKey}`로 직접 연결하며,
+모바일에서도 카드 전체가 충분한 tap target이 되고 가로 overflow를 만들지 않아야 한다.
+
 ## Tire Model Detail Disclosure
 
 타이어 모델 상세는 모델 이해 후 판매 규격을 선택하는 Gate다. 규격명, 고객용 장착

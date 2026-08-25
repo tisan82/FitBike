@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { DEFAULT_OG_IMAGE } from "@/lib/seo/site";
+import { getPublishedContents } from "@/services/content.service";
+
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "오토바이 타이어·배터리·브레이크 규격 찾기",
@@ -9,7 +13,9 @@ export const metadata: Metadata = {
   twitter: { card: "summary", title: "오토바이 타이어·배터리·브레이크 규격 찾기 | FitBike", description: "브랜드, 모델, 연식 기준으로 내 바이크의 부품 규격을 확인하세요.", images: [DEFAULT_OG_IMAGE] },
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const recentGuides = (await getPublishedContents()).slice(0, 3);
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       {/* Hero */}
@@ -86,24 +92,19 @@ export default function HomePage() {
           </p>
 
           <div className="mt-8 grid gap-5 md:grid-cols-3">
-            <ArticleCard
-              title="바이크 배터리 교체 전에 꼭 확인해야 할 5가지"
-              description="시동이 약하거나 계기판 불빛이 흐릴 때, 바로 교체하기 전에 확인해야 할 기준입니다."
-              tag="Battery"
-            />
-
-            <ArticleCard
-              title="바이크 타이어 교체 시기, 마모선만 보면 충분할까?"
-              description="마모선, 균열, 공기압, 제조일자까지 정비소 가기 전 확인할 항목을 정리합니다."
-              tag="Tire"
-            />
-
-            <ArticleCard
-              title="엔진오일 교체 전에 봐야 할 신호"
-              description="주행거리뿐 아니라 색상, 점도, 냄새까지 함께 확인합니다."
-              tag="Oil"
-            />
+            {recentGuides.map((guide) => (
+              <ArticleCard
+                contentKey={guide.contentKey}
+                description={guide.summary}
+                key={guide.contentId}
+                tag={guide.contentType}
+                title={guide.title}
+              />
+            ))}
           </div>
+          <Link className="mt-8 inline-flex min-h-11 items-center font-bold text-primary transition hover:text-primary-hover" href="/contents">
+            전체 가이드 보기 →
+          </Link>
         </div>
       </section>
 
@@ -132,22 +133,31 @@ export default function HomePage() {
 }
 
 function ArticleCard({
+  contentKey,
   title,
   description,
   tag,
 }: {
+  contentKey: string;
   title: string;
   description: string;
   tag: string;
 }) {
+  const labels: Record<string, string> = {
+    MAINTENANCE: "점검/관리",
+    DIY: "교체/DIY",
+    PARTS_GUIDE: "부품 규격",
+    MODEL_GUIDE: "모델 가이드",
+  };
+
   return (
-    <article className="rounded-2xl border border-border bg-surface p-6">
-      <p className="mb-4 text-sm font-semibold text-primary">{tag}</p>
-      <h3 className="text-xl font-bold leading-snug">{title}</h3>
-      <p className="mt-4 text-base leading-7 text-foreground-secondary">{description}</p>
-      <button className="mt-6 text-sm font-semibold text-primary transition hover:text-primary-hover">
-        곧 공개 예정 →
-      </button>
+    <article className="overflow-hidden rounded-2xl border border-border bg-surface transition-colors hover:border-primary">
+      <Link className="block min-h-11 p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" href={`/contents/${encodeURIComponent(contentKey)}`}>
+        <p className="mb-4 text-sm font-semibold text-primary">{labels[tag] ?? tag}</p>
+        <h3 className="text-xl font-bold leading-snug">{title}</h3>
+        <p className="mt-4 text-base leading-7 text-foreground-secondary">{description}</p>
+        <p className="mt-6 text-base font-semibold text-primary">가이드 보기 →</p>
+      </Link>
     </article>
   );
 }

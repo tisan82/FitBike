@@ -22,7 +22,7 @@ Production origin은 `https://fitbike.co.kr`이며 공통 site config에서 관�
 
 ## Sitemap Policy
 
-Sitemap은 `/`, `/bike-selector`, `/tire-models/maxxis`, 활성 Model-Year URL을 포함한다. Model-Year는 실제 `updated_at`을 `lastModified`로 사용하며 요청 시각을 임의로 사용하지 않는다. 현재 규모에서는 단일 sitemap을 사용하고 존재하지 않거나 비활성인 ID를 생성하지 않는다.
+Sitemap은 `/`, `/bike-selector`, `/tire-models/maxxis`, `/contents`, 활성 Model-Year URL과 공개 Content Detail URL을 포함한다. Model-Year와 Content는 실제 `updated_at`을 `lastModified`로 사용하며 요청 시각을 임의로 사용하지 않는다. 현재 규모에서는 단일 sitemap을 사용하고 존재하지 않거나 비활성인 ID를 생성하지 않는다.
 
 ## Robots Policy
 
@@ -34,7 +34,7 @@ JSON-LD와 화면에 표시되는 실제 데이터만 사용한다. DB 문자열
 
 ## Image SEO and Internal Linking
 
-대표 이미지는 Brand/Model/Year 기반의 간결한 alt를 사용한다. Placeholder를 실제 모델 이미지로 표현하지 않는다. OG image에는 absolute public URL만 사용한다. Model-Year 연식 링크와 실제 활성 모델을 보여주는 Brand/Model directory card는 crawler가 탐색 가능한 내부 링크다. 실제 Brand/Model directory가 없으면 SEO용 빈 page를 만들지 않는다.
+대표 이미지는 Brand/Model/Year 기반의 간결한 alt를 사용한다. Placeholder를 실제 모델 이미지로 표현하지 않는다. OG image에는 absolute public URL만 사용한다. Model-Year 연식 링크, 실제 활성 모델을 보여주는 Brand/Model directory card, Home의 Content Gate와 `/contents`의 Content card는 crawler가 탐색 가능한 내부 링크다. 실제 Brand/Model directory가 없으면 SEO용 빈 page를 만들지 않는다.
 
 ## SEO-critical SSR and Performance
 

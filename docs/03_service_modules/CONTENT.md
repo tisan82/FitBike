@@ -36,6 +36,8 @@ The supported `body_blocks` union is limited to `heading`, `paragraph`, `image`,
 
 Public content must satisfy all of the following: `is_active = true`, `published_at IS NOT NULL`, and `published_at <= now()`. The directory order is `published_at DESC`, then `content_id DESC`.
 
+`/contents`, Home's recent-guide gate, and the content sitemap use five-minute ISR so runtime publishing is reflected without disabling the route cache globally.
+
 ## Current Scope
 
 - Published content list and content-type filter
@@ -45,6 +47,8 @@ Public content must satisfy all of the following: `is_active = true`, `published
 - Missing, inactive, and unpublished content handled with Next.js `notFound()`
 - Up to three published guides on a related Bike Model Detail page
 - Related active bike cards on content detail, linked through the newest active model-year route
+- Home discovery gate with up to three newest published guides and a `/contents` CTA
+- `/contents` and every published content detail included in the sitemap
 - Generic part-category relations may be stored without a specific product target; the migrated battery check article uses `BATTERY` / `CATEGORY`.
 
 ## Deferred Scope

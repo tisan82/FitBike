@@ -6,6 +6,8 @@ import { getPublishedContents } from "@/services/content.service";
 const title = "바이크 가이드";
 const description = "오토바이 점검·관리부터 부품과 규격 정보까지 확인하세요.";
 
+export const revalidate = 300;
+
 export const metadata: Metadata = {
   title,
   description,
