@@ -5,6 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import { createClient } from "@supabase/supabase-js";
+
 const execute = promisify(execFile);
 const imageDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectDirectory = path.resolve(imageDirectory, "../../..");
@@ -67,7 +69,16 @@ function validateVisualQa(qa, asset, expectedSourceType) {
   return { pass: failures.length === 0, failures };
 }
 
-async function downloadAsset(url, outputPath) {
+async function downloadAsset(url, outputPath, storage = {}) {
+  const origin = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const secret = process.env.SUPABASE_SECRET_KEY;
+  if (storage.bucket && storage.objectPath && origin && secret) {
+    const client = createClient(origin, secret, { auth: { persistSession: false, autoRefreshToken: false } });
+    const result = await client.storage.from(storage.bucket).download(storage.objectPath);
+    if (result.error) throw new Error(`ASSET_STORAGE_DOWNLOAD:${result.error.message}`);
+    await writeFile(outputPath, Buffer.from(await result.data.arrayBuffer()), { flag: "wx" });
+    return;
+  }
   const response = await fetch(url);
   if (!response.ok) throw new Error(`ASSET_HTTP_${response.status}`);
   await writeFile(outputPath, Buffer.from(await response.arrayBuffer()), { flag: "wx" });
@@ -107,7 +118,7 @@ async function executeAssets({ contentDirectory, request, contentPackage, brandR
       const resolved = await brandResolver({ partType: contentPackage.relations.parts[0]?.partType ?? null, bikeModelId: contentPackage.relations.bikeModels[0]?.bikeModelId ?? null, asset });
       if (!resolved?.relationVerified) return { status: "HOLD_CONTENT", reason: "PRODUCT_MODEL_MISMATCH", asset: asset.id };
       sourcePath = path.join(sourceDirectory, `${asset.id}-brand-source` + path.extname(new URL(resolved.url).pathname || ".webp"));
-      if (!existsSync(sourcePath)) await downloader(resolved.url, sourcePath);
+      if (!existsSync(sourcePath)) await downloader(resolved.url, sourcePath, resolved);
       const qaPath = path.join(sourceDirectory, `${asset.id}.qa.json`);
       if (!existsSync(qaPath)) {
         pending.push({ assetId: asset.id, role: selection.role, task: "VISUAL_QA", sourceFile: path.relative(contentDirectory, sourcePath).replaceAll("\\", "/"), qaSidecar: `${asset.id}.qa.json`, sourceType: selection.sourceType, brand: resolved.brand_name });

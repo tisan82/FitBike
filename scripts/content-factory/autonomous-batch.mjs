@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { classifyTopicRisk } from "./automation-policy.mjs";
 import { runAutonomousBatch } from "./autonomous-batch-engine.mjs";
 import { deriveModelCandidates } from "./autonomous-policy.mjs";
+import { evaluateCapabilities } from "./production-capabilities.mjs";
 
 const execute = promisify(execFile);
 const factoryDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -169,6 +170,13 @@ async function main() {
   const batchDirectory = path.join(projectDirectory, "content-work", "autonomous-batches");
   const batchFile = path.join(batchDirectory, `${batchId}.json`);
   await loadLocalEnvironment();
+  if (!dryRun) {
+    const preflight = await evaluateCapabilities();
+    if (preflight.status !== "READY") {
+      console.log(JSON.stringify({ status: "BATCH_PREFLIGHT_BLOCKED", batchId, target, mutation: "NONE", preflight, batchFile: null }, null, 2));
+      return;
+    }
+  }
   const previousRecords = dryRun ? {} : await readPreviousRecords(batchFile);
   const retryHold = args["retry-hold"] === "true";
   const retrySystem = args["retry-system"] === "true";

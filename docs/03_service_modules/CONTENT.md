@@ -62,6 +62,8 @@ Image QA는 Subject/Role 일치, Brand Asset First, Product/Model 일치, 기술
 
 `HOLD_CONTENT`는 해당 Candidate만 보류하고 Batch를 계속하지만, `BLOCKED_SYSTEM`은 현재 Candidate의 실패 단계와 완료 단계를 저장한 즉시 Batch 전체를 종료하며 이후 Candidate 평가와 Production Mutation을 금지한다. 동일 Batch 재개 시 완료된 단계를 반복하지 않고 실패 단계부터 진행하며, 재개 전 Published 수를 Target 계산에 그대로 포함한다.
 
+Production Batch는 Candidate 평가 전에 DB read/write, Research, Content Generation, Brand Asset read, Image Generation/Output/QA, Storage write, Publish, Production HTTP QA와 Sitemap QA를 실제 Runtime 증거로 검사한다. 필수 Capability 중 하나라도 E2E 검증되지 않으면 `BATCH_PREFLIGHT_BLOCKED`로 종료하며 Topic·Content·Publish Mutation을 시작하지 않는다. Image Runtime은 최신 생성 Artifact와 QA receipt를 요구하고, Storage write 검사는 disposable object를 업로드·readback한 뒤 즉시 삭제한다.
+
 - Published content list and content-type filter
 - Published content detail and structured block rendering
 - Optional thumbnail and hero rendering from `content-assets` object paths
