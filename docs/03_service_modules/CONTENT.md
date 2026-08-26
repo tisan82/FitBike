@@ -66,6 +66,10 @@ Production Batch는 Candidate 평가 전에 DB read/write, Research, Content Gen
 
 Brand Asset 존재 검사는 Visual Planning 이후 Candidate 단위로 수행한다. `EDUCATIONAL`과 `NO_VISUAL`은 Brand Asset을 요구하지 않고, `PRODUCT_REPRESENTATION`은 해당 제품 역할에 승인된 Brand Asset의 DB 관계·정확한 Bucket·Object 접근성을 검사하며, `MIXED`는 제품 역할의 Brand Gate와 Educational 생성 Gate를 각각 적용한다. Selector/Resolver 실행 장애는 `BLOCKED_SYSTEM`이지만, 특정 승인 Object 누락·경로 불일치·승인 Asset 부재는 `ASSET_DATA_ISSUE`, 제품/모델 관계 불일치는 `PRODUCT_MODEL_MISMATCH`로 해당 Candidate만 `HOLD_CONTENT` 처리한다. 정책이 명시적으로 허용하는 Generic/Educational fallback이 있을 때만 fallback을 사용할 수 있으며 임의의 유사 제품 Asset으로 대체하지 않는다.
 
+Model-specific Content의 Critical Fact는 Production DB의 활성 Brand → Model → Model Year를 먼저 식별한 뒤 Subject별 기존 관계를 `FITBIKE_VERIFIED_DATA` Claim Matrix로 기록한다. Tire는 연식별 앞·뒤 규격과 Tube Type 및 실제 Tire Product 관계, Battery는 `battery_standard_code`·전압·실제 Standard Product Mapping, Brake는 실제 Model Year Brake Product 관계를 사용한다. 연식별 값은 단일 모델 값으로 일반화하지 않으며, 필수 값이나 관계가 없으면 `CRITICAL_CLAIM_UNVERIFIED`, 동일 범위의 Critical Claim이 충돌하면 `SOURCE_CONFLICT`로 해당 Candidate를 `HOLD_CONTENT` 처리한다.
+
+Content QA의 문장 조각, `TOO_LIGHT`, 반복, 구조 연결 및 경미한 질문-본문 정렬 문제는 최대 2회까지 Evidence-only Auto Repair 후 같은 Gate로 재검사한다. Repair는 기존 Evidence에 없는 수치·규격·호환 Claim을 추가할 수 없다. Fact Conflict, Safety Uncertainty, Unsupported Numeric Claim, Subject Evidence 부족과 Critical Claim 미검증은 Auto Repair 대상이 아니며 기존 HOLD 정책을 유지한다.
+
 - Published content list and content-type filter
 - Published content detail and structured block rendering
 - Optional thumbnail and hero rendering from `content-assets` object paths

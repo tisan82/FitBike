@@ -9,6 +9,7 @@ import { classifyTopicRisk } from "./automation-policy.mjs";
 import { runAutonomousBatch } from "./autonomous-batch-engine.mjs";
 import { deriveModelCandidates } from "./autonomous-policy.mjs";
 import { evaluateCapabilities } from "./production-capabilities.mjs";
+import { repairContentDirectory } from "./content-repair.mjs";
 
 const execute = promisify(execFile);
 const factoryDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -83,7 +84,7 @@ function createProductionStages() {
     },
     async FACT_QA(candidate, context) {
       const evidence = JSON.parse(await readFile(path.join(context.contentDirectory, "evidence.json"), "utf8"));
-      const criticalFact = evidence.status === "VERIFIED" || evidence.status === "NOT_REQUIRED" ? "VERIFIED" : "UNVERIFIED";
+      const criticalFact = ["VERIFIED", "VERIFIED_DB", "NOT_REQUIRED"].includes(evidence.status) ? "VERIFIED" : "UNVERIFIED";
       return {
         ...context,
         evidence,
@@ -107,11 +108,17 @@ function createProductionStages() {
       return { ...context, imageRequest, assetExecution, imageResult };
     },
     async CONTENT_QA(candidate, context) {
-      const qa = JSON.parse(await readFile(path.join(context.contentDirectory, "qa.json"), "utf8"));
+      let qa = JSON.parse(await readFile(path.join(context.contentDirectory, "qa.json"), "utf8"));
+      let contentRepair = null;
+      if (qa.status !== "READY_FOR_REVIEW") {
+        contentRepair = await repairContentDirectory(context.contentDirectory, 2);
+        if (contentRepair.status === "PASS") qa = contentRepair.qa;
+      }
       const pass = qa.status === "READY_FOR_REVIEW" && qa.checks?.unsupportedClaims === 0 && qa.checks?.subjectDrift === true;
       return {
         ...context,
         qa,
+        contentRepair,
         gates: { ...context.gates, duplicateIntentGate: qa.checks?.postGenerationDuplicate?.status === "CONTENT_DUPLICATE" ? "FAIL" : "PASS", contentQa: pass ? "PASS" : "FAIL", unsupportedNumericClaim: qa.checks?.unsupportedClaims === 0 ? "NONE" : "PRESENT", unsupportedServiceLimit: qa.checks?.unsupportedClaims === 0 ? "NONE" : "PRESENT", mandatoryHumanReview: "NONE" },
         holdSignals: { ...context.holdSignals, UNRESOLVED_DUPLICATE: qa.checks?.postGenerationDuplicate?.status === "CONTENT_DUPLICATE", UNRESOLVED_SUBJECT_DRIFT: qa.checks?.subjectDrift !== true, FACT_QA_FAILED: !pass }
       };

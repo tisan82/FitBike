@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createClient } from "@supabase/supabase-js";
+import { resolveFitBikeEvidence } from "./verified-evidence.mjs";
 
 const factoryDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectDirectory = path.resolve(factoryDirectory, "../..");
@@ -444,8 +445,16 @@ function modelGuideDraft(topic, targetPart, intent, evidence) {
   const tireRows = targetPart === "TIRE"
     ? yearFacts.filter((year) => year.front_tire_full_size || year.rear_tire_full_size).map((year) => [year.year_range_label ?? year.generation_name ?? "연식 구간 확인 필요", year.front_tire_full_size ?? "확인 필요", year.rear_tire_full_size ?? "확인 필요"])
     : [];
+  const structuredClaims = evidence.structured?.claims ?? [];
+  const subjectRows = targetPart === "BATTERY"
+    ? structuredClaims.filter((item) => ["battery_standard_code", "battery_voltage", "compatible_battery"].includes(item.name)).map((item) => [item.year_range ?? "연식 구간 확인 필요", item.name, String(item.value)])
+    : targetPart === "BRAKE"
+      ? structuredClaims.filter((item) => item.name.endsWith("_compatible_brake")).map((item) => [item.year_range ?? "연식 구간 확인 필요", item.name.startsWith("front") ? "앞" : "뒤", String(item.value)])
+      : [];
   const verifiedDataBlock = tireRows.length > 0
     ? { type: "table", headers: ["연식/세대", "앞타이어", "뒤타이어"], rows: tireRows }
+    : subjectRows.length > 0
+      ? { type: "table", headers: ["연식/세대", targetPart === "BATTERY" ? "확인 항목" : "위치", "검증값"], rows: subjectRows }
     : { type: "paragraph", text: `현재 Evidence에는 연식별 ${part} 규격이 충분하지 않습니다. 확인되지 않은 값을 임의로 추가하지 않습니다.` };
   const inspectionBlocks = intent.action === "INSPECT" ? [
     { type: "heading", level: 2, text: "점검에 활용하는 방법" },
@@ -699,7 +708,7 @@ async function main() {
     return;
   }
 
-  const evidence = { status: "NOT_REQUIRED", sources: [], facts: [], missing: [] };
+  const evidence = { status: "NOT_REQUIRED", sources: [], facts: [], missing: [], conflicts: [], structured: null };
   const relations = { bikeModels: [], bikeModelYears: [], parts: targetPart ? [{ partType: targetPart, scopeType: "CATEGORY" }] : [] };
   if (targetBikeModelKey) {
     try {
@@ -718,9 +727,21 @@ async function main() {
     } catch (error) {
       evidence.missing.push(error instanceof Error ? error.message : "bike evidence query failed");
     }
+    try {
+      evidence.structured = await resolveFitBikeEvidence({ readEvidence, modelKey: targetBikeModelKey, partType: targetPart });
+      evidence.sources.push(...["FITBIKE_VERIFIED_DATA", ...new Set(evidence.structured.claims.map((item) => item.table))]);
+      evidence.facts.push(...evidence.structured.claims.map((item) => ({ type: "STRUCTURED_CLAIM", value: item, source: item.table })));
+      evidence.missing.push(...evidence.structured.missing);
+      evidence.conflicts.push(...evidence.structured.conflicts);
+    } catch (error) {
+      evidence.missing.push(error instanceof Error ? error.message : "structured evidence query failed");
+    }
   }
-  if (evidence.missing.length > 0) evidence.status = "BLOCKED";
-  else if (evidence.sources.length > 0) evidence.status = "VERIFIED_DB";
+  evidence.missing = [...new Set(evidence.missing)];
+  evidence.sources = [...new Set(evidence.sources)];
+  if (evidence.conflicts.length > 0) evidence.status = "SOURCE_CONFLICT";
+  else if (evidence.missing.length > 0) evidence.status = "BLOCKED";
+  else if (evidence.sources.length > 0) evidence.status = "VERIFIED";
 
   const draft = selectStrategy({ topic, contentType, targetPart, intent: requestIntent, evidence });
   const postGenerationDuplicate = classifyPostGenerationDuplicate(requestIntent, draft, existingContents);
@@ -762,7 +783,7 @@ async function main() {
   const sentenceFragments = countSentenceFragments(draft.blocks);
   const relationValidity = relations.parts.every((part) => rules.validPartTypes.includes(part.partType) && part.scopeType === "CATEGORY") && (targetBikeModelKey ? relations.bikeModels.length === 1 : true);
   const imagePlanValidity = typeof imagePlan.thumbnail.required === "boolean" && typeof imagePlan.hero.required === "boolean" && Array.isArray(imagePlan.bodyImages);
-  const evidenceComplete = ["VERIFIED_DB", "NOT_REQUIRED"].includes(evidence.status);
+  const evidenceComplete = ["VERIFIED", "VERIFIED_DB", "NOT_REQUIRED"].includes(evidence.status);
   const qaIssues = [
     ...(postGenerationDuplicate.status === "CONTENT_DUPLICATE" ? [`Post-generation duplicate detected: ${postGenerationDuplicate.duplicateWith}`] : []),
     ...blockIssues,

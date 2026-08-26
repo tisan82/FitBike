@@ -139,6 +139,8 @@ Production 모드는 Candidate를 읽기 전에 `production-capabilities.mjs` Pr
 
 Global Preflight는 실행 Capability만 검사하며 Brand Asset 존재 여부는 포함하지 않는다. Brand Asset Gate는 Visual Planning 이후 Candidate에 적용한다. `EDUCATIONAL`/`NO_VISUAL`은 Brand Asset 비의존, `PRODUCT_REPRESENTATION`은 해당 승인 Brand Asset을 검사하고, `MIXED`는 Product Brand Gate와 Educational 생성 Gate를 모두 통과해야 한다. 승인 Asset 부재 시 정책상 허용된 fallback만 사용할 수 있고, 그렇지 않으면 해당 Candidate를 `ASSET_DATA_ISSUE`로 `HOLD_CONTENT` 처리한다.
 
+Model Guide Research는 활성 Model/Year를 먼저 Resolve하고 Tire·Battery·Brake의 기존 Production 관계를 구조화된 `FITBIKE_VERIFIED_DATA` Claim Matrix로 저장한다. 필수 관계가 없거나 연식별 Coverage가 부족하면 VERIFIED로 승격하지 않는다. Content QA에서 자동 수정 가능한 문장 조각과 정보 밀도·구조 문제만 최대 2회 Evidence-only Repair하며, 새 수치나 호환 Claim을 만들지 않고 Re-QA를 통과한 결과만 다음 Gate로 보낸다.
+
 ## System and content ownership
 
 - GitHub stores application and Factory code, rules, block and database schema migrations, and operating documentation.
