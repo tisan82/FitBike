@@ -6,8 +6,8 @@ import test from "node:test";
 
 import { checkImageReceipt, requiredCapabilities } from "./production-capabilities.mjs";
 
-test("Production Preflight 필수 Capability는 12개다", () => {
-  assert.deepEqual(requiredCapabilities, ["DB_READ", "DB_WRITE", "RESEARCH", "CONTENT_GENERATION", "BRAND_ASSET_READ", "IMAGE_GENERATION", "IMAGE_OUTPUT_ACQUISITION", "IMAGE_QA", "STORAGE_WRITE", "PUBLISH", "PRODUCTION_HTTP_QA", "SITEMAP_QA"]);
+test("Production Preflight 필수 Global Capability는 Brand Asset 존재 여부와 분리된다", () => {
+  assert.deepEqual(requiredCapabilities, ["DB_READ", "DB_WRITE", "RESEARCH", "CONTENT_GENERATION", "IMAGE_GENERATION", "IMAGE_OUTPUT_ACQUISITION", "IMAGE_QA", "STORAGE_WRITE", "PUBLISH", "PRODUCTION_HTTP_QA", "SITEMAP_QA", "CHECKPOINT_RESUME"]);
 });
 
 test("실제 출력과 QA가 있는 최신 Image Runtime Receipt는 E2E 검증 상태다", async () => {

@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
 const projectDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const requiredCapabilities = ["DB_READ", "DB_WRITE", "RESEARCH", "CONTENT_GENERATION", "BRAND_ASSET_READ", "IMAGE_GENERATION", "IMAGE_OUTPUT_ACQUISITION", "IMAGE_QA", "STORAGE_WRITE", "PUBLISH", "PRODUCTION_HTTP_QA", "SITEMAP_QA"];
+const requiredCapabilities = ["DB_READ", "DB_WRITE", "RESEARCH", "CONTENT_GENERATION", "IMAGE_GENERATION", "IMAGE_OUTPUT_ACQUISITION", "IMAGE_QA", "STORAGE_WRITE", "PUBLISH", "PRODUCTION_HTTP_QA", "SITEMAP_QA", "CHECKPOINT_RESUME"];
 
 async function loadEnvironment() {
   const file = path.join(projectDirectory, ".env.local");
@@ -68,6 +68,38 @@ async function checkStorageWrite() {
   return failure ? blocked("BLOCKED_BY_EXTERNAL_SERVICE", failure) : ready({ disposableObject: objectPath, cleanup: "VERIFIED_REMOVED" });
 }
 
+async function auditBrandAssets() {
+  const origin = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const secret = process.env.SUPABASE_SECRET_KEY;
+  if (!origin || !secret) throw new Error("STORAGE_READ_CREDENTIAL_MISSING");
+  const client = createClient(origin, secret, { auth: { persistSession: false, autoRefreshToken: false } });
+  const bucketResult = await client.storage.listBuckets();
+  if (bucketResult.error) throw new Error(`STORAGE_BUCKET_LIST:${bucketResult.error.message}`);
+  const buckets = bucketResult.data.map((bucket) => bucket.name);
+  const rows = await managementQuery(`select 'POWEROAD' as brand,battery_part_key as asset_key,product_image_url as asset from public."05_battery_product" where is_active=true and upper(brand_name)='POWEROAD' and product_image_url is not null union all select distinct 'MAXXIS' as brand,tm.tire_model_key as asset_key,coalesce(tm.main_image_url,tp.product_image_url,'tire-models/maxxis/' || tm.tire_model_key || '/main.webp') as asset from public."11_tire_model" tm left join public."04_tire_product" tp on tp.tire_model_id=tm.tire_model_id and tp.is_active=true where tm.is_active=true and (upper(tm.brand_name)='MAXXIS' or upper(tm.tire_model_key) like 'MAXXIS_%') order by brand,asset_key`);
+  const results = [];
+  for (const row of rows) {
+    if (/^https?:\/\//.test(row.asset)) {
+      const response = await fetch(row.asset, { headers: { Range: "bytes=0-0" } });
+      results.push({ ...row, expectedBucket: null, actualBucket: null, status: [200, 206].includes(response.status) ? "VALID" : "BROKEN", cause: [200, 206].includes(response.status) ? "NONE" : `HTTP_${response.status}` });
+      continue;
+    }
+    const objectPath = row.asset.replace(/^\/+/, "");
+    const expectedBucket = objectPath.startsWith("tire-models/") ? "tire-assets" : objectPath.startsWith("battery-products/") ? "battery-assets" : "bike-assets";
+    let actualBucket = null;
+    for (const bucket of [expectedBucket, ...buckets.filter((name) => name !== expectedBucket)]) {
+      const download = await client.storage.from(bucket).download(objectPath);
+      if (!download.error && download.data.size > 0) { actualBucket = bucket; break; }
+    }
+    results.push({ ...row, expectedBucket, actualBucket, status: actualBucket ? "VALID" : "BROKEN", cause: !actualBucket ? "OBJECT_MISSING" : actualBucket === expectedBucket ? "NONE" : "BUCKET_RESOLUTION_ERROR" });
+  }
+  const summarize = (brand) => {
+    const brandRows = results.filter((row) => row.brand === brand);
+    return { dbAssets: brandRows.length, storageValid: brandRows.filter((row) => row.status === "VALID").length, broken: brandRows.filter((row) => row.status === "BROKEN").length, rows: brandRows };
+  };
+  return { POWEROAD: summarize("POWEROAD"), MAXXIS: summarize("MAXXIS") };
+}
+
 async function evaluateCapabilities({ receiptPath = path.join(projectDirectory, "content-work/runtime-capabilities/image-generation.json"), origin = "https://fitbike.co.kr" } = {}) {
   const matrix = {};
   try { await managementQuery("select 1 as ok"); matrix.DB_READ = ready(); } catch (error) { matrix.DB_READ = blocked("BLOCKED_BY_CREDENTIAL", error.message); }
@@ -76,28 +108,6 @@ async function evaluateCapabilities({ receiptPath = path.join(projectDirectory, 
   const checkpointDirectory = path.join(projectDirectory, "content-work/brake-specification-check");
   matrix.RESEARCH = existsSync(path.join(checkpointDirectory, "evidence.json")) ? ready({ artifact: "evidence.json" }) : blocked("MISSING", "RESEARCH_ARTIFACT_MISSING");
   matrix.CONTENT_GENERATION = existsSync(path.join(checkpointDirectory, "content-package.json")) ? ready({ artifact: "content-package.json" }) : blocked("MISSING", "CONTENT_PACKAGE_MISSING");
-
-  try {
-    const assets = await managementQuery(`(select 'MAXXIS' as brand,coalesce(tm.main_image_url,tp.product_image_url) as asset from public."11_tire_model" tm left join public."04_tire_product" tp on tp.tire_model_id=tm.tire_model_id and tp.is_active=true where tm.is_active=true and upper(tm.brand_name)='MAXXIS' and coalesce(tm.main_image_url,tp.product_image_url) is not null limit 1) union all (select 'POWEROAD' as brand,bp.product_image_url as asset from public."05_battery_product" bp where bp.is_active=true and upper(bp.brand_name)='POWEROAD' and bp.product_image_url is not null limit 1)`);
-    if (assets.length < 1) throw new Error("APPROVED_BRAND_ASSET_MISSING");
-    const checks = [];
-    const storageClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-    for (const asset of assets) {
-      const objectPath = asset.asset.replace(/^\/+/, "");
-      const bucket = objectPath.startsWith("tire-models/") ? "tire-assets" : "bike-assets";
-      const assetUrl = /^https?:\/\//.test(asset.asset) ? asset.asset : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${objectPath}`;
-      if (/^https?:\/\//.test(asset.asset)) {
-        const response = await fetch(assetUrl, { headers: { Range: "bytes=0-0" } });
-        checks.push({ brand: asset.brand, asset: asset.asset, access: `HTTP_${response.status}`, ready: [200, 206].includes(response.status) });
-      } else {
-        const download = await storageClient.storage.from(bucket).download(objectPath);
-        checks.push({ brand: asset.brand, asset: asset.asset, access: download.error ? `STORAGE_ERROR:${download.error.message}` : "AUTHENTICATED_STORAGE", ready: !download.error && download.data.size > 0 });
-      }
-    }
-    const accessible = checks.find((check) => check.ready);
-    if (!accessible) throw new Error(`APPROVED_BRAND_ASSET_UNAVAILABLE:${JSON.stringify(checks)}`);
-    matrix.BRAND_ASSET_READ = ready({ testedBrand: accessible.brand, asset: accessible.asset, access: accessible.access, checks });
-  } catch (error) { matrix.BRAND_ASSET_READ = blocked("BLOCKED_BY_EXTERNAL_SERVICE", error.message); }
 
   const image = await checkImageReceipt(receiptPath);
   matrix.IMAGE_GENERATION = image;
@@ -117,8 +127,17 @@ async function evaluateCapabilities({ receiptPath = path.join(projectDirectory, 
     matrix.SITEMAP_QA = sitemap.status === 200 && text.includes("/contents/motorcycle-brake-check") ? ready() : blocked("BLOCKED_BY_EXTERNAL_SERVICE", "SITEMAP_NOT_READY");
   } catch (error) { matrix.SITEMAP_QA = blocked("BLOCKED_BY_EXTERNAL_SERVICE", error.message); }
 
+  const checkpointPath = path.join(projectDirectory, "content-work/autonomous-batches/canary-3-6898291.json");
+  try {
+    const checkpoint = JSON.parse(await readFile(checkpointPath, "utf8"));
+    const blockedRecord = checkpoint.records?.find((record) => record.state === "BLOCKED_SYSTEM");
+    matrix.CHECKPOINT_RESUME = blockedRecord?.resumeFrom === "ASSET_GENERATION_OR_SELECTION" && blockedRecord?.checkpoint?.resumeEligible === true ? ready({ batchId: checkpoint.batchId, stage: blockedRecord.resumeFrom }) : blocked("MISSING", "RESUMABLE_CHECKPOINT_MISSING");
+  } catch (error) { matrix.CHECKPOINT_RESUME = blocked("MISSING", error.message); }
+
   const blockedCapabilities = requiredCapabilities.filter((capability) => matrix[capability]?.state !== "IMPLEMENTED_AND_E2E_VERIFIED");
-  return { status: blockedCapabilities.length ? "BATCH_PREFLIGHT_BLOCKED" : "READY", required: requiredCapabilities.length, ready: requiredCapabilities.length - blockedCapabilities.length, blocked: blockedCapabilities.length, blockedCapabilities, matrix };
+  let assetCatalog;
+  try { assetCatalog = await auditBrandAssets(); } catch (error) { assetCatalog = { status: "BLOCKED_SYSTEM", reason: error.message }; }
+  return { status: blockedCapabilities.length ? "BATCH_PREFLIGHT_BLOCKED" : "READY", required: requiredCapabilities.length, ready: requiredCapabilities.length - blockedCapabilities.length, blocked: blockedCapabilities.length, blockedCapabilities, matrix, assetCatalog };
 }
 
 async function main() {
@@ -130,4 +149,4 @@ async function main() {
 
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
 
-export { checkImageReceipt, evaluateCapabilities, requiredCapabilities };
+export { auditBrandAssets, checkImageReceipt, evaluateCapabilities, requiredCapabilities };

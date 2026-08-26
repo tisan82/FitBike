@@ -75,7 +75,7 @@ test("MIXED는 Brand Asset과 Educational Asset을 각각 실행한다", async (
 test("제품/모델 관계 불일치는 HOLD_CONTENT다", async () => withDirectory(async (directory) => {
   const request = { status: "READY_FOR_IMAGE_GENERATION", assets: [{ id: "thumbnail", sourceArgument: "thumbnail-source", sourceSelection: { sourceType: "APPROVED_BRAND_ASSET", role: "PRODUCT_REPRESENTATION" } }] };
   const result = await executeAssets({ contentDirectory: directory, request, contentPackage: packageFixture, brandResolver: async () => null });
-  assert.deepEqual(result, { status: "HOLD_CONTENT", reason: "PRODUCT_MODEL_MISMATCH", asset: "thumbnail" });
+  assert.deepEqual(result, { status: "HOLD_CONTENT", reason: "ASSET_DATA_ISSUE", asset: "thumbnail" });
 }));
 
 test("NO_VISUAL은 Image QA를 빈 Asset PASS로 완료한다", async () => withDirectory(async (directory) => {

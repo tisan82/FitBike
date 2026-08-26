@@ -133,9 +133,11 @@ Production Image 단계는 `images/generate-images.mjs --mode prepare` 뒤 `imag
 node scripts/content-factory/autonomous-batch.mjs --target 3 --mode production --batch-id {same-batch-id} --retry-system true
 ```
 
-`BLOCKED_SYSTEM`은 시스템 실행 대기 상태로 Topic Registry를 변경하지 않고, 체크포인트 저장 직후 Batch 전체를 중단하여 이후 Candidate 평가와 Mutation을 막는다. 동일 Batch ID와 `--retry-system true`로 실패한 Asset 단계부터 재개하며 이전 Published 수를 Target에 포함한다. `HOLD_CONTENT`는 제품/모델 불일치, Image QA 실패 등 Candidate 자체의 검토 상태이며 기존 `--retry-hold true` 정책에 따라 다음 Candidate 처리를 계속한다.
+`BLOCKED_SYSTEM`은 시스템 실행 대기 상태로 Topic Registry를 변경하지 않고, 체크포인트 저장 직후 Batch 전체를 중단하여 이후 Candidate 평가와 Mutation을 막는다. 동일 Batch ID와 `--retry-system true`로 실패한 Asset 단계부터 재개하며 이전 Published 수를 Target에 포함한다. `HOLD_CONTENT`는 `ASSET_DATA_ISSUE`, 제품/모델 불일치, Image QA 실패 등 Candidate 자체의 검토 상태이며 기존 `--retry-hold true` 정책에 따라 다음 Candidate 처리를 계속한다. Asset Selector API/Resolver 자체의 예외는 `BLOCKED_SYSTEM`이고, 특정 승인 Object 누락이나 경로·관계 문제는 Batch 전체 장애가 아니다.
 
-Production 모드는 Candidate를 읽기 전에 `production-capabilities.mjs` Preflight를 실행한다. 12개 필수 Runtime Capability가 모두 `IMPLEMENTED_AND_E2E_VERIFIED`일 때만 Queue 처리를 시작하며, 하나라도 준비되지 않으면 `BATCH_PREFLIGHT_BLOCKED`와 `mutation: NONE`을 반환한다. 단순 파일 존재나 Mock 결과는 READY 근거로 사용하지 않는다.
+Production 모드는 Candidate를 읽기 전에 `production-capabilities.mjs` Preflight를 실행한다. DB read/write, Research, Content Generation, Image Generation/Output/QA, Storage write, Publish, Production HTTP QA, Sitemap QA, Checkpoint Resume의 12개 Runtime Capability가 모두 `IMPLEMENTED_AND_E2E_VERIFIED`일 때만 Queue 처리를 시작하며, 하나라도 준비되지 않으면 `BATCH_PREFLIGHT_BLOCKED`와 `mutation: NONE`을 반환한다. 단순 파일 존재나 Mock 결과는 READY 근거로 사용하지 않는다.
+
+Global Preflight는 실행 Capability만 검사하며 Brand Asset 존재 여부는 포함하지 않는다. Brand Asset Gate는 Visual Planning 이후 Candidate에 적용한다. `EDUCATIONAL`/`NO_VISUAL`은 Brand Asset 비의존, `PRODUCT_REPRESENTATION`은 해당 승인 Brand Asset을 검사하고, `MIXED`는 Product Brand Gate와 Educational 생성 Gate를 모두 통과해야 한다. 승인 Asset 부재 시 정책상 허용된 fallback만 사용할 수 있고, 그렇지 않으면 해당 Candidate를 `ASSET_DATA_ISSUE`로 `HOLD_CONTENT` 처리한다.
 
 ## System and content ownership
 

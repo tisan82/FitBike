@@ -42,7 +42,7 @@ async function managementQuery(query, parameters = []) {
 function storageLocation(storagePath) {
   if (/^https?:\/\//.test(storagePath)) return { url: storagePath, bucket: null, objectPath: storagePath };
   const objectPath = storagePath.replace(/^\/+/, "");
-  const bucket = objectPath.startsWith("tire-models/") ? "tire-assets" : "bike-assets";
+  const bucket = objectPath.startsWith("tire-models/") ? "tire-assets" : objectPath.startsWith("battery-products/") ? "battery-assets" : "bike-assets";
   const origin = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!origin) throw new Error("ASSET_STORAGE_ORIGIN_UNAVAILABLE");
   return { url: `${origin}/storage/v1/object/public/${bucket}/${objectPath}`, bucket, objectPath };
@@ -51,14 +51,23 @@ function storageLocation(storagePath) {
 async function resolveApprovedBrandAsset({ partType, bikeModelId }) {
   let rows;
   if (partType === "TIRE") {
-    rows = await managementQuery(`select tm.tire_model_key,tm.brand_name,tm.main_image_url as source_asset from public."11_tire_model" tm join public."04_tire_product" tp on tp.tire_model_id=tm.tire_model_id and tp.is_active=true join public."07_bike_model_year_tire_product" m on m.tire_product_id=tp.tire_product_id and m.is_active=true join public."03_bike_model_year" y on y.bike_model_year_id=m.bike_model_year_id and y.is_active=true where tm.is_active=true and upper(tm.brand_name)='MAXXIS' and tm.main_image_url is not null and ($1::bigint is null or y.bike_model_id=$1) order by m.display_order,tm.tire_model_id limit 1`, [bikeModelId ?? null]);
+    rows = await managementQuery(`select tm.tire_model_key,coalesce(nullif(tm.brand_name,''),'MAXXIS') as brand_name,coalesce(tm.main_image_url,tp.product_image_url,'tire-models/maxxis/' || tm.tire_model_key || '/main.webp') as source_asset from public."11_tire_model" tm join public."04_tire_product" tp on tp.tire_model_id=tm.tire_model_id and tp.is_active=true join public."07_bike_model_year_tire_product" m on m.tire_product_id=tp.tire_product_id and m.is_active=true join public."03_bike_model_year" y on y.bike_model_year_id=m.bike_model_year_id and y.is_active=true where tm.is_active=true and (upper(tm.brand_name)='MAXXIS' or upper(tm.tire_model_key) like 'MAXXIS_%') and ($1::bigint is null or y.bike_model_id=$1) order by m.display_order,tm.tire_model_id limit 50`, [bikeModelId ?? null]);
   } else if (partType === "BATTERY") {
-    rows = await managementQuery(`select bp.battery_part_key,bp.brand_name,bp.product_image_url as source_asset from public."05_battery_product" bp join public."08_battery_standard_product" m on m.battery_product_id=bp.battery_product_id and m.is_active=true join public."03_bike_model_year" y on y.battery_standard_code=m.battery_standard_code and y.is_active=true where bp.is_active=true and upper(bp.brand_name)='POWEROAD' and bp.product_image_url is not null and ($1::bigint is null or y.bike_model_id=$1) order by m.display_order,bp.battery_product_id limit 1`, [bikeModelId ?? null]);
+    rows = await managementQuery(`select bp.battery_part_key,bp.brand_name,bp.product_image_url as source_asset from public."05_battery_product" bp join public."08_battery_standard_product" m on m.battery_product_id=bp.battery_product_id and m.is_active=true join public."03_bike_model_year" y on y.battery_standard_code=m.battery_standard_code and y.is_active=true where bp.is_active=true and upper(bp.brand_name)='POWEROAD' and bp.product_image_url is not null and ($1::bigint is null or y.bike_model_id=$1) order by m.display_order,bp.battery_product_id limit 50`, [bikeModelId ?? null]);
   } else {
     return null;
   }
-  if (rows.length !== 1) return null;
-  return { ...rows[0], relationVerified: true, ...storageLocation(rows[0].source_asset) };
+  const origin = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const secret = process.env.SUPABASE_SECRET_KEY;
+  if (!origin || !secret) throw new Error("ASSET_STORAGE_CREDENTIAL_UNAVAILABLE");
+  const client = createClient(origin, secret, { auth: { persistSession: false, autoRefreshToken: false } });
+  for (const row of rows) {
+    const location = storageLocation(row.source_asset);
+    if (!location.bucket) return { ...row, relationVerified: true, ...location };
+    const result = await client.storage.from(location.bucket).download(location.objectPath);
+    if (!result.error && result.data.size > 0) return { ...row, relationVerified: true, ...location };
+  }
+  return null;
 }
 
 function validateVisualQa(qa, asset, expectedSourceType) {
@@ -116,7 +125,8 @@ async function executeAssets({ contentDirectory, request, contentPackage, brandR
     let metadata;
     if (selection.sourceType === "APPROVED_BRAND_ASSET") {
       const resolved = await brandResolver({ partType: contentPackage.relations.parts[0]?.partType ?? null, bikeModelId: contentPackage.relations.bikeModels[0]?.bikeModelId ?? null, asset });
-      if (!resolved?.relationVerified) return { status: "HOLD_CONTENT", reason: "PRODUCT_MODEL_MISMATCH", asset: asset.id };
+      if (!resolved) return { status: "HOLD_CONTENT", reason: "ASSET_DATA_ISSUE", asset: asset.id };
+      if (!resolved.relationVerified) return { status: "HOLD_CONTENT", reason: "PRODUCT_MODEL_MISMATCH", asset: asset.id };
       sourcePath = path.join(sourceDirectory, `${asset.id}-brand-source` + path.extname(new URL(resolved.url).pathname || ".webp"));
       if (!existsSync(sourcePath)) await downloader(resolved.url, sourcePath, resolved);
       const qaPath = path.join(sourceDirectory, `${asset.id}.qa.json`);
