@@ -45,9 +45,47 @@ function defaultDryRunGates() {
   };
 }
 
-async function processCandidate({ candidate, publishedContents, previousRecord, retryHold, dryRun, classifyTopicRisk, stages }) {
-  if (shouldSkipCandidate(previousRecord, { retryHold })) return { ...previousRecord, skipped: true };
+function resumableContext(stageResult) {
+  const context = { ...stageResult };
+  delete context.record;
+  delete context.systemBlock;
+  return context;
+}
+
+async function processCandidate({ candidate, publishedContents, previousRecord, retryHold, retrySystem, dryRun, classifyTopicRisk, stages }) {
+  if (shouldSkipCandidate(previousRecord, { retryHold, retrySystem })) return { ...previousRecord, skipped: true };
   const record = previousRecord ?? { topicKey: candidate.topic_key, originalTopicKey: candidate.topic_key, state: "CANDIDATE", history: [] };
+  const resumingSystemBlock = previousRecord?.state === "BLOCKED_SYSTEM" && retrySystem;
+  if (resumingSystemBlock) {
+    delete record.skipped;
+    const workingCandidate = record.candidate ?? candidate;
+    const classification = record.classification ?? reclassifyAfterRedefinition(workingCandidate, classifyTopicRisk);
+    const visual = record.visual ?? decideVisual(workingCandidate);
+    const resumeIndex = stateOrder.indexOf(record.resumeFrom);
+    if (resumeIndex < 2 || resumeIndex >= stateOrder.indexOf("RISK_GATE")) throw new Error("INVALID_RESUME_STATE");
+    let stageResult = record.resumeContext ?? { gates: {}, holdSignals: {} };
+    for (const state of stateOrder.slice(resumeIndex, stateOrder.indexOf("RISK_GATE"))) {
+      transition(record, state, state === record.resumeFrom ? { resumed: true } : {});
+      stageResult = await stages[state](workingCandidate, { ...stageResult, classification, visual, record });
+      if (stageResult.systemBlock) {
+        record.resumeFrom = stageResult.systemBlock.resumeFrom ?? state;
+        record.resumeContext = resumableContext(stageResult);
+        transition(record, "BLOCKED_SYSTEM", { reason: stageResult.systemBlock.reason, resumeFrom: record.resumeFrom });
+        return record;
+      }
+      const hold = mandatoryHoldReason(stageResult.holdSignals);
+      if (hold) {
+        transition(record, "HOLD_CONTENT", { reason: hold });
+        record.gates = stageResult.gates;
+        delete record.resumeContext;
+        delete record.resumeFrom;
+        return record;
+      }
+    }
+    delete record.resumeContext;
+    delete record.resumeFrom;
+    return finalizeCandidate({ record, workingCandidate, classification, visual, stageResult, stages });
+  }
   transition(record, "DUPLICATE_CHECK");
   let workingCandidate = candidate;
   let duplicate = evaluateDuplicate(workingCandidate, publishedContents);
@@ -88,31 +126,41 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
   for (const state of stateOrder.slice(2, stateOrder.indexOf("RISK_GATE"))) {
     transition(record, state);
     stageResult = await stages[state](workingCandidate, { ...stageResult, classification, visual, record });
+    if (stageResult.systemBlock) {
+      record.resumeFrom = stageResult.systemBlock.resumeFrom ?? state;
+      record.resumeContext = resumableContext(stageResult);
+      transition(record, "BLOCKED_SYSTEM", { reason: stageResult.systemBlock.reason, resumeFrom: record.resumeFrom });
+      return record;
+    }
     const hold = mandatoryHoldReason(stageResult.holdSignals);
     if (hold) {
-      transition(record, "HOLD", { reason: hold });
+      transition(record, "HOLD_CONTENT", { reason: hold });
       record.gates = stageResult.gates;
       return record;
     }
   }
+  return finalizeCandidate({ record, workingCandidate, classification, visual, stageResult, stages });
+}
+
+async function finalizeCandidate({ record, workingCandidate, classification, visual, stageResult, stages }) {
   transition(record, "RISK_GATE");
   const clearance = evaluateAutoClearance({ riskLevel: classification.riskLevel, gates: stageResult.gates });
   record.gates = stageResult.gates;
   record.autoClearance = clearance;
   if (clearance.decision === "HOLD") {
-    transition(record, "HOLD", { reason: clearance.status, failures: clearance.failures });
+    transition(record, "HOLD_CONTENT", { reason: clearance.status, failures: clearance.failures });
     return record;
   }
   transition(record, "PUBLISH");
   const publish = await stages.PUBLISH(workingCandidate, { ...stageResult, classification, visual, record });
   if (publish.status !== "PUBLISHED") {
-    transition(record, "HOLD", { reason: publish.reason ?? "PUBLISH_FAILED" });
+    transition(record, "HOLD_CONTENT", { reason: publish.reason ?? "PUBLISH_FAILED" });
     return record;
   }
   transition(record, "PRODUCTION_QA");
   const productionQa = await stages.PRODUCTION_QA(workingCandidate, { ...stageResult, publish, classification, visual, record });
   if (productionQa.status !== "PASS") {
-    transition(record, "HOLD", { reason: "PRODUCTION_INTEGRITY_UNCERTAINTY" });
+    transition(record, "HOLD_CONTENT", { reason: "PRODUCTION_INTEGRITY_UNCERTAINTY" });
     return record;
   }
   record.productionQa = productionQa;
@@ -120,7 +168,7 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
   return record;
 }
 
-async function runAutonomousBatch({ target, maxCandidates, candidates, publishedContents = [], previousRecords = {}, retryHold = false, dryRun = false, classifyTopicRisk, stages = {}, onRecord = null }) {
+async function runAutonomousBatch({ target, maxCandidates, candidates, publishedContents = [], previousRecords = {}, retryHold = false, retrySystem = false, dryRun = false, classifyTopicRisk, stages = {}, onRecord = null }) {
   if (!Number.isInteger(target) || target < 1 || !Number.isInteger(maxCandidates) || maxCandidates < target) throw new Error("INVALID_BATCH_LIMIT");
   const records = [];
   let published = 0;
@@ -131,13 +179,14 @@ async function runAutonomousBatch({ target, maxCandidates, candidates, published
     considered += 1;
     let record;
     try {
-      record = await processCandidate({ candidate, publishedContents, previousRecord: previousRecords[candidate.topic_key], retryHold, dryRun, classifyTopicRisk, stages });
+      record = await processCandidate({ candidate, publishedContents, previousRecord: previousRecords[candidate.topic_key], retryHold, retrySystem, dryRun, classifyTopicRisk, stages });
     } catch (error) {
       record = {
         topicKey: candidate.topic_key,
         originalTopicKey: candidate.topic_key,
-        state: "HOLD",
-        history: [{ state: "HOLD", reason: "STAGE_ERROR", error: error instanceof Error ? error.message : String(error) }]
+        state: "BLOCKED_SYSTEM",
+        resumeFrom: "RESEARCH",
+        history: [{ state: "BLOCKED_SYSTEM", reason: "STAGE_ERROR", error: error instanceof Error ? error.message : String(error), resumeFrom: "RESEARCH" }]
       };
     }
     records.push(record);

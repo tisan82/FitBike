@@ -1,4 +1,4 @@
-const terminalStates = new Set(["PUBLISHED", "DROP", "HOLD"]);
+const terminalStates = new Set(["PUBLISHED", "DROP", "HOLD", "HOLD_CONTENT"]);
 const criticalHoldReasons = new Set([
   "SOURCE_CONFLICT",
   "FACT_QA_FAILED",
@@ -10,6 +10,7 @@ const criticalHoldReasons = new Set([
   "PRODUCT_MODEL_MISMATCH",
   "UNRESOLVED_DUPLICATE",
   "UNRESOLVED_SUBJECT_DRIFT",
+  "IMAGE_SOURCE_BLOCKED",
   "IMAGE_QA_FAILED",
   "PRODUCTION_INTEGRITY_UNCERTAINTY",
   "MANDATORY_HUMAN_REVIEW"
@@ -169,8 +170,9 @@ function mandatoryHoldReason(signals = {}) {
   return Object.entries(signals).find(([key, active]) => active && criticalHoldReasons.has(key))?.[0] ?? null;
 }
 
-function shouldSkipCandidate(record, { retryHold = false } = {}) {
-  if (record?.state === "HOLD") return !retryHold;
+function shouldSkipCandidate(record, { retryHold = false, retrySystem = false } = {}) {
+  if (record?.state === "HOLD" || record?.state === "HOLD_CONTENT") return !retryHold;
+  if (record?.state === "BLOCKED_SYSTEM") return !retrySystem;
   return terminalStates.has(record?.state);
 }
 

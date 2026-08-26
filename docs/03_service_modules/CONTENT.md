@@ -54,6 +54,12 @@ Risk와 관계없이 Source Conflict, Fact QA 실패, Critical Claim 검증 부�
 
 ## Current Scope
 
+### Autonomous Image Execution and Resume
+
+Autonomous Batch의 Image 단계는 계획 파일 생성만으로 PASS하지 않는다. `PRODUCT_REPRESENTATION`은 현재 Production 관계를 read-only로 조회해 Tire는 승인된 MAXXIS, Battery는 승인된 POWEROAD Asset을 선택하고, 대상 모델과의 관계 및 Storage 접근성을 확인한다. 승인 Brand Asset이 없는 Brake 표현은 Generic/Educational 정책을 적용한다. `EDUCATIONAL`은 생성 Prompt, 출력 파일, 역할/주제 제약 Metadata와 Image QA sidecar가 모두 존재해야 실행 완료로 인정하며, `MIXED`는 Brand Asset과 Educational Asset을 각각 검증한다. 정책상 이미지가 필요 없는 `NO_VISUAL`만 빈 Asset PASS를 허용한다.
+
+Image QA는 Subject/Role 일치, Brand Asset First, Product/Model 일치, 기술적 오인, 근거 없는 수치, 위험 표현, 모바일 가독성, Asset 가용성과 Storage 준비 상태를 fail-closed로 검사한다. 이미지 생성 출력처럼 시스템 실행 능력이 아직 제공되지 않은 경우 Candidate는 `BLOCKED_SYSTEM`으로 체크포인트되며 Registry를 `BLOCKED`로 바꾸지 않는다. 출력과 QA sidecar를 준비한 뒤 동일 Batch ID와 `--retry-system true`를 사용하면 `ASSET_GENERATION_OR_SELECTION`부터 재개한다. 콘텐츠 자체의 불일치나 Image QA 실패는 `HOLD_CONTENT`이며, `PUBLISHED`와 `DROP`은 재실행하지 않는다.
+
 - Published content list and content-type filter
 - Published content detail and structured block rendering
 - Optional thumbnail and hero rendering from `content-assets` object paths

@@ -61,7 +61,7 @@ async function prepareRequests(contentDirectory, imagePlan, contentPackage, rule
   const selections = assets.map((asset) => {
     const brandRegistry = registry.brands[partType];
     const imageRole = asset.plan.imageRole ?? (asset.role === "body" && asset.plan.type === "diagram" ? "EDUCATIONAL_DIAGRAM" : "PRODUCT_REPRESENTATION");
-    return { role: imageRole, ...selectImageSource({ partType, role: asset.role, imageRole, brandAssetAvailable: (brandRegistry?.availableAssetCount ?? 0) > 0, brandAssetSuitable: asset.plan.brandAssetSuitable !== false, sourceAsset: asset.plan.sourceAsset ?? null, fallbackReason: asset.plan.brand_asset_not_suitable_reason ?? null }) };
+    return { role: imageRole, ...selectImageSource({ partType, role: asset.role, imageRole, brandAssetAvailable: (brandRegistry?.availableAssetCount ?? 0) > 0 || Boolean(asset.plan.sourceAsset), brandAssetLookupAvailable: Boolean(brandRegistry?.brand), brandAssetSuitable: asset.plan.brandAssetSuitable !== false, sourceAsset: asset.plan.sourceAsset ?? null, fallbackReason: asset.plan.brand_asset_not_suitable_reason ?? null }) };
   });
   const request = {
     status: assets.length === 0 ? "NO_IMAGES_REQUIRED" : selections.some((selection) => selection.status === "FAIL") ? "IMAGE_SOURCE_BLOCKED" : selections.every((selection) => selection.sourceType === "APPROVED_BRAND_ASSET") ? "READY_FOR_BRAND_ASSET" : "READY_FOR_IMAGE_GENERATION",
@@ -194,7 +194,9 @@ async function main() {
   console.log(JSON.stringify({ status, contentDirectory, assets: serializableAssets.length, reviewSheet: imageResult.reviewSheet }, null, 2));
 }
 
-main().catch((error) => {
+if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });
+
+export { buildPrompt, prepareRequests, requestedAssets };

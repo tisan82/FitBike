@@ -46,8 +46,10 @@ async function managementQuery(query, parameters = []) {
   return response.json();
 }
 
-async function loadProductionInputs(maxCandidates) {
-  const queuedCandidates = await managementQuery(`select t.content_topic_id,t.topic_key,t.topic,t.content_type,t.part_type,t.bike_model_id,b.model_key as bike_model_key,t.normalized_subject,t.normalized_action,t.normalized_scope,t.status,t.priority,t.automation_level,t.risk_level,t.attempt_count,t.last_error,t.content_id,t.created_at from public."16_content_topic" t left join public."02_bike_model" b on b.bike_model_id=t.bike_model_id where t.status='PLANNED' order by t.priority,t.created_at,t.content_topic_id limit $1`, [maxCandidates]);
+async function loadProductionInputs(maxCandidates, resumeTopicKeys = []) {
+  const resumeClause = resumeTopicKeys.length ? `or t.topic_key = any($2::text[])` : "";
+  const resumeOrder = resumeTopicKeys.length ? `case when t.topic_key = any($2::text[]) then 0 else 1 end,` : "";
+  const queuedCandidates = await managementQuery(`select t.content_topic_id,t.topic_key,t.topic,t.content_type,t.part_type,t.bike_model_id,b.model_key as bike_model_key,t.normalized_subject,t.normalized_action,t.normalized_scope,t.status,t.priority,t.automation_level,t.risk_level,t.attempt_count,t.last_error,t.content_id,t.created_at from public."16_content_topic" t left join public."02_bike_model" b on b.bike_model_id=t.bike_model_id where (t.status='PLANNED' ${resumeClause}) order by ${resumeOrder}t.priority,t.created_at,t.content_topic_id limit $1`, resumeTopicKeys.length ? [maxCandidates, resumeTopicKeys] : [maxCandidates]);
   const publishedContents = await managementQuery(`select c.content_id,c.content_key,c.title,c.summary,c.content_type,c.body_blocks,coalesce(array_agg(distinct p.part_type) filter (where p.part_type is not null), '{}') as part_types,coalesce(array_agg(distinct b.model_key) filter (where b.model_key is not null), '{}') as model_keys from public."12_content" c left join public."15_content_part_link" p on p.content_id=c.content_id and p.is_active=true left join public."13_content_bike_model" cb on cb.content_id=c.content_id left join public."02_bike_model" b on b.bike_model_id=cb.bike_model_id where c.is_active=true and c.published_at is not null and c.published_at <= now() group by c.content_id,c.content_key,c.title,c.summary,c.content_type,c.body_blocks order by c.content_id`);
   const registryKeys = new Set((await managementQuery(`select topic_key from public."16_content_topic"`)).map((row) => row.topic_key));
   const models = await managementQuery(`select b.bike_model_id,b.model_key,b.model_name_en,b.model_name_ko,bool_or(y.front_tire_full_size is not null or y.rear_tire_full_size is not null) as has_tire_data,bool_or(y.battery_standard_code is not null) as has_battery_data,bool_or(y.front_brake_spec is not null or y.rear_brake_spec is not null) as has_brake_data from public."02_bike_model" b join public."03_bike_model_year" y on y.bike_model_id=b.bike_model_id and y.is_active=true where b.is_active=true group by b.bike_model_id,b.model_key,b.model_name_en,b.model_name_ko order by b.bike_model_id`);
@@ -97,9 +99,11 @@ function createProductionStages() {
     },
     async ASSET_GENERATION_OR_SELECTION(candidate, context) {
       const imageRequest = await runScript(path.join("images", "generate-images.mjs"), ["--content-dir", context.contentDirectory, "--mode", "prepare"]);
-      const imageResultPath = path.join(context.contentDirectory, "image-result.json");
-      if (!existsSync(imageResultPath)) return { ...context, imageRequest, holdSignals: { ...context.holdSignals, IMAGE_QA_FAILED: true } };
-      return { ...context, imageRequest, imageResult: JSON.parse(await readFile(imageResultPath, "utf8")) };
+      const assetExecution = await runScript(path.join("images", "asset-executor.mjs"), ["--content-dir", context.contentDirectory]);
+      if (assetExecution.status === "BLOCKED_SYSTEM") return { ...context, imageRequest, assetExecution, systemBlock: { reason: assetExecution.reason, resumeFrom: "ASSET_GENERATION_OR_SELECTION" } };
+      if (assetExecution.status === "HOLD_CONTENT") return { ...context, imageRequest, assetExecution, holdSignals: { ...context.holdSignals, [assetExecution.reason]: true } };
+      const imageResult = JSON.parse(await readFile(path.join(context.contentDirectory, "image-result.json"), "utf8"));
+      return { ...context, imageRequest, assetExecution, imageResult };
     },
     async CONTENT_QA(candidate, context) {
       const qa = JSON.parse(await readFile(path.join(context.contentDirectory, "qa.json"), "utf8"));
@@ -165,16 +169,18 @@ async function main() {
   const batchDirectory = path.join(projectDirectory, "content-work", "autonomous-batches");
   const batchFile = path.join(batchDirectory, `${batchId}.json`);
   await loadLocalEnvironment();
-  const { candidates, publishedContents } = await loadProductionInputs(maxCandidates);
   const previousRecords = dryRun ? {} : await readPreviousRecords(batchFile);
   const retryHold = args["retry-hold"] === "true";
+  const retrySystem = args["retry-system"] === "true";
+  const resumeTopicKeys = retrySystem ? Object.values(previousRecords).filter((record) => record.state === "BLOCKED_SYSTEM").map((record) => record.originalTopicKey) : [];
+  const { candidates, publishedContents } = await loadProductionInputs(maxCandidates, resumeTopicKeys);
   const checkpoints = { ...previousRecords };
   if (!dryRun) await mkdir(batchDirectory, { recursive: true });
   const onRecord = dryRun ? null : async (candidate, record) => {
     try {
       if (!record.skipped && record.state === "DROP" && !candidate.generated_candidate) {
         await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "DUPLICATE"]);
-      } else if (!record.skipped && record.state === "HOLD") {
+      } else if (!record.skipped && ["HOLD", "HOLD_CONTENT"].includes(record.state)) {
         await runScript("topic-registry.mjs", ["--operation", "record-automation-error", "--topic-key", candidate.topic_key, "--error", record.history.at(-1)?.reason ?? "AUTONOMOUS_HOLD"]);
         await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "BLOCKED"]);
       }
@@ -184,7 +190,7 @@ async function main() {
     checkpoints[candidate.topic_key] = record;
     await writeFile(batchFile, `${JSON.stringify({ status: "IN_PROGRESS", target, maxCandidates, records: Object.values(checkpoints) }, null, 2)}\n`, "utf8");
   };
-  const result = await runAutonomousBatch({ target, maxCandidates, candidates, publishedContents, previousRecords, retryHold, dryRun, classifyTopicRisk, stages: dryRun ? {} : createProductionStages(), onRecord });
+  const result = await runAutonomousBatch({ target, maxCandidates, candidates, publishedContents, previousRecords, retryHold, retrySystem, dryRun, classifyTopicRisk, stages: dryRun ? {} : createProductionStages(), onRecord });
   if (!dryRun) {
     await writeFile(batchFile, `${JSON.stringify(result, null, 2)}\n`, "utf8");
   }

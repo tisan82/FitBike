@@ -46,13 +46,43 @@ test("HOLD Candidate 뒤에도 Batch가 계속된다", async () => {
   const stages = passingStages();
   stages.RESEARCH = async () => ++calls === 1 ? { gates: passGates(), holdSignals: { SOURCE_CONFLICT: true } } : { gates: passGates(), holdSignals: {} };
   const result = await runAutonomousBatch({ target: 1, maxCandidates: 2, candidates, classifyTopicRisk, stages });
-  assert.equal(result.records[0].state, "HOLD");
+  assert.equal(result.records[0].state, "HOLD_CONTENT");
   assert.equal(result.records[1].state, "PUBLISHED");
 });
 test("PUBLISHED와 DROP과 HOLD는 Resume 시 재처리하지 않는다", () => {
   assert.equal(shouldSkipCandidate({ state: "PUBLISHED" }), true);
   assert.equal(shouldSkipCandidate({ state: "DROP" }), true);
   assert.equal(shouldSkipCandidate({ state: "HOLD" }), true);
+  assert.equal(shouldSkipCandidate({ state: "HOLD_CONTENT" }), true);
+});
+test("BLOCKED_SYSTEM은 명시적 retry에서만 저장된 Asset 단계부터 재개한다", async () => {
+  const candidate = { topic_key: "resume", topic: "resume topic", content_type: "PARTS_GUIDE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" };
+  const calls = [];
+  const stages = passingStages();
+  stages.ASSET_GENERATION_OR_SELECTION = async (current, context) => {
+    calls.push("ASSET");
+    return { ...context, gates: passGates(), holdSignals: {} };
+  };
+  for (const state of ["CONTENT_QA", "IMAGE_QA"]) stages[state] = async (current, context) => {
+    calls.push(state);
+    return { ...context, gates: passGates(), holdSignals: {} };
+  };
+  const previousRecord = {
+    topicKey: "resume",
+    originalTopicKey: "resume",
+    state: "BLOCKED_SYSTEM",
+    history: [{ state: "BLOCKED_SYSTEM", reason: "IMAGEGEN_OUTPUT_PENDING" }],
+    candidate,
+    classification: classifyTopicRisk(candidate),
+    visual: { type: "EDUCATIONAL" },
+    resumeFrom: "ASSET_GENERATION_OR_SELECTION",
+    resumeContext: { gates: passGates(), holdSignals: {}, contentDirectory: "content-work/resume" }
+  };
+  assert.equal(shouldSkipCandidate(previousRecord), true);
+  assert.equal(shouldSkipCandidate(previousRecord, { retrySystem: true }), false);
+  const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { resume: previousRecord }, retrySystem: true, classifyTopicRisk, stages });
+  assert.deepEqual(calls, ["ASSET", "CONTENT_QA", "IMAGE_QA"]);
+  assert.equal(result.records[0].state, "PUBLISHED");
 });
 test("원인이 해결된 HOLD는 명시적 retry 정책에서만 재처리한다", () => {
   assert.equal(shouldSkipCandidate({ state: "HOLD" }, { retryHold: false }), true);

@@ -125,6 +125,16 @@ node scripts/content-factory/autonomous-batch.mjs --target 20 --mode production 
 
 Content/topic/image execution remains runtime data and is not committed. Only Factory, schema, and policy changes belong in Git.
 
+### Image execution handoff and resume
+
+Production Image 단계는 `images/generate-images.mjs --mode prepare` 뒤 `images/asset-executor.mjs`를 실행한다. 승인 제품 이미지는 Production DB 관계를 read-only로 조회하여 MAXXIS 또는 POWEROAD 원본을 확인·선택하고, Educational 이미지는 `content-work/{contentKey}/image-execution-request.json`에 생성 Prompt와 출력 위치 및 QA sidecar 요구사항을 남긴다. Codex image generation이 지정된 `image-sources/{assetId}.{png|webp|jpg|jpeg}`와 `{assetId}.qa.json`을 준비한 후 다음 명령으로 Asset 단계부터 재개한다.
+
+```bash
+node scripts/content-factory/autonomous-batch.mjs --target 3 --mode production --batch-id {same-batch-id} --retry-system true
+```
+
+`BLOCKED_SYSTEM`은 시스템 실행 대기 상태로 Topic Registry를 변경하지 않는다. `HOLD_CONTENT`는 제품/모델 불일치, Image QA 실패 등 Candidate 자체의 검토 상태이며 기존 `--retry-hold true` 정책을 따른다. 두 상태 모두 Batch의 다음 Candidate 처리를 막지 않는다.
+
 ## System and content ownership
 
 - GitHub stores application and Factory code, rules, block and database schema migrations, and operating documentation.
