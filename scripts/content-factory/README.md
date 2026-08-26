@@ -137,6 +137,8 @@ node scripts/content-factory/autonomous-batch.mjs --target 3 --mode production -
 
 `PARTIAL` Checkpoint의 Hold Candidate는 `--retry-hold true`가 있을 때만 다시 평가한다. Content QA Hold는 검증된 기존 Runtime Artifact를 복원해 Content QA/Repair부터, Critical Fact Hold는 Research/Evidence부터 재개한다. 플래그가 없으면 Hold 상태를 유지하고 `PUBLISHED`/`DROP`은 재처리하지 않으며, 기존 Published Count는 Target 계산에 유지한다.
 
+Retry-Hold가 Publish Gate까지 통과하면 Topic Registry는 전용 복원 동작으로 기존 합법 경로 `BLOCKED → GENERATING`을 거친 뒤 게시 준비 상태로 진행한다. `BLOCKED → REVIEW_REQUIRED` 직접 전이는 사용하지 않는다. Stage Adapter 예외는 실제 실행 Stage를 Checkpoint하며, 과거 Canary의 해당 전이 오류로 `RESEARCH`가 잘못 기록된 Checkpoint는 오류 서명이 일치할 때만 `PUBLISH` 재개 대상으로 정규화해 기존 QA Artifact를 재사용한다.
+
 Production 모드는 Candidate를 읽기 전에 `production-capabilities.mjs` Preflight를 실행한다. DB read/write, Research, Content Generation, Image Generation/Output/QA, Storage write, Publish, Production HTTP QA, Sitemap QA, Checkpoint Resume의 12개 Runtime Capability가 모두 `IMPLEMENTED_AND_E2E_VERIFIED`일 때만 Queue 처리를 시작하며, 하나라도 준비되지 않으면 `BATCH_PREFLIGHT_BLOCKED`와 `mutation: NONE`을 반환한다. 단순 파일 존재나 Mock 결과는 READY 근거로 사용하지 않는다.
 
 Global Preflight는 실행 Capability만 검사하며 Brand Asset 존재 여부는 포함하지 않는다. Brand Asset Gate는 Visual Planning 이후 Candidate에 적용한다. `EDUCATIONAL`/`NO_VISUAL`은 Brand Asset 비의존, `PRODUCT_REPRESENTATION`은 해당 승인 Brand Asset을 검사하고, `MIXED`는 Product Brand Gate와 Educational 생성 Gate를 모두 통과해야 한다. 승인 Asset 부재 시 정책상 허용된 fallback만 사용할 수 있고, 그렇지 않으면 해당 Candidate를 `ASSET_DATA_ISSUE`로 `HOLD_CONTENT` 처리한다.

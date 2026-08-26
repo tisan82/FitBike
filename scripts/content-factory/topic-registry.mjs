@@ -18,6 +18,12 @@ const transitions = {
   ARCHIVED: []
 };
 
+function retryHoldRestorePath(status) {
+  if (status === "BLOCKED") return ["GENERATING"];
+  if (["GENERATING", "REVIEW_REQUIRED", "APPROVED"].includes(status)) return [];
+  throw new Error(`INVALID_RETRY_HOLD_RESTORE_STATE:${status}`);
+}
+
 function parseArguments(argv) {
   const result = {};
   for (let index = 0; index < argv.length; index += 2) {
@@ -179,6 +185,21 @@ async function updateTopicStatus(args) {
   return { result: "UPDATED", topic: updated[0] };
 }
 
+async function restoreTopicForRetryHold(args) {
+  const topicKey = args["topic-key"];
+  if (!topicKey) throw new Error("INVALID_TOPIC_INPUT");
+  const rows = await managementQuery(`select content_topic_id,topic_key,status,content_id from public."16_content_topic" where topic_key=$1`, [topicKey]);
+  if (rows.length !== 1) throw new Error("TOPIC_NOT_FOUND");
+  const current = rows[0];
+  const path = retryHoldRestorePath(current.status);
+  if (args["dry-run"] === "true" || path.length === 0) return { result: "RESTORED", dryRun: args["dry-run"] === "true", from: current.status, to: path.at(-1) ?? current.status, path };
+  const nextStatus = path[0];
+  if (!transitions[current.status]?.includes(nextStatus)) throw new Error(`INVALID_STATUS_TRANSITION:${current.status}->${nextStatus}`);
+  const updated = await managementQuery(`update public."16_content_topic" set status=$2 where content_topic_id=$1 and status=$3 returning content_topic_id,topic_key,status,content_id`, [current.content_topic_id, nextStatus, current.status], false);
+  if (updated.length !== 1) throw new Error("RETRY_HOLD_RESTORE_CONFLICT");
+  return { result: "RESTORED", dryRun: false, from: current.status, to: nextStatus, path, topic: updated[0] };
+}
+
 async function recordAutomationAttempt(args) {
   const topicKey = args["topic-key"];
   if (!topicKey) throw new Error("INVALID_AUTOMATION_ATTEMPT");
@@ -229,15 +250,18 @@ async function main() {
   if (args.operation === "register-topic") result = await registerTopic(args);
   else if (args.operation === "get-next-topic") result = await getNextTopic();
   else if (args.operation === "update-topic-status") result = await updateTopicStatus(args);
+  else if (args.operation === "restore-topic-for-retry-hold") result = await restoreTopicForRetryHold(args);
   else if (args.operation === "record-automation-attempt") result = await recordAutomationAttempt(args);
   else if (args.operation === "record-automation-error") result = await recordAutomationError(args);
   else if (args.operation === "classify-topic") result = await classifyStoredTopic(args);
   else if (args.operation === "redefine-topic") result = await redefineTopic(args);
-  else throw new Error("--operation register-topic|get-next-topic|update-topic-status|record-automation-attempt|record-automation-error|classify-topic|redefine-topic is required");
+  else throw new Error("--operation register-topic|get-next-topic|update-topic-status|restore-topic-for-retry-hold|record-automation-attempt|record-automation-error|classify-topic|redefine-topic is required");
   console.log(JSON.stringify(result, null, 2));
 }
 
-main().catch((error) => {
+if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });
+
+export { retryHoldRestorePath };

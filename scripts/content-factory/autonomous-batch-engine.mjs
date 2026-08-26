@@ -111,8 +111,16 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
     const preparedHold = resumingContentHold && stages.PREPARE_HOLD_RETRY ? await stages.PREPARE_HOLD_RETRY(workingCandidate, record) : null;
     const resumeFrom = resumingSystemBlock ? record.resumeFrom : preparedHold?.resumeFrom ?? record.retryFrom ?? "RESEARCH";
     const resumeIndex = stateOrder.indexOf(resumeFrom);
-    if (resumeIndex < 2 || resumeIndex >= stateOrder.indexOf("RISK_GATE")) throw new Error("INVALID_RESUME_STATE");
+    if (resumeIndex < 2 || resumeIndex > stateOrder.indexOf("PUBLISH")) throw new Error("INVALID_RESUME_STATE");
     let stageResult = resumingSystemBlock ? record.resumeContext ?? { gates: {}, holdSignals: {} } : preparedHold?.context ?? record.retryContext ?? { gates: {}, holdSignals: {} };
+    if (resumeFrom === "PUBLISH") {
+      delete record.resumeContext;
+      delete record.resumeFrom;
+      delete record.retryContext;
+      delete record.retryFrom;
+      delete record.holdCheckpoint;
+      return finalizeCandidate({ record, workingCandidate, classification, visual, stageResult, stages, publishResume: true });
+    }
     for (const state of stateOrder.slice(resumeIndex, stateOrder.indexOf("RISK_GATE"))) {
       transition(record, state, state === resumeFrom ? { resumed: true, retryType: resumingSystemBlock ? "SYSTEM" : "HOLD_CONTENT" } : {});
       stageResult = await executeStage(stages, state, workingCandidate, { ...stageResult, classification, visual, record }, record);
@@ -189,8 +197,8 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
   return finalizeCandidate({ record, workingCandidate, classification, visual, stageResult, stages });
 }
 
-async function finalizeCandidate({ record, workingCandidate, classification, visual, stageResult, stages }) {
-  transition(record, "RISK_GATE");
+async function finalizeCandidate({ record, workingCandidate, classification, visual, stageResult, stages, publishResume = false }) {
+  transition(record, "RISK_GATE", publishResume ? { reused: true } : {});
   const clearance = evaluateAutoClearance({ riskLevel: classification.riskLevel, gates: stageResult.gates });
   record.gates = stageResult.gates;
   record.autoClearance = clearance;
@@ -198,14 +206,14 @@ async function finalizeCandidate({ record, workingCandidate, classification, vis
     transition(record, "HOLD_CONTENT", { reason: clearance.status, failures: clearance.failures });
     return record;
   }
-  transition(record, "PUBLISH");
-  const publish = await stages.PUBLISH(workingCandidate, { ...stageResult, classification, visual, record });
+  transition(record, "PUBLISH", publishResume ? { resumed: true, retryType: "HOLD_CONTENT" } : {});
+  const publish = await executeStage(stages, "PUBLISH", workingCandidate, { ...stageResult, classification, visual, record }, record);
   if (publish.status !== "PUBLISHED") {
     transition(record, "HOLD_CONTENT", { reason: publish.reason ?? "PUBLISH_FAILED" });
     return record;
   }
   transition(record, "PRODUCTION_QA");
-  const productionQa = await stages.PRODUCTION_QA(workingCandidate, { ...stageResult, publish, classification, visual, record });
+  const productionQa = await executeStage(stages, "PRODUCTION_QA", workingCandidate, { ...stageResult, publish, classification, visual, record }, record);
   if (productionQa.status !== "PASS") {
     transition(record, "HOLD_CONTENT", { reason: "PRODUCTION_INTEGRITY_UNCERTAINTY" });
     return record;

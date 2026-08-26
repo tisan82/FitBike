@@ -81,20 +81,46 @@ async function readRuntimeJson(directory, fileName) {
   try { return JSON.parse(await readFile(path.join(directory, fileName), "utf8")); } catch { return null; }
 }
 
+function isLegacyRetryHoldPublishFailure(record) {
+  const reason = record.checkpoint?.blockerReason ?? record.history?.at(-1)?.reason ?? "";
+  return record.state === "BLOCKED_SYSTEM" && reason.includes("INVALID_STATUS_TRANSITION:BLOCKED->REVIEW_REQUIRED");
+}
+
+function normalizeLegacyRetryHoldPublishRecord(record) {
+  if (!isLegacyRetryHoldPublishFailure(record)) return record;
+  return {
+    ...record,
+    state: "HOLD_CONTENT",
+    retryFrom: "PUBLISH",
+    history: [...(record.history ?? []), { state: "HOLD_CONTENT", reason: "RETRY_HOLD_REGISTRY_RESTORE_REQUIRED", retryFrom: "PUBLISH", recoveredCheckpoint: true }],
+    holdCheckpoint: { failedStage: "PUBLISH", blockerType: "HOLD_CONTENT", blockerReason: "RETRY_HOLD_REGISTRY_RESTORE_REQUIRED", retryEligible: true, resumeEligible: true }
+  };
+}
+
 function createProductionStages() {
   return {
     async PREPARE_HOLD_RETRY(candidate, record) {
       const reason = record.history.at(-1)?.reason;
-      if (reason !== "FACT_QA_FAILED") return { resumeFrom: "RESEARCH", context: { gates: {}, holdSignals: {} } };
+      const publishRetry = record.retryFrom === "PUBLISH" || reason === "RETRY_HOLD_REGISTRY_RESTORE_REQUIRED";
+      if (reason !== "FACT_QA_FAILED" && !publishRetry) return { resumeFrom: "RESEARCH", context: { gates: {}, holdSignals: {} } };
       const contentDirectory = await findCandidateContentDirectory(candidate);
       if (!contentDirectory) return { resumeFrom: "RESEARCH", context: { gates: {}, holdSignals: {} } };
-      const [evidence, imagePlan, imageRequest, imageResult] = await Promise.all([
+      const [evidence, imagePlan, imageRequest, imageResult, qa] = await Promise.all([
         readRuntimeJson(contentDirectory, "evidence.json"),
         readRuntimeJson(contentDirectory, "image-plan.json"),
         readRuntimeJson(contentDirectory, "image-generation-request.json"),
-        readRuntimeJson(contentDirectory, "image-result.json")
+        readRuntimeJson(contentDirectory, "image-result.json"),
+        readRuntimeJson(contentDirectory, "qa.json")
       ]);
       if (!evidence || !imagePlan || !imageRequest || imageResult?.status !== "READY_FOR_VISUAL_REVIEW") return { resumeFrom: "RESEARCH", context: { gates: {}, holdSignals: {} } };
+      if (publishRetry) {
+        const contentPass = qa?.status === "READY_FOR_REVIEW" && qa.checks?.unsupportedClaims === 0 && qa.checks?.subjectDrift === true;
+        const imagePass = imageResult.assets?.every((asset) => asset.status === "PASS") === true;
+        const criticalFact = ["VERIFIED", "VERIFIED_DB", "NOT_REQUIRED"].includes(evidence.status) ? "VERIFIED" : "UNVERIFIED";
+        if (!contentPass || !imagePass || criticalFact !== "VERIFIED") return { resumeFrom: "CONTENT_QA", context: { gates: record.gates ?? {}, holdSignals: {}, contentDirectory, evidence, imagePlan, imageRequest, imageResult, generation: { status: "REUSED" } } };
+        const gates = { criticalFact, sourceConflict: evidence.conflicts?.length ? "PRESENT" : "NONE", criticalUnverifiedClaim: "NONE", unsupportedNumericClaim: "NONE", unsupportedServiceLimit: "NONE", safetyQa: "PASS", technicalMisrepresentation: "NONE", productModelMismatch: "NONE", duplicateIntentGate: qa.checks?.postGenerationDuplicate?.status === "CONTENT_DUPLICATE" ? "FAIL" : "PASS", contentQa: "PASS", imageQa: "PASS", mandatoryHumanReview: "NONE" };
+        return { resumeFrom: "PUBLISH", context: { gates, holdSignals: {}, contentDirectory, evidence, imagePlan, imageRequest, imageResult, qa, generation: { status: "REUSED" } } };
+      }
       return { resumeFrom: "CONTENT_QA", context: { gates: record.gates ?? {}, holdSignals: {}, contentDirectory, evidence, imagePlan, imageRequest, imageResult, generation: { status: "REUSED" } } };
     },
     async RESEARCH(candidate, context) {
@@ -179,8 +205,9 @@ function createProductionStages() {
         };
         await writeFile(approvalPath, `${JSON.stringify(approval, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
       }
-      await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "REVIEW_REQUIRED"]);
-      await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "APPROVED"]);
+      const restored = await runScript("topic-registry.mjs", ["--operation", "restore-topic-for-retry-hold", "--topic-key", candidate.topic_key]);
+      if (restored.to === "GENERATING") await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "REVIEW_REQUIRED"]);
+      if (["GENERATING", "REVIEW_REQUIRED"].includes(restored.to)) await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "APPROVED"]);
       return runScript("publish-content.mjs", ["--content-dir", context.contentDirectory, "--mode", "publish"]);
     },
     async PRODUCTION_QA(candidate, context) {
@@ -193,7 +220,10 @@ function createProductionStages() {
 async function readPreviousRecords(batchFile) {
   if (!existsSync(batchFile)) return {};
   const batch = JSON.parse(await readFile(batchFile, "utf8"));
-  return Object.fromEntries((batch.records ?? []).map((record) => [record.originalTopicKey, record]));
+  return Object.fromEntries((batch.records ?? []).map((record) => {
+    const normalized = normalizeLegacyRetryHoldPublishRecord(record);
+    return [normalized.originalTopicKey, normalized];
+  }));
 }
 
 async function main() {
@@ -243,7 +273,9 @@ async function main() {
   console.log(JSON.stringify({ ...result, batchFile: dryRun ? null : batchFile }, null, 2));
 }
 
-main().catch((error) => {
+if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });
+
+export { createProductionStages, isLegacyRetryHoldPublishFailure, normalizeLegacyRetryHoldPublishRecord };
