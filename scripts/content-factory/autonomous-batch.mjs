@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -64,8 +64,39 @@ async function runScript(script, args) {
   return JSON.parse(stdout);
 }
 
+async function findCandidateContentDirectory(candidate) {
+  const contentRoot = path.join(projectDirectory, "content-work");
+  for (const entry of await readdir(contentRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const directory = path.join(contentRoot, entry.name);
+    try {
+      const plan = JSON.parse(await readFile(path.join(directory, "plan.json"), "utf8"));
+      if (plan.topic === candidate.topic || plan.targetBikeModelKey === candidate.bike_model_key && plan.targetPart === candidate.part_type) return directory;
+    } catch { /* Runtime directory without a content plan. */ }
+  }
+  return null;
+}
+
+async function readRuntimeJson(directory, fileName) {
+  try { return JSON.parse(await readFile(path.join(directory, fileName), "utf8")); } catch { return null; }
+}
+
 function createProductionStages() {
   return {
+    async PREPARE_HOLD_RETRY(candidate, record) {
+      const reason = record.history.at(-1)?.reason;
+      if (reason !== "FACT_QA_FAILED") return { resumeFrom: "RESEARCH", context: { gates: {}, holdSignals: {} } };
+      const contentDirectory = await findCandidateContentDirectory(candidate);
+      if (!contentDirectory) return { resumeFrom: "RESEARCH", context: { gates: {}, holdSignals: {} } };
+      const [evidence, imagePlan, imageRequest, imageResult] = await Promise.all([
+        readRuntimeJson(contentDirectory, "evidence.json"),
+        readRuntimeJson(contentDirectory, "image-plan.json"),
+        readRuntimeJson(contentDirectory, "image-generation-request.json"),
+        readRuntimeJson(contentDirectory, "image-result.json")
+      ]);
+      if (!evidence || !imagePlan || !imageRequest || imageResult?.status !== "READY_FOR_VISUAL_REVIEW") return { resumeFrom: "RESEARCH", context: { gates: {}, holdSignals: {} } };
+      return { resumeFrom: "CONTENT_QA", context: { gates: record.gates ?? {}, holdSignals: {}, contentDirectory, evidence, imagePlan, imageRequest, imageResult, generation: { status: "REUSED" } } };
+    },
     async RESEARCH(candidate, context) {
       if (candidate.generated_candidate) {
         const registered = await runScript("topic-registry.mjs", ["--operation", "register-topic", "--topic-key", candidate.topic_key, "--topic", candidate.topic, "--content-type", candidate.content_type, "--part-type", candidate.part_type, "--bike-model-key", candidate.bike_model_key, "--priority", String(candidate.priority)]);
@@ -177,16 +208,16 @@ async function main() {
   const batchDirectory = path.join(projectDirectory, "content-work", "autonomous-batches");
   const batchFile = path.join(batchDirectory, `${batchId}.json`);
   await loadLocalEnvironment();
+  const retryHold = args["retry-hold"] === "true";
+  const retrySystem = args["retry-system"] === "true";
   if (!dryRun) {
-    const preflight = await evaluateCapabilities();
+    const preflight = await evaluateCapabilities({ retryHold, retrySystem });
     if (preflight.status !== "READY") {
       console.log(JSON.stringify({ status: "BATCH_PREFLIGHT_BLOCKED", batchId, target, mutation: "NONE", preflight, batchFile: null }, null, 2));
       return;
     }
   }
   const previousRecords = dryRun ? {} : await readPreviousRecords(batchFile);
-  const retryHold = args["retry-hold"] === "true";
-  const retrySystem = args["retry-system"] === "true";
   const resumeTopicKeys = Object.values(previousRecords).filter((record) => retrySystem && record.state === "BLOCKED_SYSTEM" || retryHold && ["HOLD", "HOLD_CONTENT"].includes(record.state)).map((record) => record.originalTopicKey);
   const { candidates, publishedContents } = await loadProductionInputs(maxCandidates, resumeTopicKeys);
   const checkpoints = { ...previousRecords };

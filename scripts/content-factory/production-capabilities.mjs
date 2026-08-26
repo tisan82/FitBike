@@ -100,6 +100,15 @@ async function auditBrandAssets() {
   return { POWEROAD: summarize("POWEROAD"), MAXXIS: summarize("MAXXIS") };
 }
 
+function inspectCheckpointResume(checkpoint) {
+  const records = checkpoint.records ?? [];
+  const systemRecords = records.filter((record) => record.state === "BLOCKED_SYSTEM" && record.checkpoint?.resumeEligible === true && record.resumeFrom);
+  const holdRecords = records.filter((record) => ["HOLD", "HOLD_CONTENT"].includes(record.state));
+  if (systemRecords.length) return ready({ batchId: checkpoint.batchId, mode: "SYSTEM", resumable: systemRecords.length, stage: systemRecords[0].resumeFrom });
+  if (checkpoint.status === "PARTIAL" && holdRecords.length) return ready({ batchId: checkpoint.batchId, mode: "HOLD_CONTENT", resumable: holdRecords.length, requiresFlag: "--retry-hold" });
+  return blocked("MISSING", "RESUMABLE_CHECKPOINT_MISSING");
+}
+
 async function evaluateCapabilities({ receiptPath = path.join(projectDirectory, "content-work/runtime-capabilities/image-generation.json"), origin = "https://fitbike.co.kr" } = {}) {
   const matrix = {};
   try { await managementQuery("select 1 as ok"); matrix.DB_READ = ready(); } catch (error) { matrix.DB_READ = blocked("BLOCKED_BY_CREDENTIAL", error.message); }
@@ -130,8 +139,7 @@ async function evaluateCapabilities({ receiptPath = path.join(projectDirectory, 
   const checkpointPath = path.join(projectDirectory, "content-work/autonomous-batches/canary-3-6898291.json");
   try {
     const checkpoint = JSON.parse(await readFile(checkpointPath, "utf8"));
-    const blockedRecord = checkpoint.records?.find((record) => record.state === "BLOCKED_SYSTEM");
-    matrix.CHECKPOINT_RESUME = blockedRecord?.resumeFrom === "ASSET_GENERATION_OR_SELECTION" && blockedRecord?.checkpoint?.resumeEligible === true ? ready({ batchId: checkpoint.batchId, stage: blockedRecord.resumeFrom }) : blocked("MISSING", "RESUMABLE_CHECKPOINT_MISSING");
+    matrix.CHECKPOINT_RESUME = inspectCheckpointResume(checkpoint);
   } catch (error) { matrix.CHECKPOINT_RESUME = blocked("MISSING", error.message); }
 
   const blockedCapabilities = requiredCapabilities.filter((capability) => matrix[capability]?.state !== "IMPLEMENTED_AND_E2E_VERIFIED");
@@ -149,4 +157,4 @@ async function main() {
 
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
 
-export { auditBrandAssets, checkImageReceipt, evaluateCapabilities, requiredCapabilities };
+export { auditBrandAssets, checkImageReceipt, evaluateCapabilities, inspectCheckpointResume, requiredCapabilities };

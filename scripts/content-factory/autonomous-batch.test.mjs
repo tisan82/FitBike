@@ -164,6 +164,49 @@ test("원인이 해결된 HOLD는 명시적 retry 정책에서만 재처리한�
   assert.equal(shouldSkipCandidate({ state: "HOLD" }, { retryHold: false }), true);
   assert.equal(shouldSkipCandidate({ state: "HOLD" }, { retryHold: true }), false);
 });
+test("HOLD_CONTENT는 retry-hold 없이 기존 상태를 유지한다", async () => {
+  const candidate = { ...topic15, topic_key: "hold-no-retry", topic: "고유한 브레이크 확인" };
+  const previous = { topicKey: candidate.topic_key, originalTopicKey: candidate.topic_key, state: "HOLD_CONTENT", history: [{ state: "HOLD_CONTENT", reason: "FACT_QA_FAILED" }], candidate };
+  const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, classifyTopicRisk, stages: passingStages() });
+  assert.equal(result.records[0].state, "HOLD_CONTENT");
+  assert.equal(result.records[0].skipped, true);
+});
+test("retry-hold는 저장된 Content QA 단계부터 재개하고 이전 단계를 재실행하지 않는다", async () => {
+  const candidate = { ...topic15, topic_key: "hold-stage-reuse", topic: "고유한 브레이크 확인" };
+  const previous = { topicKey: candidate.topic_key, originalTopicKey: candidate.topic_key, state: "HOLD_CONTENT", history: [{ state: "HOLD_CONTENT", reason: "FACT_QA_FAILED" }], candidate, classification: classifyTopicRisk(candidate), visual: { type: "EDUCATIONAL" }, gates: passGates() };
+  const calls = [];
+  const stages = passingStages();
+  stages.PREPARE_HOLD_RETRY = async () => ({ resumeFrom: "CONTENT_QA", context: { gates: passGates(), holdSignals: {} } });
+  for (const state of ["RESEARCH", "FACT_QA", "CONTENT_GENERATION", "VISUAL_PLANNING", "ASSET_GENERATION_OR_SELECTION", "CONTENT_QA", "IMAGE_QA"]) stages[state] = async (current, context) => { calls.push(state); return { ...context, gates: passGates(), holdSignals: {} }; };
+  const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, retryHold: true, classifyTopicRisk, stages });
+  assert.deepEqual(calls, ["CONTENT_QA", "IMAGE_QA"]);
+  assert.equal(result.records[0].state, "PUBLISHED");
+});
+test("retry-hold Fact 재평가 후 Evidence가 부족하면 HOLD_CONTENT를 유지한다", async () => {
+  const candidate = { ...topic15, topic_key: "hold-still-missing", topic: "고유한 브레이크 확인" };
+  const previous = { topicKey: candidate.topic_key, originalTopicKey: candidate.topic_key, state: "HOLD_CONTENT", history: [{ state: "HOLD_CONTENT", reason: "CRITICAL_CLAIM_UNVERIFIED" }], candidate };
+  const stages = passingStages();
+  stages.PREPARE_HOLD_RETRY = async () => ({ resumeFrom: "FACT_QA", context: { gates: {}, holdSignals: {} } });
+  stages.FACT_QA = async (current, context) => ({ ...context, gates: { ...passGates(), criticalFact: "UNVERIFIED", criticalUnverifiedClaim: "PRESENT" }, holdSignals: { CRITICAL_CLAIM_UNVERIFIED: true } });
+  const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, retryHold: true, classifyTopicRisk, stages });
+  assert.equal(result.records[0].state, "HOLD_CONTENT");
+  assert.equal(result.records[0].retryFrom, "FACT_QA");
+});
+test("retry-hold에서도 기존 Published Count와 PUBLISHED/DROP skip을 보존한다", async () => {
+  const published = { topic_key: "published-retry", topic: "published", content_type: "PARTS_GUIDE", part_type: "TIRE", risk_level: "LOW", automation_level: "L2" };
+  const dropped = { ...published, topic_key: "drop-retry" };
+  const hold = { ...topic15, topic_key: "hold-retry-target", topic: "고유한 브레이크 확인" };
+  const previousRecords = {
+    [published.topic_key]: { topicKey: published.topic_key, originalTopicKey: published.topic_key, state: "PUBLISHED", history: [{ state: "PUBLISHED" }] },
+    [dropped.topic_key]: { topicKey: dropped.topic_key, originalTopicKey: dropped.topic_key, state: "DROP", history: [{ state: "DROP" }] },
+    [hold.topic_key]: { topicKey: hold.topic_key, originalTopicKey: hold.topic_key, state: "HOLD_CONTENT", history: [{ state: "HOLD_CONTENT", reason: "FACT_QA_FAILED" }], candidate: hold }
+  };
+  const stages = passingStages(); stages.PREPARE_HOLD_RETRY = async () => ({ resumeFrom: "CONTENT_QA", context: { gates: passGates(), holdSignals: {} } });
+  const result = await runAutonomousBatch({ target: 2, maxCandidates: 3, candidates: [published, dropped, hold], previousRecords, retryHold: true, classifyTopicRisk, stages });
+  assert.equal(result.publishedAtStart, 1); assert.equal(result.published, 2); assert.equal(result.status, "SUCCESS");
+  assert.equal(result.records.find((record) => record.originalTopicKey === published.topic_key).skipped, true);
+  assert.equal(result.records.find((record) => record.originalTopicKey === dropped.topic_key).skipped, true);
+});
 test("Dry Run은 Production Mutation 없이 계획까지만 계산한다", async () => {
   const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [topic15], publishedContents: [topic14], dryRun: true, classifyTopicRisk });
   assert.equal(result.mutation, "NONE");

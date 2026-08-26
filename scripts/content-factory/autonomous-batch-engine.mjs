@@ -70,6 +70,21 @@ function checkpointSystemBlock(record, candidate, reason, failedStage) {
   return record;
 }
 
+function checkpointContentHold(record, stageResult, reason, failedStage) {
+  record.retryFrom = failedStage;
+  record.retryContext = resumableContext(stageResult);
+  record.holdCheckpoint = {
+    failedStage,
+    blockerType: "HOLD_CONTENT",
+    blockerReason: reason,
+    retryEligible: true,
+    resumeEligible: true
+  };
+  transition(record, "HOLD_CONTENT", { reason, retryFrom: failedStage });
+  record.gates = stageResult.gates;
+  return record;
+}
+
 async function executeStage(stages, state, candidate, context, record) {
   try {
     return await stages[state](candidate, context);
@@ -87,16 +102,19 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
   if (shouldSkipCandidate(previousRecord, { retryHold, retrySystem })) return { ...previousRecord, skipped: true };
   const record = previousRecord ?? { topicKey: candidate.topic_key, originalTopicKey: candidate.topic_key, state: "CANDIDATE", history: [] };
   const resumingSystemBlock = previousRecord?.state === "BLOCKED_SYSTEM" && retrySystem;
-  if (resumingSystemBlock) {
+  const resumingContentHold = ["HOLD", "HOLD_CONTENT"].includes(previousRecord?.state) && retryHold;
+  if (resumingSystemBlock || resumingContentHold) {
     delete record.skipped;
     const workingCandidate = record.candidate ?? candidate;
     const classification = record.classification ?? reclassifyAfterRedefinition(workingCandidate, classifyTopicRisk);
     const visual = record.visual ?? decideVisual(workingCandidate);
-    const resumeIndex = stateOrder.indexOf(record.resumeFrom);
+    const preparedHold = resumingContentHold && stages.PREPARE_HOLD_RETRY ? await stages.PREPARE_HOLD_RETRY(workingCandidate, record) : null;
+    const resumeFrom = resumingSystemBlock ? record.resumeFrom : preparedHold?.resumeFrom ?? record.retryFrom ?? "RESEARCH";
+    const resumeIndex = stateOrder.indexOf(resumeFrom);
     if (resumeIndex < 2 || resumeIndex >= stateOrder.indexOf("RISK_GATE")) throw new Error("INVALID_RESUME_STATE");
-    let stageResult = record.resumeContext ?? { gates: {}, holdSignals: {} };
+    let stageResult = resumingSystemBlock ? record.resumeContext ?? { gates: {}, holdSignals: {} } : preparedHold?.context ?? record.retryContext ?? { gates: {}, holdSignals: {} };
     for (const state of stateOrder.slice(resumeIndex, stateOrder.indexOf("RISK_GATE"))) {
-      transition(record, state, state === record.resumeFrom ? { resumed: true } : {});
+      transition(record, state, state === resumeFrom ? { resumed: true, retryType: resumingSystemBlock ? "SYSTEM" : "HOLD_CONTENT" } : {});
       stageResult = await executeStage(stages, state, workingCandidate, { ...stageResult, classification, visual, record }, record);
       if (stageResult.systemBlock) {
         record.resumeFrom = stageResult.systemBlock.resumeFrom ?? state;
@@ -105,8 +123,7 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
       }
       const hold = mandatoryHoldReason(stageResult.holdSignals);
       if (hold) {
-        transition(record, "HOLD_CONTENT", { reason: hold });
-        record.gates = stageResult.gates;
+        checkpointContentHold(record, stageResult, hold, state);
         delete record.resumeContext;
         delete record.resumeFrom;
         return record;
@@ -114,6 +131,9 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
     }
     delete record.resumeContext;
     delete record.resumeFrom;
+    delete record.retryContext;
+    delete record.retryFrom;
+    delete record.holdCheckpoint;
     return finalizeCandidate({ record, workingCandidate, classification, visual, stageResult, stages });
   }
   transition(record, "DUPLICATE_CHECK");
@@ -163,9 +183,7 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
     }
     const hold = mandatoryHoldReason(stageResult.holdSignals);
     if (hold) {
-      transition(record, "HOLD_CONTENT", { reason: hold });
-      record.gates = stageResult.gates;
-      return record;
+      return checkpointContentHold(record, stageResult, hold, state);
     }
   }
   return finalizeCandidate({ record, workingCandidate, classification, visual, stageResult, stages });
