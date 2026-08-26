@@ -20,6 +20,12 @@ test("auto publish fails closed unless every gate passes", () => {
   assert.equal(evaluateAutoPublish({ topic: { topic: "TL과 TT 타이어 차이", content_type: "PARTS_GUIDE", part_type: "TIRE", normalized_scope: "GENERIC" }, evidenceStatus: "BLOCKED", duplicateStatus: "DISTINCT_CONTENT", qa: {}, images: {} }).eligible, false);
 });
 
+test("medium risk requires and accepts explicit auto clearance", () => {
+  const input = { topic: { topic: "브레이크 패드 상태 확인", content_type: "MAINTENANCE", part_type: "BRAKE", normalized_scope: "GENERIC" }, evidenceStatus: "NOT_REQUIRED", duplicateStatus: "DISTINCT_CONTENT", qa: { informationDensity: "GOOD", semanticDuplication: true, proceduralCompleteness: true, informationPriority: true, subjectCoverage: true, crossPartContamination: true, unsupportedClaims: 0, sentenceFragments: 0, text: "" }, images: { topicRelevance: true, noUnexpectedLogo: true, noUnsupportedText: true, noTechnicalNumber: true, noProductImpersonation: true, mobileLegibility: true, bodyRequired: false } };
+  assert.equal(evaluateAutoPublish(input).eligible, false);
+  assert.equal(evaluateAutoPublish({ ...input, autoClearance: "AUTO_CLEARANCE_PASS" }).eligible, true);
+});
+
 test("uses stored L1 when current classifier returns L2", () => {
   const result = resolveExecutionClassification({ risk_level: "MEDIUM", automation_level: "L1" }, { riskLevel: "LOW", automationLevel: "L2" });
   assert.deepEqual(result.execution, { riskLevel: "MEDIUM", automationLevel: "L1" });

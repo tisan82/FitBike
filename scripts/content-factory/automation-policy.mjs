@@ -10,16 +10,16 @@ function classifyTopicRisk(topic) {
   let reason = "Generic explanatory or visual-inspection topic without known numeric, model, or safety-critical requirements.";
   if (topic.content_type === "DIY" || highRiskPattern.test(text)) {
     riskLevel = "HIGH";
-    reason = "DIY or safety-critical disassembly, electrical, removal, or torque procedure requires strict human review.";
+    reason = "DIY or safety-critical disassembly, electrical, removal, or torque procedure is high risk and must be held.";
   } else if (topic.content_type === "MODEL_GUIDE" || topic.normalized_scope === "MODEL") {
     riskLevel = "MEDIUM";
-    reason = "Model-specific content depends on verified model/year evidence and remains human-reviewed initially.";
+    reason = "Model-specific content depends on verified model/year evidence and requires Medium Auto Clearance.";
   } else if (topic.part_type === "BRAKE" && topic.content_type === "MAINTENANCE") {
     riskLevel = "MEDIUM";
     reason = "Brake maintenance can affect safety even when the topic is inspection-focused.";
   } else if (topic.normalized_subject === "TIRE_PRESSURE" || topic.normalized_subject === "BATTERY_CONDITION" || mediumRiskPattern.test(text)) {
     riskLevel = "MEDIUM";
-    reason = "The topic can invite measurements, replacement timing, or diagnostic judgment and requires human review.";
+    reason = "The topic can invite measurements, replacement timing, or diagnostic judgment and requires Medium Auto Clearance.";
   }
   const automationLevel = riskLevel === "LOW" && autoContentTypes.has(topic.content_type) ? "L2" : "L1";
   return { riskLevel, automationLevel, reason };
@@ -43,10 +43,11 @@ function resolveExecutionClassification(topic, currentClassification = classifyT
   };
 }
 
-function evaluateAutoPublish({ topic, evidenceStatus, duplicateStatus, qa, images }) {
+function evaluateAutoPublish({ topic, evidenceStatus, duplicateStatus, qa, images, autoClearance = null }) {
   const classification = classifyTopicRisk(topic);
   const blockers = [];
-  if (classification.automationLevel !== "L2") blockers.push("AUTOMATION_LEVEL_L1");
+  if (classification.riskLevel === "HIGH") blockers.push("HIGH_RISK");
+  if (classification.riskLevel === "MEDIUM" && autoClearance !== "AUTO_CLEARANCE_PASS") blockers.push("MEDIUM_AUTO_CLEARANCE_REQUIRED");
   if (duplicateStatus !== "DISTINCT_CONTENT") blockers.push(duplicateStatus === "EXACT_DUPLICATE" ? "EXACT_DUPLICATE" : "NEAR_DUPLICATE");
   if (evidenceStatus !== "NOT_REQUIRED") blockers.push(`EVIDENCE_${evidenceStatus}`);
   const requiredQa = ["informationDensity", "semanticDuplication", "proceduralCompleteness", "informationPriority", "subjectCoverage", "crossPartContamination"];

@@ -84,9 +84,9 @@ The publish command requires `publish-approval.json`, rechecks Production duplic
 
 Content images use a brand-asset-first policy. Tire thumbnails and product representation default to approved MAXXIS assets; battery equivalents default to approved POWEROAD assets. Product/part representation cannot use a generated generic substitute. A usage/action visual may fall back only with a recorded brand-unsuitability reason, while an educational body diagram may be generated when it avoids invented structure, specifications, and performance claims. Prepared image metadata records the selected source, brand check, result, and fallback reason.
 
-## Automation policy v1
+## Automation policy v2
 
-Automation defaults to Level 1 (`L1`): the queue, duplicate/evidence checks, generation, QA, and image preparation are automated, while a person approves publishing. Level 2 (`L2`) is conditional auto-publish for low-risk `MAINTENANCE` and `PARTS_GUIDE` topics only after every text, evidence, duplicate, and image gate passes. Level 3 is disabled.
+Autonomous Batch의 최종 게시 판단은 Risk와 Fact, Safety, Duplicate/Intent, Content, Image, Auto Clearance Gate의 조합으로 결정한다. `L1`/`L2`는 기존 Registry 데이터 호환성을 위해 유지하지만, `L1`은 더 이상 단독으로 Human Approval을 강제하지 않는다. 제품 정책의 Source of Truth는 `docs/03_service_modules/CONTENT.md`다.
 
 Risk is fail-closed:
 
@@ -94,18 +94,33 @@ Risk is fail-closed:
 - `MEDIUM`: model guides, pressure/diagnostic/replacement-timing topics, battery inspection, and brake maintenance; L1.
 - `HIGH`: DIY, disassembly, wheel removal, electrical work, torque, or other safety-critical procedures; L1 with strict human review.
 
-Auto-publish requires `DISTINCT_CONTENT`, `NOT_REQUIRED` evidence, `GOOD` information density, semantic duplication/procedure/priority/subject/cross-part checks passing, zero unsupported claims and sentence fragments, and all image checks passing. Technical numeric, performance, or safety-critical claims force `REVIEW_REQUIRED`. Pre-generation exact duplicates stop as `DUPLICATE`; near duplicates continue to generation. After text QA, generated title, summary, section structure, and body coverage are compared with published content. `CONTENT_DISTINCT` and `CONTENT_OVERLAP_ACCEPTABLE` continue, while `CONTENT_DUPLICATE` requires review. Generated generic images may pass L2 when they have no logo, unsupported text or number, product impersonation, technical claim, or mobile-legibility issue. Product/model likeness, potentially misleading technical diagrams or work posture, complex annotations, and generated text errors always require human review.
+LOW Risk는 모든 필수 Gate가 PASS이면 자동 게시한다. MEDIUM Risk는 Critical Fact `VERIFIED`, Source Conflict 없음, Critical Unverified Claim 없음, Unsupported Numeric Claim과 Unsupported Service Limit 없음, Safety QA PASS, Technical Misrepresentation 없음, Product/Model Mismatch 없음, Duplicate/Intent·Content·Image QA PASS, 별도 강제 Human Review 사유 없음이 모두 충족되어 `AUTO_CLEARANCE_PASS`가 된 경우에만 자동 게시한다. HIGH Risk는 항상 `HOLD`다.
+
+Pre-generation Candidate는 Published Content의 Subject, User/Search Intent, Coverage, Action을 비교해 `KEEP`, `REDEFINE`, `DROP`으로 판정한다. `REDEFINE`은 최대 한 번이며 새 Subject, Intent, Action, Coverage, Safety 특성으로 Duplicate Gate에 재진입하고 Risk를 다시 평가한다. Topic 15의 “브레이크 패드 교체 전 확인할 것”은 이 일반 규칙의 Acceptance Case로서 기존 마모 확인 콘텐츠와 높은 중복을 감지하고, 교체용 패드의 구매 전 호환 규격 확인 Intent로 재정의된다.
+
+Source Conflict, Fact QA 실패, Critical Claim 검증 부족, Safety uncertainty, 지원되지 않는 수치 또는 정비 한계, 기술적 오표현, Product/Model 불일치, 해결되지 않은 Duplicate/Subject Drift, Image QA 실패, Production integrity uncertainty는 Risk와 관계없이 강제 `HOLD`다. HOLD는 해당 Candidate만 Exception Queue로 보내며 Batch 전체를 중단하지 않는다.
 
 Automatic attempts are capped at two. A failed run records `last_error`; after two failures the topic remains `BLOCKED` for human action. Publish failures never advance a topic to `PUBLISHED`. Registry rows store only `automation_level`, `risk_level`, `attempt_count`, and `last_error`; detailed prompts and run artifacts remain in ignored `content-work/`.
 
 ### Classification source of truth
 
-`16_content_topic.risk_level` and `16_content_topic.automation_level` are the execution source of truth. The runtime classifier reports drift but cannot automatically upgrade a stored L1 topic to L2. If the current classifier is more restrictive than stored L2, the run uses L1 and requires safety review without silently rewriting the Registry. Missing stored classification fails closed. Explicit reclassification is dry-run by default: `node scripts/content-factory/topic-registry.mjs --operation classify-topic --topic-key {key}`. Add `--apply true` only for an authorized single-topic Registry update.
+`16_content_topic.risk_level` and `16_content_topic.automation_level` are the stored classification source of truth. L1/L2는 최종 게시 승인값이 아니며 Autonomous Batch가 Risk와 현재 Gate 결과를 함께 평가한다. Runtime classifier가 저장값보다 제한적이면 더 높은 Risk Gate를 적용하고 Registry를 조용히 변경하지 않는다. 저장 분류가 없으면 fail-closed한다. 명시적 재분류는 기본 Dry Run이다: `node scripts/content-factory/topic-registry.mjs --operation classify-topic --topic-key {key}`. 승인된 단일 Topic Registry 변경에만 `--apply true`를 추가한다. REDEFINE은 별도 원자적 Registry 갱신 후 새 Intent 기준 분류를 저장한다.
 
-`run-next-topic.mjs` processes at most one row. Dry-run selects and classifies the next topic without generation or mutation:
+`run-next-topic.mjs`는 단일 Topic 운영 호환 인터페이스다. Autonomous Batch는 `autonomous-batch.mjs`를 사용한다. Batch Target은 새로 게시된 Content 수이며 기본 Max Candidate는 `max(target × 3, target + 10)`이다. 제한 내에서 Target을 충족하지 못하면 `PARTIAL`로 종료한다.
 
 ```bash
-node scripts/content-factory/run-next-topic.mjs --dry-run true
+node scripts/content-factory/autonomous-batch.mjs --target 3 --mode dry-run --dry-run true
+node scripts/content-factory/autonomous-batch.mjs --target 20 --mode production --batch-id production-20
+```
+
+Dry Run은 Production Registry와 Published Content를 읽어 Candidate, Duplicate/Re-definition, Research 계획, Visual 결정, 예상 Risk를 계산하지만 DB, Storage, Publish를 변경하지 않는다. Production 실행은 기존 generation, image preparation/QA, publish pipeline을 호출하며 승인된 산출물과 모든 Gate를 다시 확인한다.
+
+Batch checkpoint는 Git에 포함되지 않는 `content-work/autonomous-batches/{batch-id}.json`에 Candidate별로 기록한다. 같은 `batch-id` 재실행 시 `PUBLISHED`와 `DROP`은 건너뛰고, `HOLD`는 기본적으로 건너뛴다. 정책 또는 원인이 해결된 HOLD만 `--retry-hold true`로 재시도한다. 중간 상태의 오류는 해당 Candidate를 HOLD로 기록하고 다음 Candidate를 계속 처리한다.
+
+Registry Queue만으로 Max Candidate를 채우지 못하면 active `02_bike_model`과 `03_bike_model_year`의 실제 non-null Tire/Battery/Brake 데이터가 있는 조합에서 Model Guide Candidate를 보충한다. Dry Run에서는 제안만 계산하며 Registry를 변경하지 않는다. Production에서는 Duplicate Gate를 통과한 보충 Candidate만 Registry에 등록하고 저장 분류를 계산한다. Fitment 값이나 존재하지 않는 모델·부품 관계를 추정해 Candidate를 만들지 않는다.
+
+```bash
+node scripts/content-factory/autonomous-batch.mjs --target 20 --mode production --batch-id production-20 --retry-hold true
 ```
 
 Content/topic/image execution remains runtime data and is not committed. Only Factory, schema, and policy changes belong in Git.

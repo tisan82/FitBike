@@ -39,9 +39,7 @@ async function main() {
     return console.log(JSON.stringify({ status: "BLOCKED", reason: classificationDecision.reason, selected, classificationDecision }, null, 2));
   }
   const classification = classificationDecision.execution;
-  const expectedFlow = classification.automationLevel === "L2"
-    ? ["PLANNED", "GENERATING", "QA", "IMAGE_AUTO_GATE", "APPROVED", "PUBLISHED"]
-    : ["PLANNED", "GENERATING", "QA", "IMAGE", "REVIEW_REQUIRED", "USER_APPROVAL", "PUBLISHED"];
+  const expectedFlow = ["PLANNED", "GENERATING", "QA", "IMAGE", "RISK_GATE", classification.riskLevel === "MEDIUM" ? "AUTO_CLEARANCE_GATE" : "REQUIRED_GATES", "PUBLISHED_OR_HOLD"];
   if (dryRun) return console.log(JSON.stringify({ status: "DRY_RUN", mutation: "NONE", selected, classification, runtimeClassification, classificationDecision, expectedFlow }, null, 2));
 
   await runScript("topic-registry.mjs", ["--operation", "record-automation-attempt", "--topic-key", selected.topic_key]);
@@ -67,7 +65,7 @@ async function main() {
   }
   const imageRequest = await runScript(path.join("images", "generate-images.mjs"), ["--content-dir", contentDirectory, "--mode", "prepare"]);
   await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", selected.topic_key, "--status", "REVIEW_REQUIRED"]);
-  console.log(JSON.stringify({ status: "REVIEW_REQUIRED", reason: classification.automationLevel === "L2" ? "IMAGE_AUTO_GATE_REQUIRES_APPROVED_SOURCES" : "LEVEL_1_HUMAN_REVIEW", selected, classification, generation, imageRequest }, null, 2));
+  console.log(JSON.stringify({ status: "REVIEW_REQUIRED", reason: "SINGLE_TOPIC_COMPATIBILITY_FLOW_USE_AUTONOMOUS_BATCH_FOR_CONDITIONAL_AUTO_PUBLISH", selected, classification, generation, imageRequest }, null, 2));
 }
 
 main().catch((error) => {

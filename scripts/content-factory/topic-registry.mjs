@@ -209,6 +209,19 @@ async function recordAutomationError(args) {
   return { result: "RECORDED", topic: updated[0] };
 }
 
+async function redefineTopic(args) {
+  const topicKey = args["topic-key"];
+  const topic = args.topic;
+  const subject = args.subject;
+  const action = args.action;
+  const riskLevel = args.risk?.toUpperCase();
+  const automationLevel = args.automation?.toUpperCase();
+  if (!topicKey || !topic || !subject || !action || !["LOW", "MEDIUM", "HIGH"].includes(riskLevel) || !["L1", "L2"].includes(automationLevel)) throw new Error("INVALID_REDEFINITION_INPUT");
+  const rows = await managementQuery(`update public."16_content_topic" set topic=$2,normalized_subject=$3,normalized_action=$4,risk_level=$5,automation_level=$6,last_error=null where topic_key=$1 and status='PLANNED' returning content_topic_id,topic_key,topic,normalized_subject,normalized_action,risk_level,automation_level,status`, [topicKey, topic, subject, action, riskLevel, automationLevel], false);
+  if (rows.length !== 1) throw new Error("TOPIC_REDEFINITION_INVALID_STATE");
+  return { result: "REDEFINED", topic: rows[0] };
+}
+
 async function main() {
   await loadLocalEnvironment();
   const args = parseArguments(process.argv.slice(2));
@@ -219,7 +232,8 @@ async function main() {
   else if (args.operation === "record-automation-attempt") result = await recordAutomationAttempt(args);
   else if (args.operation === "record-automation-error") result = await recordAutomationError(args);
   else if (args.operation === "classify-topic") result = await classifyStoredTopic(args);
-  else throw new Error("--operation register-topic|get-next-topic|update-topic-status|record-automation-attempt|record-automation-error|classify-topic is required");
+  else if (args.operation === "redefine-topic") result = await redefineTopic(args);
+  else throw new Error("--operation register-topic|get-next-topic|update-topic-status|record-automation-attempt|record-automation-error|classify-topic|redefine-topic is required");
   console.log(JSON.stringify(result, null, 2));
 }
 

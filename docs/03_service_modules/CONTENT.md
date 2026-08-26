@@ -38,6 +38,20 @@ Public content must satisfy all of the following: `is_active = true`, `published
 
 `/contents` and Home's recent-guide gate use five-minute ISR. `/sitemap.xml` uses a dynamic Route Handler with a five-minute CDN response cache so runtime publishing is reflected without disabling caching globally; the metadata sitemap convention is not used because its Production output was observed remaining bound to the deployment artifact.
 
+## Autonomous Publishing Policy
+
+Content Factory의 Autonomous Batch는 정상 Candidate마다 사람 승인을 요구하지 않고, Risk와 검증 Gate를 조합해 게시 여부를 결정한다. 기존 `L1`/`L2` 필드는 데이터 호환성과 분류 정보로 유지하지만, `L1` 자체를 무조건적인 Human Review 조건으로 사용하지 않는다.
+
+- `LOW`: 필수 Fact, Duplicate/Intent, Content, Image, Safety Gate가 모두 PASS이면 자동 게시한다.
+- `MEDIUM`: 모든 필수 Gate와 Medium Auto Clearance Gate가 모두 PASS인 경우에만 자동 게시한다.
+- `HIGH`: 자동 게시하지 않고 `HOLD`로 보낸다.
+
+Medium Auto Clearance는 Critical Fact가 `VERIFIED`이고 Source Conflict, Critical Unverified Claim, Unsupported Numeric Claim, Unsupported Service Limit, Technical Misrepresentation, Product/Model Mismatch, 별도 강제 Human Review 사유가 모두 없으며 Safety, Duplicate/Intent, Content, Image QA가 모두 PASS여야 한다. 하나라도 실패하거나 불확실하면 해당 Candidate만 `HOLD`하며 Batch는 다음 Candidate를 계속 처리한다.
+
+Risk와 관계없이 Source Conflict, Fact QA 실패, Critical Claim 검증 부족, Safety uncertainty, 지원되지 않는 수치·정비 한계, 기술적 오표현, Product/Model 불일치, 해결되지 않은 Duplicate 또는 Subject Drift, Image QA 실패, Production integrity uncertainty는 강제 `HOLD`다. Human Review는 정상 흐름의 기본 단계가 아니라 이 Exception Queue를 처리한다.
+
+중복 Candidate는 `KEEP`, `REDEFINE`, `DROP` 중 하나로 판정한다. `REDEFINE`은 한 번만 수행하고 Duplicate Gate에 다시 진입하며, 재정의된 Subject, Intent, Action, Coverage, Safety 특성으로 Risk를 다시 계산한다. Batch 완료 조건은 Candidate 생성 수가 아니라 새 `PUBLISHED` 수가 요청 Target에 도달하는 것이다.
+
 ## Current Scope
 
 - Published content list and content-type filter
