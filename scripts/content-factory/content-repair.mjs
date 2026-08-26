@@ -1,6 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { synchronizePublishArtifacts } from "./artifact-synchronization.mjs";
+
 const repairablePatterns = [/Sentence fragments detected/, /Information density is TOO_LIGHT/, /Supporting information outweighs/, /Semantic duplication detected/, /Question and answer are not aligned/];
 
 function blockText(block) { return block.text ?? block.body ?? (block.items ?? []).join(" ") ?? ""; }
@@ -82,6 +84,7 @@ async function repairContentDirectory(contentDirectory, retryLimit = 2) {
     writeFile(path.join(contentDirectory, "content-package.json"), `${JSON.stringify(result.contentPackage, null, 2)}\n`, "utf8"),
     writeFile(path.join(contentDirectory, "qa.json"), `${JSON.stringify(result.qa, null, 2)}\n`, "utf8")
   ]);
+  if (result.status === "PASS") result.artifactSynchronization = await synchronizePublishArtifacts(contentDirectory, { required: false });
   return result;
 }
 

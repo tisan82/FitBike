@@ -10,6 +10,7 @@ import { runAutonomousBatch } from "./autonomous-batch-engine.mjs";
 import { deriveModelCandidates } from "./autonomous-policy.mjs";
 import { evaluateCapabilities } from "./production-capabilities.mjs";
 import { repairContentDirectory } from "./content-repair.mjs";
+import { synchronizePublishArtifacts } from "./artifact-synchronization.mjs";
 
 const execute = promisify(execFile);
 const factoryDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -205,6 +206,8 @@ function createProductionStages() {
         };
         await writeFile(approvalPath, `${JSON.stringify(approval, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
       }
+      const approval = await readRuntimeJson(context.contentDirectory, "publish-approval.json");
+      await synchronizePublishArtifacts(context.contentDirectory, { required: true, risk: { classification: context.classification, gates: context.gates, autoClearance: context.record.autoClearance }, approval: { status: approval.status, mode: approval.mode, text: approval.text } });
       const restored = await runScript("topic-registry.mjs", ["--operation", "restore-topic-for-retry-hold", "--topic-key", candidate.topic_key]);
       if (restored.to === "GENERATING") await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "REVIEW_REQUIRED"]);
       if (["GENERATING", "REVIEW_REQUIRED"].includes(restored.to)) await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "APPROVED"]);
