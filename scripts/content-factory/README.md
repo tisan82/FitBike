@@ -133,7 +133,7 @@ Production Image 단계는 `images/generate-images.mjs --mode prepare` 뒤 `imag
 node scripts/content-factory/autonomous-batch.mjs --target 3 --mode production --batch-id {same-batch-id} --retry-system true
 ```
 
-`BLOCKED_SYSTEM`은 시스템 실행 대기 상태로 Topic Registry를 변경하지 않는다. `HOLD_CONTENT`는 제품/모델 불일치, Image QA 실패 등 Candidate 자체의 검토 상태이며 기존 `--retry-hold true` 정책을 따른다. 두 상태 모두 Batch의 다음 Candidate 처리를 막지 않는다.
+`BLOCKED_SYSTEM`은 시스템 실행 대기 상태로 Topic Registry를 변경하지 않고, 체크포인트 저장 직후 Batch 전체를 중단하여 이후 Candidate 평가와 Mutation을 막는다. 동일 Batch ID와 `--retry-system true`로 실패한 Asset 단계부터 재개하며 이전 Published 수를 Target에 포함한다. `HOLD_CONTENT`는 제품/모델 불일치, Image QA 실패 등 Candidate 자체의 검토 상태이며 기존 `--retry-hold true` 정책에 따라 다음 Candidate 처리를 계속한다.
 
 ## System and content ownership
 

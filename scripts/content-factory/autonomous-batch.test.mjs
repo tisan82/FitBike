@@ -84,6 +84,82 @@ test("BLOCKED_SYSTEM은 명시적 retry에서만 저장된 Asset 단계부터 �
   assert.deepEqual(calls, ["ASSET", "CONTENT_QA", "IMAGE_QA"]);
   assert.equal(result.records[0].state, "PUBLISHED");
 });
+test("BLOCKED_SYSTEM 발생 즉시 Batch를 중단하고 다음 Candidate를 평가하지 않는다", async () => {
+  const candidates = [
+    { topic_key: "system-block", content_topic_id: 101, topic: "system block", content_type: "PARTS_GUIDE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" },
+    { topic_key: "must-not-run", content_topic_id: 102, topic: "must not run", content_type: "PARTS_GUIDE", part_type: "TIRE", normalized_subject: "TIRE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" }
+  ];
+  const evaluated = [];
+  const stages = passingStages();
+  stages.RESEARCH = async (candidate, context) => {
+    evaluated.push(candidate.topic_key);
+    return { ...context, gates: passGates(), holdSignals: {} };
+  };
+  stages.ASSET_GENERATION_OR_SELECTION = async (candidate, context) => ({ ...context, systemBlock: { reason: "IMAGE_EXECUTOR_UNAVAILABLE", resumeFrom: "ASSET_GENERATION_OR_SELECTION" } });
+  const result = await runAutonomousBatch({ batchId: "canary-regression", target: 1, maxCandidates: 2, candidates, classifyTopicRisk, stages });
+  assert.equal(result.status, "BLOCKED_SYSTEM");
+  assert.equal(result.considered, 1);
+  assert.deepEqual(evaluated, ["system-block"]);
+  assert.equal(result.records.some((record) => record.originalTopicKey === "must-not-run"), false);
+});
+test("BLOCKED_SYSTEM 이후 DB와 Storage Mutation 경로를 호출하지 않는다", async () => {
+  const candidates = [
+    { topic_key: "blocked", topic: "blocked", content_type: "PARTS_GUIDE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" },
+    { topic_key: "mutation", topic: "mutation", content_type: "PARTS_GUIDE", part_type: "TIRE", normalized_subject: "TIRE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" }
+  ];
+  let databaseMutations = 0;
+  let storageMutations = 0;
+  const stages = passingStages();
+  stages.ASSET_GENERATION_OR_SELECTION = async (candidate, context) => candidate.topic_key === "blocked"
+    ? { ...context, systemBlock: { reason: "CAPABILITY_MISSING", resumeFrom: "ASSET_GENERATION_OR_SELECTION" } }
+    : (databaseMutations += 1, storageMutations += 1, context);
+  await runAutonomousBatch({ target: 1, maxCandidates: 2, candidates, classifyTopicRisk, stages });
+  assert.equal(databaseMutations, 0);
+  assert.equal(storageMutations, 0);
+});
+test("BLOCKED_SYSTEM Checkpoint는 실패 단계와 재개 정보를 보존한다", async () => {
+  const candidate = { topic_key: "checkpoint", content_topic_id: 301, topic: "checkpoint", content_type: "PARTS_GUIDE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" };
+  const stages = passingStages();
+  stages.ASSET_GENERATION_OR_SELECTION = async (current, context) => ({ ...context, systemBlock: { reason: "IMAGEGEN_OUTPUT_PENDING", resumeFrom: "ASSET_GENERATION_OR_SELECTION" } });
+  const result = await runAutonomousBatch({ batchId: "checkpoint-batch", target: 1, maxCandidates: 1, candidates: [candidate], classifyTopicRisk, stages });
+  const checkpoint = result.records[0].checkpoint;
+  assert.equal(result.batchId, "checkpoint-batch");
+  assert.equal(checkpoint.topicId, 301);
+  assert.equal(checkpoint.failedStage, "ASSET_GENERATION_OR_SELECTION");
+  assert.equal(checkpoint.blockerType, "BLOCKED_SYSTEM");
+  assert.equal(checkpoint.blockerReason, "IMAGEGEN_OUTPUT_PENDING");
+  assert.equal(checkpoint.resumeEligible, true);
+  assert.equal(checkpoint.completedStages.includes("RESEARCH"), true);
+});
+test("Pipeline Adapter 예외도 실제 실패 단계에서 BLOCKED_SYSTEM으로 기록한다", async () => {
+  const candidate = { topic_key: "adapter-error", content_topic_id: 302, topic: "adapter error", content_type: "PARTS_GUIDE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" };
+  const stages = passingStages();
+  stages.ASSET_GENERATION_OR_SELECTION = async () => { throw new Error("ADAPTER_UNAVAILABLE"); };
+  const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], classifyTopicRisk, stages });
+  assert.equal(result.status, "BLOCKED_SYSTEM");
+  assert.equal(result.records[0].checkpoint.failedStage, "ASSET_GENERATION_OR_SELECTION");
+  assert.match(result.records[0].checkpoint.blockerReason, /ADAPTER_UNAVAILABLE/);
+});
+test("Resume은 이전 Published Count를 보존하고 Target까지 이어서 처리한다", async () => {
+  const blockedCandidate = { topic_key: "resume-target", topic: "resume target", content_type: "PARTS_GUIDE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" };
+  const nextCandidate = { topic_key: "target-three", topic: "target three", content_type: "PARTS_GUIDE", part_type: "TIRE", normalized_subject: "TIRE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" };
+  const previousRecords = {
+    published: { topicKey: "published", originalTopicKey: "published", state: "PUBLISHED", history: [{ state: "PUBLISHED" }] },
+    "resume-target": { topicKey: "resume-target", originalTopicKey: "resume-target", state: "BLOCKED_SYSTEM", history: [{ state: "BLOCKED_SYSTEM" }], candidate: blockedCandidate, classification: classifyTopicRisk(blockedCandidate), visual: { type: "EDUCATIONAL" }, resumeFrom: "ASSET_GENERATION_OR_SELECTION", resumeContext: { gates: passGates(), holdSignals: {} } }
+  };
+  const result = await runAutonomousBatch({ batchId: "target-preservation", target: 3, maxCandidates: 3, candidates: [blockedCandidate, nextCandidate], previousRecords, retrySystem: true, classifyTopicRisk, stages: passingStages() });
+  assert.equal(result.publishedAtStart, 1);
+  assert.equal(result.published, 3);
+  assert.equal(result.status, "SUCCESS");
+});
+test("PUBLISHED 재등장은 Target Count를 중복 증가시키지 않는다", async () => {
+  const candidate = { topic_key: "already-published", topic: "already", content_type: "PARTS_GUIDE", part_type: "TIRE", normalized_subject: "TIRE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" };
+  const previousRecords = { "already-published": { topicKey: "already-published", originalTopicKey: "already-published", state: "PUBLISHED", history: [{ state: "PUBLISHED" }] } };
+  const result = await runAutonomousBatch({ target: 2, maxCandidates: 2, candidates: [candidate], previousRecords, classifyTopicRisk, stages: passingStages() });
+  assert.equal(result.publishedAtStart, 1);
+  assert.equal(result.published, 1);
+  assert.equal(result.records[0].skipped, true);
+});
 test("원인이 해결된 HOLD는 명시적 retry 정책에서만 재처리한다", () => {
   assert.equal(shouldSkipCandidate({ state: "HOLD" }, { retryHold: false }), true);
   assert.equal(shouldSkipCandidate({ state: "HOLD" }, { retryHold: true }), false);

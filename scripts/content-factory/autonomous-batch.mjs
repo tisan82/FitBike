@@ -172,11 +172,11 @@ async function main() {
   const previousRecords = dryRun ? {} : await readPreviousRecords(batchFile);
   const retryHold = args["retry-hold"] === "true";
   const retrySystem = args["retry-system"] === "true";
-  const resumeTopicKeys = retrySystem ? Object.values(previousRecords).filter((record) => record.state === "BLOCKED_SYSTEM").map((record) => record.originalTopicKey) : [];
+  const resumeTopicKeys = Object.values(previousRecords).filter((record) => retrySystem && record.state === "BLOCKED_SYSTEM" || retryHold && ["HOLD", "HOLD_CONTENT"].includes(record.state)).map((record) => record.originalTopicKey);
   const { candidates, publishedContents } = await loadProductionInputs(maxCandidates, resumeTopicKeys);
   const checkpoints = { ...previousRecords };
   if (!dryRun) await mkdir(batchDirectory, { recursive: true });
-  const onRecord = dryRun ? null : async (candidate, record) => {
+  const onRecord = dryRun ? null : async (candidate, record, progress) => {
     try {
       if (!record.skipped && record.state === "DROP" && !candidate.generated_candidate) {
         await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "DUPLICATE"]);
@@ -188,9 +188,9 @@ async function main() {
       record.registryCheckpoint = { status: "FAILED", error: error instanceof Error ? error.message : String(error) };
     }
     checkpoints[candidate.topic_key] = record;
-    await writeFile(batchFile, `${JSON.stringify({ status: "IN_PROGRESS", target, maxCandidates, records: Object.values(checkpoints) }, null, 2)}\n`, "utf8");
+    await writeFile(batchFile, `${JSON.stringify({ status: record.state === "BLOCKED_SYSTEM" ? "BLOCKED_SYSTEM" : "IN_PROGRESS", batchId, target, maxCandidates, published: progress.publishedCount, considered: progress.considered, currentCandidate: candidate.topic_key, checkpoint: record.checkpoint ?? null, records: Object.values(checkpoints) }, null, 2)}\n`, "utf8");
   };
-  const result = await runAutonomousBatch({ target, maxCandidates, candidates, publishedContents, previousRecords, retryHold, retrySystem, dryRun, classifyTopicRisk, stages: dryRun ? {} : createProductionStages(), onRecord });
+  const result = await runAutonomousBatch({ batchId, target, maxCandidates, candidates, publishedContents, previousRecords, retryHold, retrySystem, dryRun, classifyTopicRisk, stages: dryRun ? {} : createProductionStages(), onRecord });
   if (!dryRun) {
     await writeFile(batchFile, `${JSON.stringify(result, null, 2)}\n`, "utf8");
   }

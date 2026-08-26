@@ -52,6 +52,37 @@ function resumableContext(stageResult) {
   return context;
 }
 
+function checkpointSystemBlock(record, candidate, reason, failedStage) {
+  record.resumeFrom = failedStage;
+  record.checkpoint = {
+    candidateId: candidate.content_topic_id ?? null,
+    topicId: candidate.content_topic_id ?? null,
+    topicKey: candidate.topic_key,
+    currentPipelineStage: failedStage,
+    completedStages: [...new Set(record.history.map((entry) => entry.state).filter((state) => stateOrder.includes(state) && state !== failedStage))],
+    failedStage,
+    blockerType: "BLOCKED_SYSTEM",
+    blockerReason: reason,
+    retryEligible: true,
+    resumeEligible: true
+  };
+  transition(record, "BLOCKED_SYSTEM", { reason, resumeFrom: failedStage });
+  return record;
+}
+
+async function executeStage(stages, state, candidate, context, record) {
+  try {
+    return await stages[state](candidate, context);
+  } catch (error) {
+    if (error && typeof error === "object") {
+      error.pipelineStage = state;
+      error.pipelineRecord = record;
+      error.resumeContext = resumableContext(context);
+    }
+    throw error;
+  }
+}
+
 async function processCandidate({ candidate, publishedContents, previousRecord, retryHold, retrySystem, dryRun, classifyTopicRisk, stages }) {
   if (shouldSkipCandidate(previousRecord, { retryHold, retrySystem })) return { ...previousRecord, skipped: true };
   const record = previousRecord ?? { topicKey: candidate.topic_key, originalTopicKey: candidate.topic_key, state: "CANDIDATE", history: [] };
@@ -66,12 +97,11 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
     let stageResult = record.resumeContext ?? { gates: {}, holdSignals: {} };
     for (const state of stateOrder.slice(resumeIndex, stateOrder.indexOf("RISK_GATE"))) {
       transition(record, state, state === record.resumeFrom ? { resumed: true } : {});
-      stageResult = await stages[state](workingCandidate, { ...stageResult, classification, visual, record });
+      stageResult = await executeStage(stages, state, workingCandidate, { ...stageResult, classification, visual, record }, record);
       if (stageResult.systemBlock) {
         record.resumeFrom = stageResult.systemBlock.resumeFrom ?? state;
         record.resumeContext = resumableContext(stageResult);
-        transition(record, "BLOCKED_SYSTEM", { reason: stageResult.systemBlock.reason, resumeFrom: record.resumeFrom });
-        return record;
+        return checkpointSystemBlock(record, workingCandidate, stageResult.systemBlock.reason, record.resumeFrom);
       }
       const hold = mandatoryHoldReason(stageResult.holdSignals);
       if (hold) {
@@ -125,12 +155,11 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
   let stageResult = { gates: {}, holdSignals: {} };
   for (const state of stateOrder.slice(2, stateOrder.indexOf("RISK_GATE"))) {
     transition(record, state);
-    stageResult = await stages[state](workingCandidate, { ...stageResult, classification, visual, record });
+    stageResult = await executeStage(stages, state, workingCandidate, { ...stageResult, classification, visual, record }, record);
     if (stageResult.systemBlock) {
       record.resumeFrom = stageResult.systemBlock.resumeFrom ?? state;
       record.resumeContext = resumableContext(stageResult);
-      transition(record, "BLOCKED_SYSTEM", { reason: stageResult.systemBlock.reason, resumeFrom: record.resumeFrom });
-      return record;
+      return checkpointSystemBlock(record, workingCandidate, stageResult.systemBlock.reason, record.resumeFrom);
     }
     const hold = mandatoryHoldReason(stageResult.holdSignals);
     if (hold) {
@@ -168,37 +197,49 @@ async function finalizeCandidate({ record, workingCandidate, classification, vis
   return record;
 }
 
-async function runAutonomousBatch({ target, maxCandidates, candidates, publishedContents = [], previousRecords = {}, retryHold = false, retrySystem = false, dryRun = false, classifyTopicRisk, stages = {}, onRecord = null }) {
+async function runAutonomousBatch({ batchId = null, target, maxCandidates, candidates, publishedContents = [], previousRecords = {}, retryHold = false, retrySystem = false, dryRun = false, classifyTopicRisk, stages = {}, onRecord = null }) {
   if (!Number.isInteger(target) || target < 1 || !Number.isInteger(maxCandidates) || maxCandidates < target) throw new Error("INVALID_BATCH_LIMIT");
-  const records = [];
-  let published = 0;
+  const recordsByKey = new Map(Object.values(previousRecords).map((record) => [record.originalTopicKey, record]));
+  const publishedAtStart = dryRun ? 0 : [...recordsByKey.values()].filter((record) => record.state === "PUBLISHED").length;
+  let published = publishedAtStart;
   let readyCandidates = 0;
   let considered = 0;
+  let systemBlocked = false;
   for (const candidate of candidates) {
     if ((dryRun ? readyCandidates : published) >= target || considered >= maxCandidates) break;
     considered += 1;
+    const wasPublished = previousRecords[candidate.topic_key]?.state === "PUBLISHED";
     let record;
     try {
       record = await processCandidate({ candidate, publishedContents, previousRecord: previousRecords[candidate.topic_key], retryHold, retrySystem, dryRun, classifyTopicRisk, stages });
     } catch (error) {
-      record = {
+      const failedStage = error?.pipelineStage ?? "RESEARCH";
+      record = error?.pipelineRecord ?? {
         topicKey: candidate.topic_key,
         originalTopicKey: candidate.topic_key,
-        state: "BLOCKED_SYSTEM",
-        resumeFrom: "RESEARCH",
-        history: [{ state: "BLOCKED_SYSTEM", reason: "STAGE_ERROR", error: error instanceof Error ? error.message : String(error), resumeFrom: "RESEARCH" }]
+        state: "CANDIDATE",
+        history: []
       };
+      record.resumeContext = error?.resumeContext ?? { gates: {}, holdSignals: {} };
+      record = checkpointSystemBlock(record, record.candidate ?? candidate, `STAGE_ERROR:${error instanceof Error ? error.message : String(error)}`, failedStage);
     }
-    records.push(record);
-    if (!dryRun && onRecord) await onRecord(candidate, record);
-    if (record.state === "PUBLISHED") published += 1;
+    recordsByKey.set(record.originalTopicKey, record);
+    if (record.state === "PUBLISHED" && !wasPublished) published += 1;
     if (record.state === "DRY_RUN_READY") readyCandidates += 1;
+    if (!dryRun && onRecord) await onRecord(candidate, record, { batchId, target, publishedCount: published, considered });
+    if (record.state === "BLOCKED_SYSTEM") {
+      systemBlocked = true;
+      break;
+    }
   }
+  const records = [...recordsByKey.values()];
   return {
-    status: dryRun ? "DRY_RUN" : published >= target ? "SUCCESS" : "PARTIAL",
+    status: dryRun ? "DRY_RUN" : systemBlocked ? "BLOCKED_SYSTEM" : published >= target ? "SUCCESS" : "PARTIAL",
+    batchId,
     target,
     maxCandidates,
     considered,
+    publishedAtStart,
     published,
     readyCandidates,
     mutation: dryRun ? "NONE" : "PRODUCTION",

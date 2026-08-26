@@ -60,6 +60,8 @@ Autonomous Batch의 Image 단계는 계획 파일 생성만으로 PASS하지 않
 
 Image QA는 Subject/Role 일치, Brand Asset First, Product/Model 일치, 기술적 오인, 근거 없는 수치, 위험 표현, 모바일 가독성, Asset 가용성과 Storage 준비 상태를 fail-closed로 검사한다. 이미지 생성 출력처럼 시스템 실행 능력이 아직 제공되지 않은 경우 Candidate는 `BLOCKED_SYSTEM`으로 체크포인트되며 Registry를 `BLOCKED`로 바꾸지 않는다. 출력과 QA sidecar를 준비한 뒤 동일 Batch ID와 `--retry-system true`를 사용하면 `ASSET_GENERATION_OR_SELECTION`부터 재개한다. 콘텐츠 자체의 불일치나 Image QA 실패는 `HOLD_CONTENT`이며, `PUBLISHED`와 `DROP`은 재실행하지 않는다.
 
+`HOLD_CONTENT`는 해당 Candidate만 보류하고 Batch를 계속하지만, `BLOCKED_SYSTEM`은 현재 Candidate의 실패 단계와 완료 단계를 저장한 즉시 Batch 전체를 종료하며 이후 Candidate 평가와 Production Mutation을 금지한다. 동일 Batch 재개 시 완료된 단계를 반복하지 않고 실패 단계부터 진행하며, 재개 전 Published 수를 Target 계산에 그대로 포함한다.
+
 - Published content list and content-type filter
 - Published content detail and structured block rendering
 - Optional thumbnail and hero rendering from `content-assets` object paths
