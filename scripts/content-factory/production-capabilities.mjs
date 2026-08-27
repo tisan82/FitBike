@@ -105,18 +105,20 @@ function inspectCheckpointResume(checkpoint) {
   if (completedBatchStates.has(checkpoint.status)) return blocked("NOT_RESUMABLE", "COMPLETED_BATCH");
   const records = checkpoint.records ?? [];
   const pendingRecords = records.filter((record) => record.state === "PUBLISHED_PENDING_QA");
-  const systemRecords = records.filter((record) => record.state === "BLOCKED_SYSTEM" && record.checkpoint?.resumeEligible === true && record.resumeFrom);
+  const systemRecords = records.filter((record) => ["BLOCKED_SYSTEM", "GLOBAL_FATAL"].includes(record.state) && record.checkpoint?.resumeEligible === true && record.resumeFrom);
+  const failedRecords = records.filter((record) => record.state === "CANDIDATE_FAILED" && record.checkpoint?.resumeEligible === true && record.resumeFrom);
   const holdRecords = records.filter((record) => ["HOLD", "HOLD_CONTENT"].includes(record.state));
   if (systemRecords.length) return ready({ batchId: checkpoint.batchId, mode: "SYSTEM", resumable: systemRecords.length, stage: systemRecords[0].resumeFrom });
   if (pendingRecords.length) return ready({ batchId: checkpoint.batchId, mode: "PRODUCTION_QA_RECONCILIATION", resumable: pendingRecords.length, stage: "PRODUCTION_QA" });
+  if (failedRecords.length) return ready({ batchId: checkpoint.batchId, mode: "CANDIDATE_FAILED", resumable: failedRecords.length, requiresFlag: "--retry-system" });
   if (checkpoint.status === "PARTIAL" && holdRecords.length) return ready({ batchId: checkpoint.batchId, mode: "HOLD_CONTENT", resumable: holdRecords.length, requiresFlag: "--retry-hold" });
   return blocked("MISSING", "RESUMABLE_CHECKPOINT_MISSING");
 }
 
 function isActiveBatch(checkpoint) {
   if (completedBatchStates.has(checkpoint.status)) return false;
-  if (["RUNNING", "BLOCKED_SYSTEM", "PARTIAL"].includes(checkpoint.status) || Number(checkpoint.pendingQa) > 0) return true;
-  return (checkpoint.records ?? []).some((record) => ["BLOCKED_SYSTEM", "PUBLISHED_PENDING_QA"].includes(record.state));
+  if (["RUNNING", "BLOCKED_SYSTEM", "GLOBAL_FATAL", "PARTIAL"].includes(checkpoint.status) || Number(checkpoint.pendingQa) > 0) return true;
+  return (checkpoint.records ?? []).some((record) => ["BLOCKED_SYSTEM", "GLOBAL_FATAL", "CANDIDATE_FAILED", "PUBLISHED_PENDING_QA"].includes(record.state));
 }
 
 function inspectOperationPreflight({ operationMode, checkpoints = [], checkpoint = null, batchId = null }) {

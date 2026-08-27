@@ -88,7 +88,7 @@ test("BLOCKED_SYSTEM은 명시적 retry에서만 저장된 Asset 단계부터 �
   assert.deepEqual(calls, ["ASSET", "CONTENT_QA", "IMAGE_QA"]);
   assert.equal(result.records[0].state, "PUBLISHED_VERIFIED");
 });
-test("BLOCKED_SYSTEM 발생 즉시 Batch를 중단하고 다음 Candidate를 평가하지 않는다", async () => {
+test("GLOBAL_FATAL 발생 즉시 Batch를 중단하고 다음 Candidate를 평가하지 않는다", async () => {
   const candidates = [
     { topic_key: "system-block", content_topic_id: 101, topic: "system block", content_type: "PARTS_GUIDE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" },
     { topic_key: "must-not-run", content_topic_id: 102, topic: "must not run", content_type: "PARTS_GUIDE", part_type: "TIRE", normalized_subject: "TIRE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" }
@@ -99,14 +99,14 @@ test("BLOCKED_SYSTEM 발생 즉시 Batch를 중단하고 다음 Candidate를 평
     evaluated.push(candidate.topic_key);
     return { ...context, gates: passGates(), holdSignals: {} };
   };
-  stages.ASSET_GENERATION_OR_SELECTION = async (candidate, context) => ({ ...context, systemBlock: { reason: "IMAGE_EXECUTOR_UNAVAILABLE", resumeFrom: "ASSET_GENERATION_OR_SELECTION" } });
+  stages.ASSET_GENERATION_OR_SELECTION = async (candidate, context) => ({ ...context, systemBlock: { reason: "IMAGE_EXECUTOR_UNAVAILABLE", failureScope: "GLOBAL", resumeFrom: "ASSET_GENERATION_OR_SELECTION" } });
   const result = await runAutonomousBatch({ batchId: "canary-regression", target: 1, maxCandidates: 2, candidates, classifyTopicRisk, stages });
-  assert.equal(result.status, "BLOCKED_SYSTEM");
+  assert.equal(result.status, "GLOBAL_FATAL");
   assert.equal(result.considered, 1);
   assert.deepEqual(evaluated, ["system-block"]);
   assert.equal(result.records.some((record) => record.originalTopicKey === "must-not-run"), false);
 });
-test("BLOCKED_SYSTEM 이후 DB와 Storage Mutation 경로를 호출하지 않는다", async () => {
+test("GLOBAL_FATAL 이후 DB와 Storage Mutation 경로를 호출하지 않는다", async () => {
   const candidates = [
     { topic_key: "blocked", topic: "blocked", content_type: "PARTS_GUIDE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" },
     { topic_key: "mutation", topic: "mutation", content_type: "PARTS_GUIDE", part_type: "TIRE", normalized_subject: "TIRE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" }
@@ -115,32 +115,32 @@ test("BLOCKED_SYSTEM 이후 DB와 Storage Mutation 경로를 호출하지 않는
   let storageMutations = 0;
   const stages = passingStages();
   stages.ASSET_GENERATION_OR_SELECTION = async (candidate, context) => candidate.topic_key === "blocked"
-    ? { ...context, systemBlock: { reason: "CAPABILITY_MISSING", resumeFrom: "ASSET_GENERATION_OR_SELECTION" } }
+    ? { ...context, systemBlock: { reason: "CAPABILITY_MISSING", failureScope: "GLOBAL", resumeFrom: "ASSET_GENERATION_OR_SELECTION" } }
     : (databaseMutations += 1, storageMutations += 1, context);
   await runAutonomousBatch({ target: 1, maxCandidates: 2, candidates, classifyTopicRisk, stages });
   assert.equal(databaseMutations, 0);
   assert.equal(storageMutations, 0);
 });
-test("BLOCKED_SYSTEM Checkpoint는 실패 단계와 재개 정보를 보존한다", async () => {
+test("GLOBAL_FATAL Checkpoint는 실패 단계와 재개 정보를 보존한다", async () => {
   const candidate = { topic_key: "checkpoint", content_topic_id: 301, topic: "checkpoint", content_type: "PARTS_GUIDE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" };
   const stages = passingStages();
-  stages.ASSET_GENERATION_OR_SELECTION = async (current, context) => ({ ...context, systemBlock: { reason: "IMAGEGEN_OUTPUT_PENDING", resumeFrom: "ASSET_GENERATION_OR_SELECTION" } });
+  stages.ASSET_GENERATION_OR_SELECTION = async (current, context) => ({ ...context, systemBlock: { reason: "IMAGEGEN_OUTPUT_PENDING", failureScope: "GLOBAL", resumeFrom: "ASSET_GENERATION_OR_SELECTION" } });
   const result = await runAutonomousBatch({ batchId: "checkpoint-batch", target: 1, maxCandidates: 1, candidates: [candidate], classifyTopicRisk, stages });
   const checkpoint = result.records[0].checkpoint;
   assert.equal(result.batchId, "checkpoint-batch");
   assert.equal(checkpoint.topicId, 301);
   assert.equal(checkpoint.failedStage, "ASSET_GENERATION_OR_SELECTION");
-  assert.equal(checkpoint.blockerType, "BLOCKED_SYSTEM");
+  assert.equal(checkpoint.blockerType, "GLOBAL_FATAL");
   assert.equal(checkpoint.blockerReason, "IMAGEGEN_OUTPUT_PENDING");
   assert.equal(checkpoint.resumeEligible, true);
   assert.equal(checkpoint.completedStages.includes("RESEARCH"), true);
 });
-test("Pipeline Adapter 예외도 실제 실패 단계에서 BLOCKED_SYSTEM으로 기록한다", async () => {
+test("전역 Pipeline Adapter 예외는 실제 실패 단계에서 GLOBAL_FATAL로 기록한다", async () => {
   const candidate = { topic_key: "adapter-error", content_topic_id: 302, topic: "adapter error", content_type: "PARTS_GUIDE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "UNDERSTAND", normalized_scope: "GENERIC", risk_level: "LOW", automation_level: "L2" };
   const stages = passingStages();
-  stages.ASSET_GENERATION_OR_SELECTION = async () => { throw new Error("ADAPTER_UNAVAILABLE"); };
+  stages.ASSET_GENERATION_OR_SELECTION = async () => { const error = new Error("ADAPTER_UNAVAILABLE"); error.failureScope = "GLOBAL"; throw error; };
   const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], classifyTopicRisk, stages });
-  assert.equal(result.status, "BLOCKED_SYSTEM");
+  assert.equal(result.status, "GLOBAL_FATAL");
   assert.equal(result.records[0].checkpoint.failedStage, "ASSET_GENERATION_OR_SELECTION");
   assert.match(result.records[0].checkpoint.blockerReason, /ADAPTER_UNAVAILABLE/);
 });
@@ -314,7 +314,7 @@ test("PRODUCTION_QA Resume은 Publish를 건너뛰고 존재 확인과 QA만 실
   assert.equal(result.status, "PARTIAL");
 });
 
-test("Production Content가 없으면 Publish 없이 PRODUCTION_QA BLOCKED_SYSTEM을 유지한다", async () => {
+test("Production Content가 없으면 Publish 없이 Candidate 실패로 격리한다", async () => {
   const candidate = { ...topic15, topic_key: "production-missing" };
   let publishCalls = 0;
   const stages = passingStages();
@@ -322,7 +322,8 @@ test("Production Content가 없으면 Publish 없이 PRODUCTION_QA BLOCKED_SYSTE
   stages.PREPARE_PRODUCTION_QA_RESUME = async () => { throw new Error("PRODUCTION_QA_RESUME_PUBLISHED_CONTENT_MISSING"); };
   const previous = productionQaCheckpoint(candidate);
   const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, retrySystem: true, classifyTopicRisk, stages });
-  assert.equal(result.status, "BLOCKED_SYSTEM");
+  assert.equal(result.status, "PARTIAL");
+  assert.equal(result.records[0].state, "CANDIDATE_FAILED");
   assert.equal(result.records[0].checkpoint.failedStage, "PRODUCTION_QA");
   assert.match(result.records[0].checkpoint.blockerReason, /PUBLISHED_CONTENT_MISSING/);
   assert.equal(publishCalls, 0);
@@ -419,12 +420,13 @@ test("Contents ISR 미반영은 BLOCKED_SYSTEM이 아닌 PRODUCTION_QA_PENDING�
   assert.equal(result.status, "PRODUCTION_QA_PENDING");
 });
 
-test("Production QA Runtime 예외만 BLOCKED_SYSTEM으로 중단한다", async () => {
+test("Candidate별 Production QA Runtime 예외는 격리한다", async () => {
   const candidate = { ...topic15, topic_key: "qa-runtime-failure", topic: "qa runtime failure" };
   const stages = passingStages();
   stages.PRODUCTION_QA = async () => { throw new Error("PRODUCTION_HTTP_RUNTIME_DOWN"); };
   const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], classifyTopicRisk, stages });
-  assert.equal(result.status, "BLOCKED_SYSTEM");
+  assert.equal(result.status, "PARTIAL");
+  assert.equal(result.records[0].state, "CANDIDATE_FAILED");
   assert.equal(result.records[0].checkpoint.failedStage, "PRODUCTION_QA");
 });
 

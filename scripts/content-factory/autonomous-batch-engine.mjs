@@ -7,6 +7,7 @@ import {
   reclassifyAfterRedefinition,
   shouldSkipCandidate
 } from "./autonomous-policy.mjs";
+import { classifyFailureScope, createFailureEntry, groupFailureBacklog } from "./failure-isolation.mjs";
 
 const stateOrder = [
   "CANDIDATE",
@@ -63,7 +64,10 @@ function clearResumeCheckpoint(record) {
   delete record.checkpoint;
 }
 
-function checkpointSystemBlock(record, candidate, reason, failedStage) {
+function checkpointFailure(record, candidate, error, failedStage) {
+  const failureScope = classifyFailureScope(error);
+  const failureType = failureScope === "GLOBAL" ? "GLOBAL_FATAL" : "CANDIDATE_FAILED";
+  const reason = error?.reason ?? error?.message ?? String(error);
   record.resumeFrom = failedStage;
   record.checkpoint = {
     candidateId: candidate.content_topic_id ?? null,
@@ -72,12 +76,13 @@ function checkpointSystemBlock(record, candidate, reason, failedStage) {
     currentPipelineStage: failedStage,
     completedStages: [...new Set(record.history.map((entry) => entry.state).filter((state) => stateOrder.includes(state) && state !== failedStage))],
     failedStage,
-    blockerType: "BLOCKED_SYSTEM",
+    blockerType: failureType,
     blockerReason: reason,
     retryEligible: true,
     resumeEligible: true
   };
-  transition(record, "BLOCKED_SYSTEM", { reason, resumeFrom: failedStage });
+  record.failure = createFailureEntry({ candidate, record, error, failedStage, failureType });
+  transition(record, failureType, { reason, failureScope, resumeFrom: failedStage });
   return record;
 }
 
@@ -149,7 +154,7 @@ async function reconcileProductionQa({ record, workingCandidate, classification,
 async function processCandidate({ candidate, publishedContents, previousRecord, retryHold, retrySystem, dryRun, classifyTopicRisk, stages }) {
   if (shouldSkipCandidate(previousRecord, { retryHold, retrySystem })) return { ...previousRecord, skipped: true };
   const record = previousRecord ?? { topicKey: candidate.topic_key, originalTopicKey: candidate.topic_key, state: "CANDIDATE", history: [] };
-  const resumingSystemBlock = previousRecord?.state === "BLOCKED_SYSTEM" && retrySystem;
+  const resumingSystemBlock = ["BLOCKED_SYSTEM", "GLOBAL_FATAL", "CANDIDATE_FAILED"].includes(previousRecord?.state) && retrySystem;
   const resumingContentHold = ["HOLD", "HOLD_CONTENT"].includes(previousRecord?.state) && retryHold;
   const reconcilingProductionQa = previousRecord?.state === "PUBLISHED_PENDING_QA";
   if (reconcilingProductionQa) {
@@ -161,6 +166,7 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
   }
   if (resumingSystemBlock || resumingContentHold) {
     delete record.skipped;
+    delete record.failure;
     const workingCandidate = record.candidate ?? candidate;
     const classification = record.classification ?? reclassifyAfterRedefinition(workingCandidate, classifyTopicRisk);
     const visual = record.visual ?? decideVisual(workingCandidate);
@@ -189,7 +195,7 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
       if (stageResult.systemBlock) {
         record.resumeFrom = stageResult.systemBlock.resumeFrom ?? state;
         record.resumeContext = resumableContext(stageResult);
-        return checkpointSystemBlock(record, workingCandidate, stageResult.systemBlock.reason, record.resumeFrom);
+        return checkpointFailure(record, workingCandidate, stageResult.systemBlock, record.resumeFrom);
       }
       const hold = mandatoryHoldReason(stageResult.holdSignals);
       if (hold) {
@@ -245,7 +251,7 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
     if (stageResult.systemBlock) {
       record.resumeFrom = stageResult.systemBlock.resumeFrom ?? state;
       record.resumeContext = resumableContext(stageResult);
-      return checkpointSystemBlock(record, workingCandidate, stageResult.systemBlock.reason, record.resumeFrom);
+      return checkpointFailure(record, workingCandidate, stageResult.systemBlock, record.resumeFrom);
     }
     const hold = mandatoryHoldReason(stageResult.holdSignals);
     if (hold) {
@@ -286,7 +292,7 @@ async function runAutonomousBatch({ batchId = null, target, maxCandidates, candi
   let pendingQa = dryRun ? 0 : [...recordsByKey.values()].filter((record) => record.state === "PUBLISHED_PENDING_QA").length;
   let readyCandidates = 0;
   let considered = 0;
-  let systemBlocked = false;
+  let globalFatal = false;
   for (const candidate of candidates) {
     if ((dryRun ? readyCandidates : published) >= target || considered >= maxCandidates) break;
     const previousRecord = previousRecords[candidate.topic_key];
@@ -306,23 +312,44 @@ async function runAutonomousBatch({ batchId = null, target, maxCandidates, candi
         history: []
       };
       record.resumeContext = error?.resumeContext ?? { gates: {}, holdSignals: {} };
-      record = checkpointSystemBlock(record, record.candidate ?? candidate, `STAGE_ERROR:${error instanceof Error ? error.message : String(error)}`, failedStage);
+      record = checkpointFailure(record, record.candidate ?? candidate, error, failedStage);
     }
     recordsByKey.set(record.originalTopicKey, record);
     if (verifiedStates.has(record.state) && !wasPublished) published += 1;
     if (record.state === "PUBLISHED_PENDING_QA" && !wasPending) pendingQa += 1;
     if (wasPending && record.state !== "PUBLISHED_PENDING_QA") pendingQa -= 1;
     if (record.state === "DRY_RUN_READY") readyCandidates += 1;
-    if (!dryRun && onRecord) await onRecord(candidate, record, { batchId, target, publishedCount: published, considered });
-    if (record.state === "BLOCKED_SYSTEM") {
-      systemBlocked = true;
+    if (!dryRun && onRecord) {
+      try {
+        await onRecord(candidate, record, { batchId, target, publishedCount: published, considered });
+      } catch (error) {
+        if (error && typeof error === "object") {
+          error.failureScope = "GLOBAL";
+          error.errorCode = error.errorCode ?? "BATCH_CHECKPOINT_WRITE_FAILED";
+          error.mutationState = "CHECKPOINT_PERSISTENCE_FAILED";
+        }
+        record = checkpointFailure(record, record.candidate ?? candidate, error, "BATCH_CHECKPOINT");
+        recordsByKey.set(record.originalTopicKey, record);
+      }
+    }
+    if (["GLOBAL_FATAL", "BLOCKED_SYSTEM"].includes(record.state)) {
+      globalFatal = true;
+      record.globalFatalContext = {
+        failedStage: record.checkpoint?.failedStage ?? null,
+        rootCause: record.failure?.rootCause ?? record.checkpoint?.blockerReason ?? null,
+        checkpoint: record.checkpoint ?? null,
+        mutationState: record.failure?.mutationState ?? "UNKNOWN",
+        lastSuccessfulCandidate: [...recordsByKey.values()].reverse().find((item) => verifiedStates.has(item.state))?.originalTopicKey ?? null,
+        verifiedCounter: published
+      };
       break;
     }
   }
   const records = [...recordsByKey.values()];
-  const actualPublished = records.filter((record) => verifiedStates.has(record.state) || ["PUBLISHED_PENDING_QA", "PRODUCTION_QA_FAILED"].includes(record.state)).length;
+  const actualPublished = records.filter((record) => verifiedStates.has(record.state) || ["PUBLISHED_PENDING_QA", "PRODUCTION_QA_FAILED"].includes(record.state) || record.publish?.status === "PUBLISHED").length;
+  const failureBacklog = records.map((record) => record.failure).filter(Boolean);
   return {
-    status: dryRun ? "DRY_RUN" : systemBlocked ? "BLOCKED_SYSTEM" : published >= target ? "SUCCESS" : "PARTIAL",
+    status: dryRun ? "DRY_RUN" : globalFatal ? "GLOBAL_FATAL" : published >= target ? "SUCCESS" : "PARTIAL",
     batchId,
     target,
     maxCandidates,
@@ -334,6 +361,9 @@ async function runAutonomousBatch({ batchId = null, target, maxCandidates, candi
     actualPublished,
     readyCandidates,
     mutation: dryRun ? "NONE" : "PRODUCTION",
+    failureBacklog,
+    failureGroups: groupFailureBacklog(failureBacklog),
+    globalFatal: records.find((record) => record.state === "GLOBAL_FATAL")?.globalFatalContext ?? null,
     records
   };
 }

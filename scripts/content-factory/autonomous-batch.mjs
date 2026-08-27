@@ -12,6 +12,7 @@ import { evaluateCapabilities } from "./production-capabilities.mjs";
 import { repairContentDirectory } from "./content-repair.mjs";
 import { synchronizePublishArtifacts } from "./artifact-synchronization.mjs";
 import { isHoldResumeStateMachineFailure, resolveHoldResumePolicy } from "./hold-resume-policy.mjs";
+import { createFailureEntry } from "./failure-isolation.mjs";
 
 const execute = promisify(execFile);
 const factoryDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -320,7 +321,7 @@ async function main() {
     }
   }
   const previousRecords = dryRun ? {} : await readPreviousRecords(batchFile);
-  const resumeTopicKeys = Object.values(previousRecords).filter((record) => record.state === "PUBLISHED_PENDING_QA" || retrySystem && record.state === "BLOCKED_SYSTEM" || retryHold && ["HOLD", "HOLD_CONTENT"].includes(record.state)).map((record) => record.originalTopicKey);
+  const resumeTopicKeys = Object.values(previousRecords).filter((record) => record.state === "PUBLISHED_PENDING_QA" || retrySystem && ["BLOCKED_SYSTEM", "GLOBAL_FATAL", "CANDIDATE_FAILED"].includes(record.state) || retryHold && ["HOLD", "HOLD_CONTENT"].includes(record.state)).map((record) => record.originalTopicKey);
   const inputs = await loadProductionInputs(maxCandidates, resumeTopicKeys);
   const candidates = reconcileOnly ? inputs.candidates.filter((candidate) => previousRecords[candidate.topic_key]?.state === "PUBLISHED_PENDING_QA") : inputs.candidates;
   const { publishedContents } = inputs;
@@ -334,10 +335,17 @@ async function main() {
         await runScript("topic-registry.mjs", ["--operation", "finalize-topic-hold", "--topic-key", candidate.topic_key, "--error", record.history.at(-1)?.reason ?? "AUTONOMOUS_HOLD"]);
       }
     } catch (error) {
-      record.registryCheckpoint = { status: "FAILED", error: error instanceof Error ? error.message : String(error) };
+      const reason = error instanceof Error ? error.message : String(error);
+      const failedStage = "REGISTRY_STATE";
+      delete record.resumeFrom;
+      record.checkpoint = { candidateId: candidate.content_topic_id ?? null, topicId: candidate.content_topic_id ?? null, topicKey: candidate.topic_key, currentPipelineStage: failedStage, completedStages: [...new Set(record.history.map((entry) => entry.state))], failedStage, blockerType: "CANDIDATE_FAILED", blockerReason: reason, retryEligible: false, resumeEligible: false };
+      record.failure = createFailureEntry({ candidate, record, error: { reason, errorCode: reason, failureScope: "CANDIDATE_LOCAL", retryable: false, mutationState: "REGISTRY_FINALIZATION_FAILED" }, failedStage });
+      record.state = "CANDIDATE_FAILED";
+      record.history.push({ state: "CANDIDATE_FAILED", reason, failureScope: "CANDIDATE_LOCAL", resumeFrom: failedStage });
+      record.registryCheckpoint = { status: "FAILED", error: reason };
     }
     checkpoints[candidate.topic_key] = record;
-    await writeFile(batchFile, `${JSON.stringify({ status: record.state === "BLOCKED_SYSTEM" ? "BLOCKED_SYSTEM" : "IN_PROGRESS", batchId, target, maxCandidates, published: progress.publishedCount, considered: progress.considered, currentCandidate: candidate.topic_key, checkpoint: record.checkpoint ?? null, records: Object.values(checkpoints) }, null, 2)}\n`, "utf8");
+    await writeFile(batchFile, `${JSON.stringify({ status: ["BLOCKED_SYSTEM", "GLOBAL_FATAL"].includes(record.state) ? "GLOBAL_FATAL" : "IN_PROGRESS", batchId, target, maxCandidates, published: progress.publishedCount, considered: progress.considered, currentCandidate: candidate.topic_key, checkpoint: record.checkpoint ?? null, records: Object.values(checkpoints) }, null, 2)}\n`, "utf8");
   };
   const result = await runAutonomousBatch({ batchId, target, maxCandidates, candidates, publishedContents, previousRecords, retryHold, retrySystem, dryRun, classifyTopicRisk, stages: dryRun ? {} : createProductionStages(), onRecord });
   if (!dryRun) {

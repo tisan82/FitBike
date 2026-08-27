@@ -1,4 +1,4 @@
-const terminalStates = new Set(["PUBLISHED", "PUBLISHED_VERIFIED", "PRODUCTION_QA_FAILED", "DROP", "HOLD", "HOLD_CONTENT"]);
+const terminalStates = new Set(["PUBLISHED", "PUBLISHED_VERIFIED", "PRODUCTION_QA_FAILED", "DROP", "HOLD", "HOLD_CONTENT", "CANDIDATE_FAILED"]);
 const criticalHoldReasons = new Set([
   "SOURCE_CONFLICT",
   "FACT_QA_FAILED",
@@ -173,7 +173,8 @@ function mandatoryHoldReason(signals = {}) {
 
 function shouldSkipCandidate(record, { retryHold = false, retrySystem = false } = {}) {
   if (record?.state === "HOLD" || record?.state === "HOLD_CONTENT") return record.holdCheckpoint?.retryEligible === false || !retryHold;
-  if (record?.state === "BLOCKED_SYSTEM") return !retrySystem;
+  if (record?.state === "CANDIDATE_FAILED") return record.checkpoint?.retryEligible === false || !retrySystem;
+  if (["BLOCKED_SYSTEM", "GLOBAL_FATAL"].includes(record?.state)) return !retrySystem;
   return terminalStates.has(record?.state);
 }
 

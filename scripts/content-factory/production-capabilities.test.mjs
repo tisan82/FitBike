@@ -69,7 +69,7 @@ test("완료된 Canary는 NEW_BATCH 시작을 막지 않는다", () => {
 });
 
 test("활성 Production Batch는 중복 NEW_BATCH 실행을 차단한다", () => {
-  for (const status of ["RUNNING", "PARTIAL", "BLOCKED_SYSTEM"]) assert.equal(isActiveBatch({ status }), true);
+  for (const status of ["RUNNING", "PARTIAL", "BLOCKED_SYSTEM", "GLOBAL_FATAL"]) assert.equal(isActiveBatch({ status }), true);
   const result = inspectOperationPreflight({ operationMode: "NEW_BATCH", checkpoints: [{ batchId: "active", status: "RUNNING" }] });
   assert.equal(result.activeBatchGuard.reason, "ACTIVE_BATCH_CONFLICT");
   assert.equal(result.allowed, false);
@@ -80,6 +80,14 @@ test("RESUME_BATCH는 유효한 BLOCKED_SYSTEM Checkpoint를 허용한다", () =
   const result = inspectOperationPreflight({ operationMode: "RESUME_BATCH", checkpoint, checkpoints: [checkpoint], batchId: "blocked" });
   assert.equal(result.checkpointResume.state, "IMPLEMENTED_AND_E2E_VERIFIED");
   assert.equal(result.allowed, true);
+});
+
+test("PARTIAL CANDIDATE_FAILED checkpoint는 명시적 retry 대상으로 보존한다", () => {
+  const checkpoint = { batchId: "failed", status: "PARTIAL", records: [{ state: "CANDIDATE_FAILED", resumeFrom: "IMAGE_QA", checkpoint: { resumeEligible: true } }] };
+  const result = inspectCheckpointResume(checkpoint);
+  assert.equal(result.state, "IMPLEMENTED_AND_E2E_VERIFIED");
+  assert.equal(result.mode, "CANDIDATE_FAILED");
+  assert.equal(result.requiresFlag, "--retry-system");
 });
 
 test("RESUME_BATCH의 누락 Checkpoint는 실패한다", () => {

@@ -115,7 +115,7 @@ node scripts/content-factory/autonomous-batch.mjs --target 20 --mode production 
 
 Dry Run은 Production Registry와 Published Content를 읽어 Candidate, Duplicate/Re-definition, Research 계획, Visual 결정, 예상 Risk를 계산하지만 DB, Storage, Publish를 변경하지 않는다. Production 실행은 기존 generation, image preparation/QA, publish pipeline을 호출하며 승인된 산출물과 모든 Gate를 다시 확인한다.
 
-Batch checkpoint는 Git에 포함되지 않는 `content-work/autonomous-batches/{batch-id}.json`에 Candidate별로 기록한다. 같은 `batch-id` 재실행 시 `PUBLISHED`와 `DROP`은 건너뛰고, `HOLD`는 기본적으로 건너뛴다. 정책 또는 원인이 해결된 HOLD만 `--retry-hold true`로 재시도한다. 중간 상태의 오류는 해당 Candidate를 HOLD로 기록하고 다음 Candidate를 계속 처리한다.
+Batch checkpoint는 Git에 포함되지 않는 `content-work/autonomous-batches/{batch-id}.json`에 Candidate별로 기록한다. 같은 `batch-id` 재실행 시 `PUBLISHED`와 `DROP`은 건너뛰고, `HOLD`는 기본적으로 건너뛴다. 정책 또는 원인이 해결된 HOLD만 `--retry-hold true`로 재시도한다. Candidate-local Runtime 오류는 `CANDIDATE_FAILED`와 Failure Backlog로 기록하고 다음 Candidate를 계속 처리한다.
 
 Registry Queue만으로 Max Candidate를 채우지 못하면 active `02_bike_model`과 `03_bike_model_year`의 실제 non-null Tire/Battery/Brake 데이터가 있는 조합에서 Model Guide Candidate를 보충한다. Dry Run에서는 제안만 계산하며 Registry를 변경하지 않는다. Production에서는 Duplicate Gate를 통과한 보충 Candidate만 Registry에 등록하고 저장 분류를 계산한다. Fitment 값이나 존재하지 않는 모델·부품 관계를 추정해 Candidate를 만들지 않는다.
 
@@ -127,19 +127,21 @@ Content/topic/image execution remains runtime data and is not committed. Only Fa
 
 ### Image execution handoff and resume
 
-Production Image 단계는 `images/generate-images.mjs --mode prepare` 뒤 `images/asset-executor.mjs`를 실행한다. 승인 제품 이미지는 Production DB 관계를 read-only로 조회하여 MAXXIS 또는 POWEROAD 원본을 확인·선택한다. Educational 이미지는 Canary, NEW_BATCH, RESUME_BATCH가 모두 동일한 Executor에서 Codex built-in image generation을 호출하고 실제 `image-sources/{assetId}.{png|webp|jpg|jpeg}`, QA sidecar, runtime receipt를 획득한 뒤에만 다음 단계로 진행한다. 출력과 유효한 QA가 이미 있으면 재생성하지 않으며, 비동기 Pending은 제한된 poll/acquire 범위에서 재확인하고 상한 이후에만 `BLOCKED_SYSTEM`으로 분류한다. Candidate 자체의 Visual QA 실패는 `HOLD_CONTENT`로 분리한다.
+Production Image 단계는 `images/generate-images.mjs --mode prepare` 뒤 `images/asset-executor.mjs`를 실행한다. 승인 제품 이미지는 Production DB 관계를 read-only로 조회하여 MAXXIS 또는 POWEROAD 원본을 확인·선택한다. Educational 이미지는 Canary, NEW_BATCH, RESUME_BATCH가 모두 동일한 Executor에서 Codex built-in image generation을 호출하고 실제 `image-sources/{assetId}.{png|webp|jpg|jpeg}`, QA sidecar, runtime receipt를 획득한 뒤에만 다음 단계로 진행한다. 출력과 유효한 QA가 이미 있으면 재생성하지 않는다. 특정 Candidate의 Generation 또는 Output Acquisition Runtime 실패는 `CANDIDATE_FAILED`, 콘텐츠 Visual QA 실패는 `HOLD_CONTENT`다.
 
 ```bash
 node scripts/content-factory/autonomous-batch.mjs --target 3 --mode production --batch-id {same-batch-id} --retry-system true
 ```
 
-Publish 성공 직후 Candidate는 `PUBLISHED_PENDING_QA`가 되며 Production QA는 별도의 retry/reconciliation 단계로 실행한다. `/contents` ISR, Sitemap, Internal Discovery의 Cache/CDN 전파 지연은 `PRODUCTION_QA_PENDING`으로 유지하고 Batch를 차단하지 않는다. 기본 동시 Pending 한도 2건 안에서는 다음 Candidate를 계속 처리한다. QA PASS는 `PUBLISHED_VERIFIED`와 Verified Counter를 정확히 한 번 확정하며, 실제 Production 무결성 실패는 `PRODUCTION_QA_FAILED`로 분리한다. QA Runtime이나 DB/Storage Runtime 장애만 `BLOCKED_SYSTEM`이다.
+Publish 성공 직후 Candidate는 `PUBLISHED_PENDING_QA`가 되며 Production QA는 별도의 retry/reconciliation 단계로 실행한다. `/contents` ISR, Sitemap, Internal Discovery의 Cache/CDN 전파 지연은 `PRODUCTION_QA_PENDING`으로 유지하고 Batch를 차단하지 않는다. 기본 동시 Pending 한도 2건 안에서는 다음 Candidate를 계속 처리한다. QA PASS는 `PUBLISHED_VERIFIED`와 Verified Counter를 정확히 한 번 확정하며, 실제 Production 무결성 실패는 `PRODUCTION_QA_FAILED`로 분리한다. Candidate 한정 QA Runtime 장애는 `CANDIDATE_FAILED`, DB/Storage 전체 Runtime 장애만 `GLOBAL_FATAL`이다.
 
 기존 Pending 항목만 게시 재실행 없이 조정하려면 `node scripts/content-factory/autonomous-batch.mjs --target {target} --mode production --batch-id {batch-id} --reconcile-only true`를 사용한다. 이 경로는 Production DB의 Content/Registry 연결과 로컬 Publish receipt를 먼저 대조하고 Production QA만 실행한다.
 
-`BLOCKED_SYSTEM`은 시스템 실행 대기 상태로 Topic Registry를 변경하지 않고, 체크포인트 저장 직후 Batch 전체를 중단하여 이후 Candidate 평가와 Mutation을 막는다. 동일 Batch ID와 `--retry-system true`로 실패한 Asset 단계부터 재개하며 이전 Published 수를 Target에 포함한다. `HOLD_CONTENT`는 `ASSET_DATA_ISSUE`, 제품/모델 불일치, Image QA 실패 등 Candidate 자체의 검토 상태이며 기존 `--retry-hold true` 정책에 따라 다음 Candidate 처리를 계속한다. Asset Selector API/Resolver 자체의 예외는 `BLOCKED_SYSTEM`이고, 특정 승인 Object 누락이나 경로·관계 문제는 Batch 전체 장애가 아니다.
+신규 실패 모델은 `CANDIDATE_FAILED`와 `GLOBAL_FATAL`을 분리한다. 특정 Candidate의 Research, Image Runtime, Artifact, Registry 상태, Content/Image/Production QA Runtime 문제는 Failure Backlog에 저장하고 다음 Candidate를 계속한다. DB·Storage 전체 쓰기 불가, 필수 Credential 또는 Production 환경 식별 상실, Registry·Batch State 전체 손상, Exactly-once·Transaction·Counter 무결성 상실처럼 후속 Candidate 전체를 안전하게 처리할 수 없는 경우만 `GLOBAL_FATAL`이며, 이때 Checkpoint 저장 직후 Batch 전체를 중단한다. 과거 `BLOCKED_SYSTEM`은 Checkpoint 재개 호환 상태로만 유지한다. `--retry-system true`는 해결된 `CANDIDATE_FAILED`, `GLOBAL_FATAL`, legacy `BLOCKED_SYSTEM`을 저장된 단계부터 재개한다.
 
-승인 MAXXIS/POWEROAD Asset은 다운로드 후 `brand-asset-visual-qa.mjs`가 기존 Image QA Sidecar 형식으로 무결성, 관계 기반 Product Identity, Thumbnail/Hero/Body 역할, 시각 품질, 기술적 오인 및 Brand Asset First를 자동 판정한다. PASS는 Image normalization으로 계속하고, Asset 자체 문제는 Candidate `HOLD_CONTENT`, QA Runtime 실행·저장 문제는 `BLOCKED_SYSTEM`으로 분류한다. Brand Asset이라는 이유만으로 QA를 생략하거나 자동 PASS하지 않는다.
+Failure Backlog는 topic, contentKey, candidateId, failureType, failureScope, failedStage, errorCode, rootCause, retryable, checkpoint, mutationState, fixCategory를 보존한다. `FACT_NORMALIZATION`, `RESEARCH`, `IMAGE_RUNTIME`, `ASSET`, `CONTENT_QA`, `IMAGE_QA`, `REGISTRY_STATE`, `PUBLISH`, `PRODUCTION_QA`, `DATA_COVERAGE`, `OTHER`로 분류하고 같은 Fix Category와 Root Cause를 그룹화한다. 일부 Candidate 실패는 이미 Verified된 Production 콘텐츠를 Rollback하지 않는다.
+
+승인 MAXXIS/POWEROAD Asset은 다운로드 후 `brand-asset-visual-qa.mjs`가 기존 Image QA Sidecar 형식으로 무결성, 관계 기반 Product Identity, Thumbnail/Hero/Body 역할, 시각 품질, 기술적 오인 및 Brand Asset First를 자동 판정한다. PASS는 Image normalization으로 계속하고, Asset 자체 문제는 Candidate `HOLD_CONTENT`, Candidate 한정 QA Runtime 실행·저장 문제는 `CANDIDATE_FAILED`로 분류한다. Brand Asset이라는 이유만으로 QA를 생략하거나 자동 PASS하지 않는다.
 
 `PARTIAL` Checkpoint의 Hold Candidate는 `--retry-hold true`가 있을 때만 다시 평가한다. Content QA Hold는 검증된 기존 Runtime Artifact를 복원해 Content QA/Repair부터, Critical Fact Hold는 Research/Evidence부터 재개한다. 플래그가 없으면 Hold 상태를 유지하고 `PUBLISHED`/`DROP`은 재처리하지 않으며, 기존 Published Count는 Target 계산에 유지한다.
 
@@ -147,7 +149,7 @@ HOLD Resume은 `hold-resume-policy.mjs`의 사유별 Matrix를 사용한다. Cri
 
 Retry-Hold가 Publish Gate까지 통과하면 Topic Registry는 전용 복원 동작으로 기존 합법 경로 `BLOCKED → GENERATING`을 거친 뒤 게시 준비 상태로 진행한다. `BLOCKED → REVIEW_REQUIRED` 직접 전이는 사용하지 않는다. Stage Adapter 예외는 실제 실행 Stage를 Checkpoint하며, 과거 Canary의 해당 전이 오류로 `RESEARCH`가 잘못 기록된 Checkpoint는 오류 서명이 일치할 때만 `PUBLISH` 재개 대상으로 정규화해 기존 QA Artifact를 재사용한다.
 
-Auto-Repair 이후 `qa.json`을 Content QA Source of Truth로 사용하고, 수정된 `content-package.json`과 함께 `content-package-with-images.json`에 동기화한다. Synchronizer는 기존 Image Metadata를 덮어쓰지 않고 Evidence Hash 및 Risk·Approval 입력을 기록하며 원자적으로 Package를 교체한다. Publish 직전 stale Package를 다시 검사해 안전하게 동기화할 수 있으면 최신화하고, Image 충돌이나 필수 Artifact 누락이면 Validator 우회 없이 `PUBLISH` 단계에서 `BLOCKED_SYSTEM` 처리한다.
+Auto-Repair 이후 `qa.json`을 Content QA Source of Truth로 사용하고, 수정된 `content-package.json`과 함께 `content-package-with-images.json`에 동기화한다. Synchronizer는 기존 Image Metadata를 덮어쓰지 않고 Evidence Hash 및 Risk·Approval 입력을 기록하며 원자적으로 Package를 교체한다. Publish 직전 stale Package를 다시 검사해 안전하게 동기화할 수 있으면 최신화하고, 특정 Candidate의 Image 충돌이나 필수 Artifact 누락이면 Validator 우회 없이 `PUBLISH` 단계에서 `CANDIDATE_FAILED` 처리한다.
 
 Production 모드는 Candidate를 읽기 전에 `production-capabilities.mjs` Preflight를 실행한다. Global Runtime은 DB read/write, Research, Content Generation, Image Generation/Output/QA, Storage write, Publish, Production HTTP QA, Sitemap QA의 11개다. Batch 파일이 없으면 CLI가 `NEW_BATCH`, 있으면 `RESUME_BATCH` Intent를 자동 선택한다. NEW에서는 `CHECKPOINT_RESUME=NOT_REQUIRED`이고 완료된 Batch는 무시하지만, Active Batch가 있으면 중복 실행을 차단한다. RESUME에서만 대상 Checkpoint Resume을 열두 번째 필수 Capability로 검사하며, 완료 Batch는 `NOT_RESUMABLE`이다. 필수 조건이 준비되지 않으면 `BATCH_PREFLIGHT_BLOCKED`와 `mutation: NONE`을 반환한다.
 
