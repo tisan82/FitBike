@@ -4,29 +4,56 @@
 
 ## Responsibility
 
-Provide published motorcycle maintenance, DIY, parts specification, and model guide articles. Content is information-first and does not introduce popularity, recommendation, or ranking.
+FitBike Content는 사람들이 실제로 검색하고 궁금해하는 오토바이 DIY, 점검, 관리, 부품 이해, 모델 정보를 정확하고 읽기 쉽게 제공한다.
+
+콘텐츠의 목적은 사용자를 무조건 차량 상세나 부품 상세로 이동시키는 것이 아니다. 한 콘텐츠 안에서 사용자의 질문에 충분히 답하는 것을 우선하며, 차량·부품 연결은 해당 정보가 다음 행동에 실제로 필요한 경우에만 제공한다.
+
+인기, 추천, 랭킹, 판매 유도는 Content의 기본 목적이 아니다.
+
+## Content Product Principles
+
+1. **Question First** — Topic은 FitBike DB에 데이터가 있다는 이유가 아니라 사용자가 실제로 궁금해할 질문과 관리·DIY 필요에서 시작한다.
+2. **Answer in Content** — 핵심 답변과 판단 기준을 본문 안에서 제공한다. 다른 서비스 화면으로 이동해야만 답을 얻을 수 있게 만들지 않는다.
+3. **Optional Connection** — Bike/Part relation은 콘텐츠 이해 또는 후속 확인에 명확한 가치가 있을 때만 사용한다. Relation 존재 자체를 CTA 노출 근거로 사용하지 않는다.
+4. **Official Facts for Model Content** — 특정 오토바이 모델의 제원·규격·정비 기준은 제조사 공식 웹사이트, Owner's Manual, Service/Technical 문서 등 공식 출처를 우선 근거로 사용한다. FitBike DB 값은 콘텐츠 사실의 원천으로 사용하지 않는다.
+5. **No Fitment Content Factory** — FitBike DB의 Tire/Battery/Brake 관계가 존재한다는 이유만으로 모델별 호환·규격 콘텐츠를 자동 생성하지 않는다. 특히 `모델명 + 타이어 규격 가이드`를 FitBike fitment 데이터에서 자동 파생하지 않는다.
+6. **Model-first Visual** — Model Guide의 대표 이미지는 해당 오토바이 모델 자체가 주 피사체여야 한다. 타이어·배터리·브레이크 제품 이미지를 Model Guide Hero/Thumbnail의 대체물로 사용하지 않는다. 검증된 모델 이미지가 없으면 잘못된 제품 이미지를 넣는 대신 대표 이미지를 생략한다.
+7. **Useful DIY & Maintenance** — 콘텐츠 포트폴리오는 점검 방법, 관리 주기 이해, 이상 징후 판단, 소모품 상태 확인, 기본 DIY 준비와 절차, 규격 읽는 법 등 실제 유지관리 질문을 중심으로 확장한다.
 
 ## DB Tables
 
 - `12_content`: article identity, publication state, images, and structured body blocks
-- `13_content_bike_model`: content-to-bike-model relation
-- `14_content_bike_model_year`: content-to-model-year relation
-- `15_content_part_link`: content-to-part relation
+- `13_content_bike_model`: optional content-to-bike-model relation
+- `14_content_bike_model_year`: optional content-to-model-year relation
+- `15_content_part_link`: optional content-to-part relation
 
-The public implementation reads content and its bike-model relations. Database mutations are delivered through reviewed migrations; the application does not mutate content or Storage data.
+Relations are metadata for relevance and contextual discovery. They do not mean that every article must render a bike or part CTA.
+
+Database mutations are delivered through reviewed migrations; the application does not mutate content or Storage data.
 
 ## Routes
 
-- `/contents`: published content directory with content-type filtering
-- `/contents/[contentKey]`: published article detail
+- `/contents`: published content discovery hub with search and content-type filtering
+- `/contents/[contentKey]`: information-first article detail
 - `/today/battery-check-before-replace`: permanent redirect to `/contents/battery-check-before-replace`
 
 ## Content Types
 
-- `MAINTENANCE`
-- `DIY`
-- `PARTS_GUIDE`
-- `MODEL_GUIDE`
+- `MAINTENANCE`: 상태 확인, 관리 방법, 이상 징후와 후속 판단
+- `DIY`: 사용자가 직접 수행할 수 있는 작업의 준비, 절차, 결과 확인과 안전 조건
+- `PARTS_GUIDE`: 부품 구조, 규격 표기, 차이와 선택 전에 이해해야 할 정보
+- `MODEL_GUIDE`: 특정 모델 자체에 대해 공식 근거로 설명할 가치가 있는 정보. FitBike fitment DB를 콘텐츠화하는 유형이 아님
+
+## Detail UX
+
+콘텐츠 상세는 읽기 경험을 우선한다.
+
+- Header: Content Type → Title → Summary → 공식 자료 우선 안내
+- Hero: 콘텐츠 이해에 필요한 경우만 사용
+- Body: 충분한 문단 간격, 명확한 H2/H3 계층, 읽기 쉬운 List/Step/Table, Tip/Warning 구분
+- Footer: `/contents`로 돌아가 다른 정보를 찾을 수 있는 경로 제공
+- 자동 `관련 바이크 → 모델 정보 보기` 섹션은 사용하지 않는다.
+- 차량/부품 CTA는 향후 콘텐츠별 명시적 Editorial Intent가 정의된 경우에만 추가한다.
 
 ## Block Types
 
@@ -36,71 +63,64 @@ The supported `body_blocks` union is limited to `heading`, `paragraph`, `image`,
 
 Public content must satisfy all of the following: `is_active = true`, `published_at IS NOT NULL`, and `published_at <= now()`. The directory order is `published_at DESC`, then `content_id DESC`.
 
-`/contents` and Home's recent-guide gate use five-minute ISR. `/sitemap.xml` uses a dynamic Route Handler with a five-minute CDN response cache so runtime publishing is reflected without disabling caching globally; the metadata sitemap convention is not used because its Production output was observed remaining bound to the deployment artifact.
+`/contents` and Home's recent-guide gate use five-minute ISR. `/sitemap.xml` uses a dynamic Route Handler with a five-minute CDN response cache.
+
+## Source Policy
+
+### Generic maintenance / DIY / parts understanding
+
+신뢰 가능한 기술 자료와 공식 자료를 조합할 수 있다. 안전, 정비 한계, 수치, 규격 등 Critical Fact는 검증되지 않은 상태로 게시하지 않는다.
+
+### Model-specific content
+
+특정 모델의 연식, 타이어 규격, 공기압, 배터리 규격, 정비 한계 등 모델 고유 사실은 공식 제조사 자료를 Source of Truth로 사용한다.
+
+- Preferred: manufacturer model page, owner's manual, official technical/specification document
+- Secondary sources may help discovery but cannot replace official verification for Critical Model Facts.
+- FitBike Production DB may be used to identify an entity or relation for service functionality, but must not be cited or treated as the authoritative content source.
+- Official evidence가 확보되지 않으면 해당 Model Fact를 생성하지 않고 Candidate를 HOLD/DROP한다.
 
 ## Autonomous Publishing Policy
 
-Content Factory의 Autonomous Batch는 정상 Candidate마다 사람 승인을 요구하지 않고, Risk와 검증 Gate를 조합해 게시 여부를 결정한다. 기존 `L1`/`L2` 필드는 데이터 호환성과 분류 정보로 유지하지만, `L1` 자체를 무조건적인 Human Review 조건으로 사용하지 않는다.
+Content Factory의 Autonomous Batch는 정상 Candidate마다 사람 승인을 요구하지 않고 Risk와 검증 Gate를 조합해 게시 여부를 결정한다. 다만 Candidate 생성 자체가 사용자 가치 기준을 통과해야 한다.
 
 - `LOW`: 필수 Fact, Duplicate/Intent, Content, Image, Safety Gate가 모두 PASS이면 자동 게시한다.
 - `MEDIUM`: 모든 필수 Gate와 Medium Auto Clearance Gate가 모두 PASS인 경우에만 자동 게시한다.
 - `HIGH`: 자동 게시하지 않고 `HOLD`로 보낸다.
 
-Medium Auto Clearance는 Critical Fact가 `VERIFIED`이고 Source Conflict, Critical Unverified Claim, Unsupported Numeric Claim, Unsupported Service Limit, Technical Misrepresentation, Product/Model Mismatch, 별도 강제 Human Review 사유가 모두 없으며 Safety, Duplicate/Intent, Content, Image QA가 모두 PASS여야 한다. 하나라도 실패하거나 불확실하면 해당 Candidate만 `HOLD`하며 Batch는 다음 Candidate를 계속 처리한다.
+Risk와 관계없이 Source Conflict, Fact QA 실패, Critical Claim 검증 부족, Safety uncertainty, 지원되지 않는 수치·정비 한계, 기술적 오표현, Product/Model 불일치, 해결되지 않은 Duplicate 또는 Subject Drift, Image QA 실패, Production integrity uncertainty는 강제 `HOLD`다.
 
-Risk와 관계없이 Source Conflict, Fact QA 실패, Critical Claim 검증 부족, Safety uncertainty, 지원되지 않는 수치·정비 한계, 기술적 오표현, Product/Model 불일치, 해결되지 않은 Duplicate 또는 Subject Drift, Image QA 실패, Production integrity uncertainty는 강제 `HOLD`다. Human Review는 정상 흐름의 기본 단계가 아니라 이 Exception Queue를 처리한다.
+## Candidate Policy
 
-중복 Candidate는 `KEEP`, `REDEFINE`, `DROP` 중 하나로 판정한다. `REDEFINE`은 한 번만 수행하고 Duplicate Gate에 다시 진입하며, 재정의된 Subject, Intent, Action, Coverage, Safety 특성으로 Risk를 다시 계산한다. Batch 완료 조건은 Candidate 생성 수나 Publish 호출 성공 수가 아니라 Production QA까지 통과한 새 `PUBLISHED_VERIFIED` 수가 요청 Target에 도달하는 것이다.
+Autonomous Batch의 부족한 Queue를 채우기 위해 FitBike DB의 모델별 Tire/Battery/Brake 보유 여부에서 Model Guide Candidate를 자동 생성하지 않는다.
 
-## Current Scope
+새 Topic은 다음 우선순위를 따른다.
 
-### Autonomous Image Execution and Resume
+1. 실제 유지관리 과정에서 반복적으로 발생하는 질문
+2. 사용자가 상태를 스스로 확인하고 다음 행동을 판단하는 데 도움이 되는 내용
+3. 초보자가 이해하기 어려운 규격·부품·용어 설명
+4. 안전하게 수행 가능한 DIY의 준비와 절차
+5. 특정 모델에 대해 공식 자료로 설명할 충분한 사용자 가치가 있는 정보
 
-Autonomous Batch의 Image 단계는 계획 파일 생성만으로 PASS하지 않는다. `PRODUCT_REPRESENTATION`은 현재 Production 관계를 read-only로 조회해 Tire는 승인된 MAXXIS, Battery는 승인된 POWEROAD Asset을 선택하고, 대상 모델과의 관계 및 Storage 접근성을 확인한다. 승인 Brand Asset이 없는 Brake 표현은 Generic/Educational 정책을 적용한다. `EDUCATIONAL`은 생성 Prompt, 출력 파일, 역할/주제 제약 Metadata와 Image QA sidecar가 모두 존재해야 실행 완료로 인정하며, `MIXED`는 Brand Asset과 Educational Asset을 각각 검증한다. 정책상 이미지가 필요 없는 `NO_VISUAL`만 빈 Asset PASS를 허용한다.
+단순히 `모델 + 부품명 + 규격` 조합을 대량 생성하는 것은 Topic 전략으로 사용하지 않는다.
 
-Image QA는 Subject/Role 일치, Brand Asset First, Product/Model 일치, 기술적 오인, 근거 없는 수치, 위험 표현, 모바일 가독성, Asset 가용성과 Storage 준비 상태를 fail-closed로 검사한다. 특정 Candidate의 이미지 생성·출력 획득·Artifact 또는 QA Runtime 실패는 `CANDIDATE_FAILED`로 체크포인트하고 다음 Candidate를 계속한다. 해결 후 동일 Batch ID와 `--retry-system true`를 사용하면 실패 단계부터 재개한다. 콘텐츠 자체의 불일치나 Image QA 실패는 `HOLD_CONTENT`이며, `PUBLISHED`와 `DROP`은 재실행하지 않는다.
+## Image Policy
 
-승인 Brand Asset은 관계 기반 선택과 Object 획득 직후 공통 Image QA Runtime에서 Asset 무결성, Product Identity, 역할 적합성, 시각 품질, 기술적 오인 여부와 Brand Asset First 준수를 자동 검사한다. 결과는 Educational Visual과 동일한 `image-sources/{asset-id}.qa.json` Sidecar 계약으로 저장하며 별도 수동 승인 파일을 Source of Truth로 두지 않는다. Candidate/Asset 자체의 누락·관계 불일치·역할 부적합은 `HOLD_CONTENT`, Candidate 한정 Reader·QA Runtime 또는 결과 저장 실패는 `CANDIDATE_FAILED`, Storage 전체 쓰기 불가는 `GLOBAL_FATAL`로 분리한다. Thumbnail과 Hero가 같은 원본을 사용해도 역할별 QA Artifact를 각각 생성한다.
+- Maintenance/DIY: 점검 위치, 작업 맥락, 상태 차이를 이해하는 Visual 우선
+- Parts Guide: 구조·표기·차이를 설명하는 Educational Visual 우선. 실제 제품 표현이 필요할 때만 승인 Brand Asset 사용
+- Model Guide: **Bike Model Representation 우선**. 해당 모델 자체가 Hero/Thumbnail의 중심이어야 한다.
+- Model Guide에서 Tire/Battery/Brake Product Asset을 Hero/Thumbnail로 사용하지 않는다.
+- 이미지가 정보 전달에 도움이 되지 않으면 `NO_VISUAL`을 허용한다.
+- 생성 이미지는 실제 기술 구조, 규격, 제조사 사실처럼 오인되게 만들지 않는다.
 
-`HOLD_CONTENT`, `DROP`, `CANDIDATE_FAILED`는 모두 해당 Candidate의 Mutation만 종료하고 Batch를 계속한다. 모든 후속 Candidate의 안전한 처리가 불가능한 DB/Storage 전체 쓰기 장애, 필수 Credential 손실, Production 환경 식별 실패, Registry·Batch State 전체 손상, Exactly-once·Transaction·Counter 무결성 상실만 `GLOBAL_FATAL`로 분류하며, 이 경우에만 Checkpoint를 저장하고 Batch 전체를 즉시 종료하여 이후 Mutation을 금지한다. 과거 `BLOCKED_SYSTEM` Checkpoint는 재개 호환 상태로 유지하되 신규 오류 분류에는 사용하지 않는다. 동일 Batch 재개 시 완료된 단계를 반복하지 않고 실패 단계부터 진행하며, 재개 전 Verified 수를 Target 계산에 그대로 포함한다.
+## Existing Content Remediation
 
-Runtime 오류는 오류명 자체가 아니라 영향 범위로 먼저 `CANDIDATE_LOCAL` 또는 `GLOBAL`로 판정한다. Candidate 실패는 Topic, Content Key, Candidate ID, Failure Type·Scope, 실패 Stage, Error Code, Root Cause, Retry 가능 여부, Checkpoint, Mutation 상태, Fix Category를 Failure Backlog에 저장한다. Fix Category와 Root Cause가 같은 항목은 그룹으로 집계해 Batch 종료 후 공통 개선 대상으로 사용한다. 이미 Verified된 콘텐츠는 일부 실패 때문에 Rollback하지 않는다.
+기존에 자동 생성된 `모델명 + 타이어 규격 가이드` 콘텐츠는 새 정책의 기준 콘텐츠로 간주하지 않는다. 별도 정리 단계에서 다음을 검토한다.
 
-`PARTIAL` Batch의 `HOLD_CONTENT`는 명시적 `--retry-hold true`에서만 재평가한다. Hold 사유가 Content QA이면 유효한 Research·Content·Visual·Asset·Image QA Artifact를 복원해 `CONTENT_QA`부터 재개하고, Critical Fact 미검증이면 개선된 Research/Evidence 단계부터 재개한다. 플래그가 없으면 Hold를 그대로 유지하며 `PUBLISHED`와 `DROP`은 항상 건너뛴다. 재평가 결과가 여전히 미검증이면 Candidate만 다시 `HOLD_CONTENT`가 되고 기존 Published Target Count는 보존된다.
+- 공식 제조사 근거 존재 여부
+- 모델 이미지 사용 여부
+- FitBike DB 기반 문구 제거 필요 여부
+- 독립적인 사용자 검색 가치 존재 여부
+- 가치가 낮거나 공식 근거가 부족하면 수정이 아니라 비활성화/통합 대상인지 판단
 
-HOLD 재평가는 사유별 Resume Matrix를 따른다. Critical Claim과 Source Conflict는 `RESEARCH`부터 새 Evidence Attempt를 정확히 한 번 기록하고, Content/Subject/Unsupported Claim 문제는 기존 Artifact를 재사용해 `CONTENT_QA`부터, Image·Asset Data·Product 관계 문제는 `ASSET_GENERATION_OR_SELECTION`부터 재개한다. Registry가 `BLOCKED`이면 기존 합법 전이 `BLOCKED → GENERATING`을 먼저 원자적으로 적용하며, 동일 Checkpoint 재개는 attempt_count를 중복 증가시키지 않는다. Attempt Limit 도달과 현재 입력으로 개선 불가능한 Terminal HOLD는 Candidate만 비재시도 HOLD로 유지하고 Batch를 계속하며 `BLOCKED_SYSTEM`으로 분류하지 않는다.
-
-Retry-Hold Candidate가 검증 Gate를 통과해 게시를 재개할 때 Registry의 `BLOCKED` 상태는 기존 합법 전이인 `BLOCKED → GENERATING`으로 먼저 복원한 뒤 `REVIEW_REQUIRED → APPROVED → PUBLISHED` 게시 흐름을 따른다. `BLOCKED → REVIEW_REQUIRED` 직접 전이는 허용하지 않는다. Runtime 예외 Checkpoint는 fallback 단계가 아니라 실제 실행 중이던 `PUBLISH` 또는 `PRODUCTION_QA`를 포함한 정확한 Pipeline Stage를 기록하며, 유효한 기존 Artifact와 QA 결과는 해당 단계 재개 시 반복 생성하지 않는다.
-
-`PUBLISH`는 Candidate별 exactly-once 단계이고 `PRODUCTION_QA`는 Publish와 분리된 재시도·reconciliation 단계다. Publish와 Registry 연결이 성공하면 Batch Checkpoint를 `PUBLISHED_PENDING_QA`로 기록하고 Publish·Registry 전이·DB Insert·Asset Upload를 다시 실행하지 않는다. `/contents` ISR, Sitemap 또는 Internal Discovery의 정상 Cache/CDN 전파 지연은 `PRODUCTION_QA_PENDING`으로 분류하며 실패로 승격하지 않는다. 안전한 동시 Pending 한도 안에서는 다음 Candidate 처리를 계속한다.
-
-Pending QA 재조정은 Content Key와 Content ID가 일치하는 활성 Production Content 및 `PUBLISHED` Registry 연결을 read-only로 확인한 뒤 Production QA만 실행한다. QA PASS 시 `PUBLISHED_VERIFIED`로 전이하고 Verified Counter를 정확히 한 번 증가시킨다. 전파 지연이 아닌 실제 Production 무결성 QA 실패는 `PRODUCTION_QA_FAILED`, 특정 Candidate의 QA Runtime 장애는 `CANDIDATE_FAILED`, DB·Storage 전체 Runtime 장애는 `GLOBAL_FATAL`이다. 이 상태들은 Batch Checkpoint의 실행 상태이며 Production Topic Registry의 기존 `PUBLISHED` lifecycle을 변경하지 않는다.
-
-Content QA의 최신 Source of Truth는 `qa.json`이다. Auto-Repair와 Re-QA가 성공하면 수정된 `content-package.json`과 `qa.json`을 먼저 확정한 뒤 `content-package-with-images.json`의 Content·QA를 원자적으로 동기화한다. 이때 Image와 Evidence 식별 정보는 보존하며 Risk·Auto Clearance·Approval 입력 상태를 동기화 Metadata로 기록한다. Publish 직전에도 최신 Source Artifact와 결합 Package를 비교하여 stale 상태는 자동 동기화하고, 특정 Candidate의 Image 충돌·필수 Artifact 누락처럼 안전하게 동기화할 수 없는 경우 `PUBLISH` 단계의 `CANDIDATE_FAILED`로 격리한다. Publish Approval Validator와 QA Gate는 완화하지 않는다.
-
-Production Batch는 Candidate 평가 전에 DB read/write, Research, Content Generation, Image Generation/Output/QA, Storage write, Publish, Production HTTP QA와 Sitemap QA의 Global Runtime 11개를 실제 증거로 검사한다. `NEW_BATCH`에서는 Checkpoint Resume가 `NOT_REQUIRED`이며, 완료된 `SUCCESS`/`COMPLETE` Batch는 신규 시작을 막지 않는다. 대신 `RUNNING`, Pending QA, legacy `BLOCKED_SYSTEM`, `GLOBAL_FATAL`, 재개 대기 `PARTIAL` Batch가 있으면 Active Batch Guard가 중복 실행을 차단한다. `RESUME_BATCH`에서만 대상 Batch 존재·상태·Candidate/Stage·Resume policy를 `CHECKPOINT_RESUME` 필수 Capability로 검증한다. 필수 Capability 중 하나라도 준비되지 않으면 `BATCH_PREFLIGHT_BLOCKED`로 종료하며 Topic·Content·Publish Mutation을 시작하지 않는다. Image Runtime은 최신 생성 Artifact와 QA receipt를 요구하고, Storage write 검사는 disposable object를 업로드·readback한 뒤 즉시 삭제한다.
-
-Brand Asset 존재 검사는 Visual Planning 이후 Candidate 단위로 수행한다. `EDUCATIONAL`과 `NO_VISUAL`은 Brand Asset을 요구하지 않고, `PRODUCT_REPRESENTATION`은 해당 제품 역할에 승인된 Brand Asset의 DB 관계·정확한 Bucket·Object 접근성을 검사하며, `MIXED`는 제품 역할의 Brand Gate와 Educational 생성 Gate를 각각 적용한다. 특정 Candidate의 Selector/Resolver 실행 장애는 `CANDIDATE_FAILED`, 특정 승인 Object 누락·경로 불일치·승인 Asset 부재는 `ASSET_DATA_ISSUE`, 제품/모델 관계 불일치는 `PRODUCT_MODEL_MISMATCH`로 해당 Candidate만 `HOLD_CONTENT` 처리한다. 정책이 명시적으로 허용하는 Generic/Educational fallback이 있을 때만 fallback을 사용할 수 있으며 임의의 유사 제품 Asset으로 대체하지 않는다.
-
-Model-specific Content의 Critical Fact는 Production DB의 활성 Brand → Model → Model Year를 먼저 식별한 뒤 Subject별 기존 관계를 `FITBIKE_VERIFIED_DATA` Claim Matrix로 기록한다. Tire는 연식별 앞·뒤 규격과 Tube Type 및 실제 Tire Product 관계, Battery는 `battery_standard_code`·전압·실제 Standard Product Mapping, Brake는 실제 Model Year Brake Product 관계를 사용한다. 연식별 값은 단일 모델 값으로 일반화하지 않으며, 필수 값이나 관계가 없으면 `CRITICAL_CLAIM_UNVERIFIED`, 동일 범위의 Critical Claim이 충돌하면 `SOURCE_CONFLICT`로 해당 Candidate를 `HOLD_CONTENT` 처리한다.
-
-Content QA의 문장 조각, `TOO_LIGHT`, 반복, 구조 연결 및 경미한 질문-본문 정렬 문제는 최대 2회까지 Evidence-only Auto Repair 후 같은 Gate로 재검사한다. Repair는 기존 Evidence에 없는 수치·규격·호환 Claim을 추가할 수 없다. Fact Conflict, Safety Uncertainty, Unsupported Numeric Claim, Subject Evidence 부족과 Critical Claim 미검증은 Auto Repair 대상이 아니며 기존 HOLD 정책을 유지한다.
-
-- Published content list and content-type filter
-- Published content detail and structured block rendering
-- Optional thumbnail and hero rendering from `content-assets` object paths
-- Detail metadata, canonical URL, Open Graph fields, and Article JSON-LD based on stored values
-- Missing, inactive, and unpublished content handled with Next.js `notFound()`
-- Up to three published guides on a related Bike Model Detail page
-- Related active bike cards on content detail, linked through the newest active model-year route
-- Home discovery gate with up to three newest published guides and a `/contents` CTA
-- `/contents` and every published content detail included in the sitemap
-- Generic part-category relations may be stored without a specific product target; the migrated battery check article uses `BATTERY` / `CATEGORY`.
-
-## Deferred Scope
-
-- Part relation UI
-- Related content
-- Admin CRUD
-- Content editor
-- `/today` migration
+신규 Factory는 이 유형을 더 생성하지 않는다.
