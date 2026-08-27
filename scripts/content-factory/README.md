@@ -149,7 +149,7 @@ Retry-Hold가 Publish Gate까지 통과하면 Topic Registry는 전용 복원 �
 
 Auto-Repair 이후 `qa.json`을 Content QA Source of Truth로 사용하고, 수정된 `content-package.json`과 함께 `content-package-with-images.json`에 동기화한다. Synchronizer는 기존 Image Metadata를 덮어쓰지 않고 Evidence Hash 및 Risk·Approval 입력을 기록하며 원자적으로 Package를 교체한다. Publish 직전 stale Package를 다시 검사해 안전하게 동기화할 수 있으면 최신화하고, Image 충돌이나 필수 Artifact 누락이면 Validator 우회 없이 `PUBLISH` 단계에서 `BLOCKED_SYSTEM` 처리한다.
 
-Production 모드는 Candidate를 읽기 전에 `production-capabilities.mjs` Preflight를 실행한다. DB read/write, Research, Content Generation, Image Generation/Output/QA, Storage write, Publish, Production HTTP QA, Sitemap QA, Checkpoint Resume의 12개 Runtime Capability가 모두 `IMPLEMENTED_AND_E2E_VERIFIED`일 때만 Queue 처리를 시작하며, 하나라도 준비되지 않으면 `BATCH_PREFLIGHT_BLOCKED`와 `mutation: NONE`을 반환한다. 단순 파일 존재나 Mock 결과는 READY 근거로 사용하지 않는다.
+Production 모드는 Candidate를 읽기 전에 `production-capabilities.mjs` Preflight를 실행한다. Global Runtime은 DB read/write, Research, Content Generation, Image Generation/Output/QA, Storage write, Publish, Production HTTP QA, Sitemap QA의 11개다. Batch 파일이 없으면 CLI가 `NEW_BATCH`, 있으면 `RESUME_BATCH` Intent를 자동 선택한다. NEW에서는 `CHECKPOINT_RESUME=NOT_REQUIRED`이고 완료된 Batch는 무시하지만, Active Batch가 있으면 중복 실행을 차단한다. RESUME에서만 대상 Checkpoint Resume을 열두 번째 필수 Capability로 검사하며, 완료 Batch는 `NOT_RESUMABLE`이다. 필수 조건이 준비되지 않으면 `BATCH_PREFLIGHT_BLOCKED`와 `mutation: NONE`을 반환한다.
 
 Global Preflight는 실행 Capability만 검사하며 Brand Asset 존재 여부는 포함하지 않는다. Brand Asset Gate는 Visual Planning 이후 Candidate에 적용한다. `EDUCATIONAL`/`NO_VISUAL`은 Brand Asset 비의존, `PRODUCT_REPRESENTATION`은 해당 승인 Brand Asset을 검사하고, `MIXED`는 Product Brand Gate와 Educational 생성 Gate를 모두 통과해야 한다. 승인 Asset 부재 시 정책상 허용된 fallback만 사용할 수 있고, 그렇지 않으면 해당 Candidate를 `ASSET_DATA_ISSUE`로 `HOLD_CONTENT` 처리한다.
 

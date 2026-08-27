@@ -312,7 +312,8 @@ async function main() {
   const retrySystem = args["retry-system"] === "true";
   const reconcileOnly = args["reconcile-only"] === "true";
   if (!dryRun) {
-    const preflight = await evaluateCapabilities({ retryHold, retrySystem });
+    const operationMode = existsSync(batchFile) ? "RESUME_BATCH" : "NEW_BATCH";
+    const preflight = await evaluateCapabilities({ operationMode, batchId });
     if (preflight.status !== "READY") {
       console.log(JSON.stringify({ status: "BATCH_PREFLIGHT_BLOCKED", batchId, target, mutation: "NONE", preflight, batchFile: null }, null, 2));
       return;
