@@ -7,6 +7,8 @@ import { promisify } from "node:util";
 
 import { createClient } from "@supabase/supabase-js";
 
+import { runBrandAssetVisualQa } from "./brand-asset-visual-qa.mjs";
+
 const execute = promisify(execFile);
 const imageDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectDirectory = path.resolve(imageDirectory, "../../..");
@@ -106,7 +108,7 @@ async function normalizeImages(contentDirectory, args) {
   return JSON.parse(stdout);
 }
 
-async function executeAssets({ contentDirectory, request, contentPackage, brandResolver = resolveApprovedBrandAsset, downloader = downloadAsset, imageNormalizer = normalizeImages }) {
+async function executeAssets({ contentDirectory, request, contentPackage, brandResolver = resolveApprovedBrandAsset, downloader = downloadAsset, imageNormalizer = normalizeImages, brandVisualQa = runBrandAssetVisualQa }) {
   if (request.status === "NO_IMAGES_REQUIRED") {
     const imageResult = { status: "READY_FOR_VISUAL_REVIEW", assets: [], reviewSheet: null, issues: [], execution: { visual: "NO_VISUAL", qa: "PASS" } };
     await writeFile(path.join(contentDirectory, "image-result.json"), `${JSON.stringify(imageResult, null, 2)}\n`, "utf8");
@@ -131,8 +133,12 @@ async function executeAssets({ contentDirectory, request, contentPackage, brandR
       if (!existsSync(sourcePath)) await downloader(resolved.url, sourcePath, resolved);
       const qaPath = path.join(sourceDirectory, `${asset.id}.qa.json`);
       if (!existsSync(qaPath)) {
-        pending.push({ assetId: asset.id, role: selection.role, task: "VISUAL_QA", sourceFile: path.relative(contentDirectory, sourcePath).replaceAll("\\", "/"), qaSidecar: `${asset.id}.qa.json`, sourceType: selection.sourceType, brand: resolved.brand_name });
-        continue;
+        try {
+          const generatedQa = await brandVisualQa({ contentDirectory, sourcePath, asset, resolved, expectedBrand: selection.brand, persist: true });
+          if (generatedQa.final !== "PASS") return { status: "HOLD_CONTENT", reason: "IMAGE_QA_FAILED", asset: asset.id, failures: generatedQa.failures };
+        } catch (error) {
+          return { status: "BLOCKED_SYSTEM", reason: "BRAND_ASSET_VISUAL_QA_RUNTIME_ERROR", asset: asset.id, error: error instanceof Error ? error.message : String(error) };
+        }
       }
       const qa = JSON.parse(await readFile(qaPath, "utf8"));
       const visualQa = validateVisualQa(qa, asset, selection.sourceType);

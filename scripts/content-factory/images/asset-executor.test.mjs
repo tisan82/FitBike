@@ -28,7 +28,7 @@ async function writeQaOnDownload(url, output) {
 
 test("MAXXIS 승인 Asset을 실제 관계 조회 결과로 선택한다", async () => withDirectory(async (directory) => {
   const request = { status: "READY_FOR_IMAGE_GENERATION", assets: [{ id: "thumbnail", sourceArgument: "thumbnail-source", sourceSelection: { sourceType: "APPROVED_BRAND_ASSET", role: "PRODUCT_REPRESENTATION" } }] };
-  const result = await executeAssets({ contentDirectory: directory, request, contentPackage: packageFixture, brandResolver: async () => ({ relationVerified: true, brand_name: "MAXXIS", source_asset: "tire-models/maxxis/test/main.webp", url: "https://example.invalid/main.webp", bucket: "tire-assets", objectPath: "tire-models/maxxis/test/main.webp" }), downloader: writeQaOnDownload, imageNormalizer: fakeNormalizer });
+  const result = await executeAssets({ contentDirectory: directory, request, contentPackage: packageFixture, brandResolver: async () => ({ relationVerified: true, tire_model_key: "MAXXIS_TEST", brand_name: "MAXXIS", source_asset: "tire-models/maxxis/test/main.webp", url: "https://example.invalid/main.webp", bucket: "tire-assets", objectPath: "tire-models/maxxis/test/main.webp" }), downloader: writeQaOnDownload, imageNormalizer: fakeNormalizer });
   assert.equal(result.status, "PASS");
   assert.equal(result.assets[0].brand, "MAXXIS");
 }));
@@ -36,7 +36,7 @@ test("MAXXIS 승인 Asset을 실제 관계 조회 결과로 선택한다", async
 test("POWEROAD 승인 Asset을 실제 관계 조회 결과로 선택한다", async () => withDirectory(async (directory) => {
   const request = { status: "READY_FOR_IMAGE_GENERATION", assets: [{ id: "thumbnail", sourceArgument: "thumbnail-source", sourceSelection: { sourceType: "APPROVED_BRAND_ASSET", role: "PRODUCT_REPRESENTATION" } }] };
   const batteryPackage = { ...packageFixture, relations: { parts: [{ partType: "BATTERY" }], bikeModels: [{ bikeModelId: 8 }] } };
-  const result = await executeAssets({ contentDirectory: directory, request, contentPackage: batteryPackage, brandResolver: async () => ({ relationVerified: true, brand_name: "POWEROAD", source_asset: "battery-products/poweroad/test/main.webp", url: "https://example.invalid/main.webp", bucket: "bike-assets", objectPath: "battery-products/poweroad/test/main.webp" }), downloader: writeQaOnDownload, imageNormalizer: fakeNormalizer });
+  const result = await executeAssets({ contentDirectory: directory, request, contentPackage: batteryPackage, brandResolver: async () => ({ relationVerified: true, battery_part_key: "POWEROAD_TEST", brand_name: "POWEROAD", source_asset: "battery-products/poweroad/test/main.webp", url: "https://example.invalid/main.webp", bucket: "bike-assets", objectPath: "battery-products/poweroad/test/main.webp" }), downloader: writeQaOnDownload, imageNormalizer: fakeNormalizer });
   assert.equal(result.assets[0].brand, "POWEROAD");
 }));
 
@@ -67,7 +67,7 @@ test("MIXED는 Brand Asset과 Educational Asset을 각각 실행한다", async (
     { id: "thumbnail", sourceArgument: "thumbnail-source", sourceSelection: { sourceType: "APPROVED_BRAND_ASSET", role: "PRODUCT_REPRESENTATION" } },
     { id: "body-01", prompt: "교육", sourceArgument: "body-01-source", sourceSelection: { sourceType: "GENERATED_EDUCATIONAL", role: "EDUCATIONAL_DIAGRAM" } }
   ] };
-  const result = await executeAssets({ contentDirectory: directory, request, contentPackage: packageFixture, brandResolver: async () => ({ relationVerified: true, brand_name: "MAXXIS", source_asset: "tire-models/maxxis/test/main.webp", url: "https://example.invalid/main.webp", bucket: "tire-assets", objectPath: "tire-models/maxxis/test/main.webp" }), downloader: writeQaOnDownload, imageNormalizer: fakeNormalizer });
+  const result = await executeAssets({ contentDirectory: directory, request, contentPackage: packageFixture, brandResolver: async () => ({ relationVerified: true, tire_model_key: "MAXXIS_TEST", brand_name: "MAXXIS", source_asset: "tire-models/maxxis/test/main.webp", url: "https://example.invalid/main.webp", bucket: "tire-assets", objectPath: "tire-models/maxxis/test/main.webp" }), downloader: writeQaOnDownload, imageNormalizer: fakeNormalizer });
   assert.equal(result.status, "PASS");
   assert.deepEqual(result.assets.map((asset) => asset.sourceType), ["APPROVED_BRAND_ASSET", "GENERATED_EDUCATIONAL"]);
 }));
