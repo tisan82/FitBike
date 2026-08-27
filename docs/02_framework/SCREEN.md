@@ -1,6 +1,6 @@
 # FitBike Screen Guide
 
-**Version:** v1.1\
+**Version:** v1.2\
 **Status:** Baseline
 
 ## Principles
@@ -108,10 +108,28 @@ Header → Content → Primary Action → Bottom Navigation(필요 시)
 
 Fitment/specification 정보는 상업적 프로모션보다 우선한다.
 
-Home은 공개된 최신 정보 콘텐츠 일부를 보여주는 `바이크 관리 가이드` Gate와
-`/contents` 전체 보기 CTA를 제공한다. Home에 전체 콘텐츠를 나열하거나 추천·인기
-순위를 만들지 않는다. 각 Guide card는 `/contents/{contentKey}`로 직접 연결하며,
-모바일에서도 카드 전체가 충분한 tap target이 되고 가로 overflow를 만들지 않아야 한다.
+### Home Discovery Hierarchy
+
+Home의 Primary Gate는 `내 바이크 찾기`다. FitBike의 Model-Year Driven 원칙에 따라
+Hero에서 Brand → Model → Model Year 선택으로 이어지는 `/bike-selector`를 가장 강한
+Primary CTA로 제공한다. 콘텐츠 탐색 CTA는 Primary CTA와 경쟁하지 않는 Secondary
+Action으로 제공한다.
+
+Home은 Bike Finder가 왜 필요한지 이해할 수 있도록 `브랜드 선택 → 모델·연식 확인 →
+부품 정보 확인`의 짧은 3단계 설명을 제공할 수 있다. 이 설명은 실제 Selector를 Home에
+복제하거나 추가 입력을 요구하지 않는다.
+
+Home의 콘텐츠 영역은 공개된 최신 정보 콘텐츠 일부를 보여주는 `바이크 가이드` Gate다.
+전체 콘텐츠를 Home에 나열하거나 추천·인기 순위를 만들지 않는다. 기본 노출은 최신 공개
+콘텐츠 최대 3건이며 `/contents` 전체 보기 CTA를 항상 함께 제공한다.
+
+Guide card는 `/contents/{contentKey}`로 직접 연결한다. 저장된 Thumbnail이 있으면 카드
+상단에 사용하고, 없으면 이미지 영역 자체를 생략한다. Home을 위해 별도 임의 이미지를
+생성하지 않는다. 카드에는 Content Type, Title, Summary를 HTML로 제공하며 모바일에서도
+카드 전체가 충분한 tap target이 되고 가로 overflow를 만들지 않아야 한다.
+
+Home 하단은 콘텐츠 탐색 이후에도 Model-Year 기준 확인으로 복귀할 수 있도록 Bike Finder
+CTA를 다시 제공한다. 일반적인 관리 정보와 실제 차량 규격을 동일한 것으로 표현하지 않는다.
 
 ## Tire Model Detail Disclosure
 
