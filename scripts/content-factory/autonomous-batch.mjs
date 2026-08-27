@@ -65,6 +65,15 @@ async function runScript(script, args) {
   return JSON.parse(stdout);
 }
 
+async function runScriptWithQaStatus(script, args) {
+  try {
+    return await runScript(script, args);
+  } catch (error) {
+    if (Number(error?.code) === 2 && error.stdout) return JSON.parse(error.stdout);
+    throw error;
+  }
+}
+
 async function findCandidateContentDirectory(candidate) {
   const contentRoot = path.join(projectDirectory, "content-work");
   for (const entry of await readdir(contentRoot, { withFileTypes: true })) {
@@ -96,6 +105,22 @@ function normalizeLegacyRetryHoldPublishRecord(record) {
     history: [...(record.history ?? []), { state: "HOLD_CONTENT", reason: "RETRY_HOLD_REGISTRY_RESTORE_REQUIRED", retryFrom: "PUBLISH", recoveredCheckpoint: true }],
     holdCheckpoint: { failedStage: "PUBLISH", blockerType: "HOLD_CONTENT", blockerReason: "RETRY_HOLD_REGISTRY_RESTORE_REQUIRED", retryEligible: true, resumeEligible: true }
   };
+}
+
+function normalizeProductionQaRecord(record) {
+  if (record.state === "PUBLISHED") return { ...record, state: "PUBLISHED_VERIFIED", history: [...(record.history ?? []), { state: "PUBLISHED_VERIFIED", migratedFrom: "PUBLISHED" }] };
+  const publishedBeforeQa = record.state === "BLOCKED_SYSTEM" && record.checkpoint?.failedStage === "PRODUCTION_QA" && record.resumeContext?.publish?.status === "PUBLISHED";
+  if (!publishedBeforeQa) return record;
+  const normalized = {
+    ...record,
+    state: "PUBLISHED_PENDING_QA",
+    qaContext: record.resumeContext,
+    history: [...(record.history ?? []), { state: "PUBLISHED_PENDING_QA", reason: "PRODUCTION_QA_PENDING", reconciledCheckpoint: true }]
+  };
+  delete normalized.resumeFrom;
+  delete normalized.resumeContext;
+  delete normalized.checkpoint;
+  return normalized;
 }
 
 async function verifyPublishedContentForProductionQaResume(candidate, context, query = managementQuery) {
@@ -231,7 +256,7 @@ function createProductionStages() {
     },
     async PRODUCTION_QA(candidate, context) {
       if (context.publish.status !== "PUBLISHED") return { status: "FAIL" };
-      return runScript("production-content-qa.mjs", ["--content-dir", context.contentDirectory]);
+      return runScriptWithQaStatus("production-content-qa.mjs", ["--content-dir", context.contentDirectory]);
     }
   };
 }
@@ -240,7 +265,7 @@ async function readPreviousRecords(batchFile) {
   if (!existsSync(batchFile)) return {};
   const batch = JSON.parse(await readFile(batchFile, "utf8"));
   return Object.fromEntries((batch.records ?? []).map((record) => {
-    const normalized = normalizeLegacyRetryHoldPublishRecord(record);
+    const normalized = normalizeProductionQaRecord(normalizeLegacyRetryHoldPublishRecord(record));
     return [normalized.originalTopicKey, normalized];
   }));
 }
@@ -259,6 +284,7 @@ async function main() {
   await loadLocalEnvironment();
   const retryHold = args["retry-hold"] === "true";
   const retrySystem = args["retry-system"] === "true";
+  const reconcileOnly = args["reconcile-only"] === "true";
   if (!dryRun) {
     const preflight = await evaluateCapabilities({ retryHold, retrySystem });
     if (preflight.status !== "READY") {
@@ -267,8 +293,10 @@ async function main() {
     }
   }
   const previousRecords = dryRun ? {} : await readPreviousRecords(batchFile);
-  const resumeTopicKeys = Object.values(previousRecords).filter((record) => retrySystem && record.state === "BLOCKED_SYSTEM" || retryHold && ["HOLD", "HOLD_CONTENT"].includes(record.state)).map((record) => record.originalTopicKey);
-  const { candidates, publishedContents } = await loadProductionInputs(maxCandidates, resumeTopicKeys);
+  const resumeTopicKeys = Object.values(previousRecords).filter((record) => record.state === "PUBLISHED_PENDING_QA" || retrySystem && record.state === "BLOCKED_SYSTEM" || retryHold && ["HOLD", "HOLD_CONTENT"].includes(record.state)).map((record) => record.originalTopicKey);
+  const inputs = await loadProductionInputs(maxCandidates, resumeTopicKeys);
+  const candidates = reconcileOnly ? inputs.candidates.filter((candidate) => previousRecords[candidate.topic_key]?.state === "PUBLISHED_PENDING_QA") : inputs.candidates;
+  const { publishedContents } = inputs;
   const checkpoints = { ...previousRecords };
   if (!dryRun) await mkdir(batchDirectory, { recursive: true });
   const onRecord = dryRun ? null : async (candidate, record, progress) => {
@@ -297,4 +325,4 @@ if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main
   process.exitCode = 1;
 });
 
-export { createProductionStages, isLegacyRetryHoldPublishFailure, normalizeLegacyRetryHoldPublishRecord, verifyPublishedContentForProductionQaResume };
+export { createProductionStages, isLegacyRetryHoldPublishFailure, normalizeLegacyRetryHoldPublishRecord, normalizeProductionQaRecord, verifyPublishedContentForProductionQaResume };

@@ -106,7 +106,7 @@ Automatic attempts are capped at two. A failed run records `last_error`; after t
 
 `16_content_topic.risk_level` and `16_content_topic.automation_level` are the stored classification source of truth. L1/L2는 최종 게시 승인값이 아니며 Autonomous Batch가 Risk와 현재 Gate 결과를 함께 평가한다. Runtime classifier가 저장값보다 제한적이면 더 높은 Risk Gate를 적용하고 Registry를 조용히 변경하지 않는다. 저장 분류가 없으면 fail-closed한다. 명시적 재분류는 기본 Dry Run이다: `node scripts/content-factory/topic-registry.mjs --operation classify-topic --topic-key {key}`. 승인된 단일 Topic Registry 변경에만 `--apply true`를 추가한다. REDEFINE은 별도 원자적 Registry 갱신 후 새 Intent 기준 분류를 저장한다.
 
-`run-next-topic.mjs`는 단일 Topic 운영 호환 인터페이스다. Autonomous Batch는 `autonomous-batch.mjs`를 사용한다. Batch Target은 새로 게시된 Content 수이며 기본 Max Candidate는 `max(target × 3, target + 10)`이다. 제한 내에서 Target을 충족하지 못하면 `PARTIAL`로 종료한다.
+`run-next-topic.mjs`는 단일 Topic 운영 호환 인터페이스다. Autonomous Batch는 `autonomous-batch.mjs`를 사용한다. Batch Target은 Production QA까지 통과한 새 `PUBLISHED_VERIFIED` Content 수이며 기본 Max Candidate는 `max(target × 3, target + 10)`이다. 제한 내에서 Target을 충족하지 못하면 `PARTIAL`로 종료한다.
 
 ```bash
 node scripts/content-factory/autonomous-batch.mjs --target 3 --mode dry-run --dry-run true
@@ -133,7 +133,9 @@ Production Image 단계는 `images/generate-images.mjs --mode prepare` 뒤 `imag
 node scripts/content-factory/autonomous-batch.mjs --target 3 --mode production --batch-id {same-batch-id} --retry-system true
 ```
 
-Publish 완료 후 `PRODUCTION_QA`에서 중단된 System Checkpoint는 `--retry-system true`로 재개한다. 이 경로는 Production DB의 Content/Registry 연결과 로컬 Publish receipt를 먼저 대조하고, 이미 게시된 Content에는 Publish나 Asset Upload를 다시 실행하지 않은 채 Production QA만 재시도한다. QA PASS 후 Checkpoint와 Published Counter는 정확히 한 번 완료된다.
+Publish 성공 직후 Candidate는 `PUBLISHED_PENDING_QA`가 되며 Production QA는 별도의 retry/reconciliation 단계로 실행한다. `/contents` ISR, Sitemap, Internal Discovery의 Cache/CDN 전파 지연은 `PRODUCTION_QA_PENDING`으로 유지하고 Batch를 차단하지 않는다. 기본 동시 Pending 한도 2건 안에서는 다음 Candidate를 계속 처리한다. QA PASS는 `PUBLISHED_VERIFIED`와 Verified Counter를 정확히 한 번 확정하며, 실제 Production 무결성 실패는 `PRODUCTION_QA_FAILED`로 분리한다. QA Runtime이나 DB/Storage Runtime 장애만 `BLOCKED_SYSTEM`이다.
+
+기존 Pending 항목만 게시 재실행 없이 조정하려면 `node scripts/content-factory/autonomous-batch.mjs --target {target} --mode production --batch-id {batch-id} --reconcile-only true`를 사용한다. 이 경로는 Production DB의 Content/Registry 연결과 로컬 Publish receipt를 먼저 대조하고 Production QA만 실행한다.
 
 `BLOCKED_SYSTEM`은 시스템 실행 대기 상태로 Topic Registry를 변경하지 않고, 체크포인트 저장 직후 Batch 전체를 중단하여 이후 Candidate 평가와 Mutation을 막는다. 동일 Batch ID와 `--retry-system true`로 실패한 Asset 단계부터 재개하며 이전 Published 수를 Target에 포함한다. `HOLD_CONTENT`는 `ASSET_DATA_ISSUE`, 제품/모델 불일치, Image QA 실패 등 Candidate 자체의 검토 상태이며 기존 `--retry-hold true` 정책에 따라 다음 Candidate 처리를 계속한다. Asset Selector API/Resolver 자체의 예외는 `BLOCKED_SYSTEM`이고, 특정 승인 Object 누락이나 경로·관계 문제는 Batch 전체 장애가 아니다.
 

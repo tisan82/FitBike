@@ -50,7 +50,7 @@ Medium Auto Clearance는 Critical Fact가 `VERIFIED`이고 Source Conflict, Crit
 
 Risk와 관계없이 Source Conflict, Fact QA 실패, Critical Claim 검증 부족, Safety uncertainty, 지원되지 않는 수치·정비 한계, 기술적 오표현, Product/Model 불일치, 해결되지 않은 Duplicate 또는 Subject Drift, Image QA 실패, Production integrity uncertainty는 강제 `HOLD`다. Human Review는 정상 흐름의 기본 단계가 아니라 이 Exception Queue를 처리한다.
 
-중복 Candidate는 `KEEP`, `REDEFINE`, `DROP` 중 하나로 판정한다. `REDEFINE`은 한 번만 수행하고 Duplicate Gate에 다시 진입하며, 재정의된 Subject, Intent, Action, Coverage, Safety 특성으로 Risk를 다시 계산한다. Batch 완료 조건은 Candidate 생성 수가 아니라 새 `PUBLISHED` 수가 요청 Target에 도달하는 것이다.
+중복 Candidate는 `KEEP`, `REDEFINE`, `DROP` 중 하나로 판정한다. `REDEFINE`은 한 번만 수행하고 Duplicate Gate에 다시 진입하며, 재정의된 Subject, Intent, Action, Coverage, Safety 특성으로 Risk를 다시 계산한다. Batch 완료 조건은 Candidate 생성 수나 Publish 호출 성공 수가 아니라 Production QA까지 통과한 새 `PUBLISHED_VERIFIED` 수가 요청 Target에 도달하는 것이다.
 
 ## Current Scope
 
@@ -68,7 +68,9 @@ Image QA는 Subject/Role 일치, Brand Asset First, Product/Model 일치, 기술
 
 Retry-Hold Candidate가 검증 Gate를 통과해 게시를 재개할 때 Registry의 `BLOCKED` 상태는 기존 합법 전이인 `BLOCKED → GENERATING`으로 먼저 복원한 뒤 `REVIEW_REQUIRED → APPROVED → PUBLISHED` 게시 흐름을 따른다. `BLOCKED → REVIEW_REQUIRED` 직접 전이는 허용하지 않는다. Runtime 예외 Checkpoint는 fallback 단계가 아니라 실제 실행 중이던 `PUBLISH` 또는 `PRODUCTION_QA`를 포함한 정확한 Pipeline Stage를 기록하며, 유효한 기존 Artifact와 QA 결과는 해당 단계 재개 시 반복 생성하지 않는다.
 
-`PUBLISH`는 Candidate별 exactly-once 단계이고 `PRODUCTION_QA`는 안전하게 재시도할 수 있는 단계다. Publish 완료 후 `PRODUCTION_QA`에서 중단된 Checkpoint는 Content Key와 Content ID가 일치하는 활성 Production Content 및 `PUBLISHED` Registry 연결을 read-only로 확인한 뒤 Publish·Registry 전이·DB Insert·Asset Upload를 건너뛰고 Production QA만 재개한다. 존재 확인이 실패하면 임의 재게시 없이 같은 `PRODUCTION_QA` 단계의 `BLOCKED_SYSTEM`으로 유지한다. QA가 통과한 시점에 Candidate를 `PUBLISHED`로 완료하고 Batch Published Counter를 한 번만 반영한다.
+`PUBLISH`는 Candidate별 exactly-once 단계이고 `PRODUCTION_QA`는 Publish와 분리된 재시도·reconciliation 단계다. Publish와 Registry 연결이 성공하면 Batch Checkpoint를 `PUBLISHED_PENDING_QA`로 기록하고 Publish·Registry 전이·DB Insert·Asset Upload를 다시 실행하지 않는다. `/contents` ISR, Sitemap 또는 Internal Discovery의 정상 Cache/CDN 전파 지연은 `PRODUCTION_QA_PENDING`으로 분류하며 `BLOCKED_SYSTEM`으로 승격하지 않는다. 안전한 동시 Pending 한도 안에서는 다음 Candidate 처리를 계속한다.
+
+Pending QA 재조정은 Content Key와 Content ID가 일치하는 활성 Production Content 및 `PUBLISHED` Registry 연결을 read-only로 확인한 뒤 Production QA만 실행한다. QA PASS 시 `PUBLISHED_VERIFIED`로 전이하고 Verified Counter를 정확히 한 번 증가시킨다. 전파 지연이 아닌 실제 Production 무결성 QA 실패는 `PRODUCTION_QA_FAILED`, DB·Storage 또는 QA Runtime 자체 장애는 `BLOCKED_SYSTEM`이다. 이 상태들은 Batch Checkpoint의 실행 상태이며 Production Topic Registry의 기존 `PUBLISHED` lifecycle을 변경하지 않는다.
 
 Content QA의 최신 Source of Truth는 `qa.json`이다. Auto-Repair와 Re-QA가 성공하면 수정된 `content-package.json`과 `qa.json`을 먼저 확정한 뒤 `content-package-with-images.json`의 Content·QA를 원자적으로 동기화한다. 이때 Image와 Evidence 식별 정보는 보존하며 Risk·Auto Clearance·Approval 입력 상태를 동기화 Metadata로 기록한다. Publish 직전에도 최신 Source Artifact와 결합 Package를 비교하여 stale 상태는 자동 동기화하고, Image 충돌·필수 Artifact 누락처럼 안전하게 동기화할 수 없는 경우 `PUBLISH` 단계의 `BLOCKED_SYSTEM`으로 중단한다. Publish Approval Validator와 QA Gate는 완화하지 않는다.
 

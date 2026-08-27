@@ -37,14 +37,14 @@ async function fetchResult(url, options = {}) {
   return { response, text: options.method === "HEAD" ? "" : await response.text() };
 }
 
-async function runChecks({ origin, contentKey, assetUrls }) {
+async function runChecks({ origin, contentKey, assetUrls, fetcher = fetchResult }) {
   const canonicalUrl = `${origin}/contents/${contentKey}`;
   const [detail, directory, sitemap, robots, ...assets] = await Promise.all([
-    fetchResult(canonicalUrl, { headers: { "User-Agent": "FitBike-Autonomous-Production-QA/1.0" } }),
-    fetchResult(`${origin}/contents`),
-    fetchResult(`${origin}/sitemap.xml`),
-    fetchResult(`${origin}/robots.txt`),
-    ...assetUrls.map((url) => fetchResult(url, { method: "HEAD" }))
+    fetcher(canonicalUrl, { headers: { "User-Agent": "FitBike-Autonomous-Production-QA/1.0" } }),
+    fetcher(`${origin}/contents`),
+    fetcher(`${origin}/sitemap.xml`),
+    fetcher(`${origin}/robots.txt`),
+    ...assetUrls.map((url) => fetcher(url, { method: "HEAD" }))
   ]);
   const html = inspectDetailHtml(detail.text, canonicalUrl);
   const checks = {
@@ -63,7 +63,10 @@ async function runChecks({ origin, contentKey, assetUrls }) {
     assetHttp200: assets.every((asset) => asset.response.status === 200),
     assetWebp: assets.every((asset) => asset.response.headers.get("content-type") === "image/webp")
   };
-  return { status: Object.values(checks).every(Boolean) ? "PASS" : "RETRY", checks };
+  const propagationChecks = ["directoryExposure", "sitemapExposure", "internalLinkNotOrphan"];
+  const allPass = Object.values(checks).every(Boolean);
+  const onlyPropagationPending = Object.entries(checks).every(([key, value]) => value || propagationChecks.includes(key));
+  return { status: allPass ? "PASS" : onlyPropagationPending ? "PRODUCTION_QA_PENDING" : "PRODUCTION_QA_FAILED", checks };
 }
 
 async function main() {
@@ -82,7 +85,7 @@ async function main() {
   let review;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     review = await runChecks({ origin, contentKey: result.contentKey, assetUrls });
-    if (review.status === "PASS") break;
+    if (review.status === "PASS" || review.status === "PRODUCTION_QA_FAILED") break;
     if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, retryMs));
   }
   console.log(JSON.stringify({ ...review, attempts, contentKey: result.contentKey }, null, 2));

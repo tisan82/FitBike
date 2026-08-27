@@ -1,4 +1,4 @@
-const terminalStates = new Set(["PUBLISHED", "DROP", "HOLD", "HOLD_CONTENT"]);
+const terminalStates = new Set(["PUBLISHED", "PUBLISHED_VERIFIED", "PRODUCTION_QA_FAILED", "DROP", "HOLD", "HOLD_CONTENT"]);
 const criticalHoldReasons = new Set([
   "SOURCE_CONFLICT",
   "FACT_QA_FAILED",

@@ -102,9 +102,11 @@ async function auditBrandAssets() {
 
 function inspectCheckpointResume(checkpoint) {
   const records = checkpoint.records ?? [];
+  const pendingRecords = records.filter((record) => record.state === "PUBLISHED_PENDING_QA");
   const systemRecords = records.filter((record) => record.state === "BLOCKED_SYSTEM" && record.checkpoint?.resumeEligible === true && record.resumeFrom);
   const holdRecords = records.filter((record) => ["HOLD", "HOLD_CONTENT"].includes(record.state));
   if (systemRecords.length) return ready({ batchId: checkpoint.batchId, mode: "SYSTEM", resumable: systemRecords.length, stage: systemRecords[0].resumeFrom });
+  if (pendingRecords.length) return ready({ batchId: checkpoint.batchId, mode: "PRODUCTION_QA_RECONCILIATION", resumable: pendingRecords.length, stage: "PRODUCTION_QA" });
   if (checkpoint.status === "PARTIAL" && holdRecords.length) return ready({ batchId: checkpoint.batchId, mode: "HOLD_CONTENT", resumable: holdRecords.length, requiresFlag: "--retry-hold" });
   return blocked("MISSING", "RESUMABLE_CHECKPOINT_MISSING");
 }

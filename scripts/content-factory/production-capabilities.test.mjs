@@ -47,3 +47,11 @@ test("PARTIAL HOLD_CONTENT checkpoint는 retry-hold 대상으로 Resume 가능�
 test("Hold도 System Block도 없는 checkpoint는 Resume 가능으로 오인하지 않는다", () => {
   assert.equal(inspectCheckpointResume({ status: "PARTIAL", records: [{ state: "DROP" }] }).reason, "RESUMABLE_CHECKPOINT_MISSING");
 });
+
+test("PUBLISHED_PENDING_QA checkpoint는 Production QA reconciliation 대상으로 Resume 가능하다", () => {
+  const result = inspectCheckpointResume({ status: "PARTIAL", batchId: "canary", records: [{ state: "PUBLISHED_PENDING_QA" }] });
+  assert.equal(result.state, "IMPLEMENTED_AND_E2E_VERIFIED");
+  assert.equal(result.mode, "PRODUCTION_QA_RECONCILIATION");
+  assert.equal(result.stage, "PRODUCTION_QA");
+  assert.equal(result.resumable, 1);
+});

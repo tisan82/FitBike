@@ -23,6 +23,8 @@ const stateOrder = [
   "PRODUCTION_QA"
 ];
 
+const verifiedStates = new Set(["PUBLISHED", "PUBLISHED_VERIFIED"]);
+
 function transition(record, state, detail = {}) {
   record.state = state;
   record.history.push({ state, ...detail });
@@ -107,11 +109,56 @@ async function executeStage(stages, state, candidate, context, record) {
   }
 }
 
+function finalizeProductionQa(record, productionQa, qaContext) {
+  record.productionQa = productionQa;
+  if (productionQa.status === "PASS") {
+    delete record.qaContext;
+    clearResumeCheckpoint(record);
+    transition(record, "PUBLISHED_VERIFIED");
+  } else if (productionQa.status === "PRODUCTION_QA_PENDING") {
+    record.qaContext = resumableContext(qaContext);
+    clearResumeCheckpoint(record);
+    transition(record, "PUBLISHED_PENDING_QA", { reason: "PRODUCTION_QA_PENDING" });
+  } else {
+    delete record.qaContext;
+    clearResumeCheckpoint(record);
+    transition(record, "PRODUCTION_QA_FAILED", { reason: productionQa.status ?? "PRODUCTION_QA_FAILED" });
+  }
+  return record;
+}
+
+async function reconcileProductionQa({ record, workingCandidate, classification, visual, stages }) {
+  let context = record.qaContext ?? record.resumeContext ?? { gates: record.gates ?? {}, holdSignals: {} };
+  transition(record, "PRODUCTION_QA", { reconciliation: true, publish: "SKIPPED_ALREADY_PUBLISHED" });
+  try {
+    if (typeof stages.PREPARE_PRODUCTION_QA_RESUME !== "function") throw new Error("PRODUCTION_QA_RESUME_VERIFIER_UNAVAILABLE");
+    context = await stages.PREPARE_PRODUCTION_QA_RESUME(workingCandidate, { ...context, classification, visual, record });
+  } catch (error) {
+    if (error && typeof error === "object") {
+      error.pipelineStage = "PRODUCTION_QA";
+      error.pipelineRecord = record;
+      error.resumeContext = resumableContext(context);
+    }
+    throw error;
+  }
+  const qaContext = { ...context, classification, visual, record };
+  const productionQa = await executeStage(stages, "PRODUCTION_QA", workingCandidate, qaContext, record);
+  return finalizeProductionQa(record, productionQa, qaContext);
+}
+
 async function processCandidate({ candidate, publishedContents, previousRecord, retryHold, retrySystem, dryRun, classifyTopicRisk, stages }) {
   if (shouldSkipCandidate(previousRecord, { retryHold, retrySystem })) return { ...previousRecord, skipped: true };
   const record = previousRecord ?? { topicKey: candidate.topic_key, originalTopicKey: candidate.topic_key, state: "CANDIDATE", history: [] };
   const resumingSystemBlock = previousRecord?.state === "BLOCKED_SYSTEM" && retrySystem;
   const resumingContentHold = ["HOLD", "HOLD_CONTENT"].includes(previousRecord?.state) && retryHold;
+  const reconcilingProductionQa = previousRecord?.state === "PUBLISHED_PENDING_QA";
+  if (reconcilingProductionQa) {
+    delete record.skipped;
+    const workingCandidate = record.candidate ?? candidate;
+    const classification = record.classification ?? reclassifyAfterRedefinition(workingCandidate, classifyTopicRisk);
+    const visual = record.visual ?? decideVisual(workingCandidate);
+    return reconcileProductionQa({ record, workingCandidate, classification, visual, stages });
+  }
   if (resumingSystemBlock || resumingContentHold) {
     delete record.skipped;
     const workingCandidate = record.candidate ?? candidate;
@@ -123,27 +170,8 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
     if (resumeIndex < 2 || resumeIndex > stateOrder.indexOf("PRODUCTION_QA")) throw new Error("INVALID_RESUME_STATE");
     let stageResult = resumingSystemBlock ? record.resumeContext ?? { gates: {}, holdSignals: {} } : preparedHold?.context ?? record.retryContext ?? { gates: {}, holdSignals: {} };
     if (resumeFrom === "PRODUCTION_QA") {
-      transition(record, "PRODUCTION_QA", { resumed: true, retryType: "SYSTEM", publish: "SKIPPED_ALREADY_PUBLISHED" });
-      try {
-        if (typeof stages.PREPARE_PRODUCTION_QA_RESUME !== "function") throw new Error("PRODUCTION_QA_RESUME_VERIFIER_UNAVAILABLE");
-        stageResult = await stages.PREPARE_PRODUCTION_QA_RESUME(workingCandidate, { ...stageResult, classification, visual, record });
-      } catch (error) {
-        if (error && typeof error === "object") {
-          error.pipelineStage = "PRODUCTION_QA";
-          error.pipelineRecord = record;
-          error.resumeContext = resumableContext(stageResult);
-        }
-        throw error;
-      }
-      const productionQa = await executeStage(stages, "PRODUCTION_QA", workingCandidate, { ...stageResult, classification, visual, record }, record);
-      if (productionQa.status !== "PASS") {
-        transition(record, "HOLD_CONTENT", { reason: "PRODUCTION_INTEGRITY_UNCERTAINTY" });
-        return record;
-      }
-      record.productionQa = productionQa;
-      clearResumeCheckpoint(record);
-      transition(record, "PUBLISHED", { resumedFrom: "PRODUCTION_QA", publish: "SKIPPED_ALREADY_PUBLISHED" });
-      return record;
+      record.qaContext = stageResult;
+      return reconcileProductionQa({ record, workingCandidate, classification, visual, stages });
     }
     if (resumeFrom === "PUBLISH") {
       clearResumeCheckpoint(record);
@@ -236,29 +264,30 @@ async function finalizeCandidate({ record, workingCandidate, classification, vis
     transition(record, "HOLD_CONTENT", { reason: publish.reason ?? "PUBLISH_FAILED" });
     return record;
   }
+  record.publish = publish;
+  transition(record, "PUBLISHED_PENDING_QA");
   transition(record, "PRODUCTION_QA");
-  const productionQa = await executeStage(stages, "PRODUCTION_QA", workingCandidate, { ...stageResult, publish, classification, visual, record }, record);
-  if (productionQa.status !== "PASS") {
-    transition(record, "HOLD_CONTENT", { reason: "PRODUCTION_INTEGRITY_UNCERTAINTY" });
-    return record;
-  }
-  record.productionQa = productionQa;
-  transition(record, "PUBLISHED");
-  return record;
+  const qaContext = { ...stageResult, publish, classification, visual, record };
+  const productionQa = await executeStage(stages, "PRODUCTION_QA", workingCandidate, qaContext, record);
+  return finalizeProductionQa(record, productionQa, qaContext);
 }
 
-async function runAutonomousBatch({ batchId = null, target, maxCandidates, candidates, publishedContents = [], previousRecords = {}, retryHold = false, retrySystem = false, dryRun = false, classifyTopicRisk, stages = {}, onRecord = null }) {
+async function runAutonomousBatch({ batchId = null, target, maxCandidates, candidates, publishedContents = [], previousRecords = {}, retryHold = false, retrySystem = false, dryRun = false, classifyTopicRisk, stages = {}, onRecord = null, maxPendingQa = 2 }) {
   if (!Number.isInteger(target) || target < 1 || !Number.isInteger(maxCandidates) || maxCandidates < target) throw new Error("INVALID_BATCH_LIMIT");
   const recordsByKey = new Map(Object.values(previousRecords).map((record) => [record.originalTopicKey, record]));
-  const publishedAtStart = dryRun ? 0 : [...recordsByKey.values()].filter((record) => record.state === "PUBLISHED").length;
+  const publishedAtStart = dryRun ? 0 : [...recordsByKey.values()].filter((record) => verifiedStates.has(record.state)).length;
   let published = publishedAtStart;
+  let pendingQa = dryRun ? 0 : [...recordsByKey.values()].filter((record) => record.state === "PUBLISHED_PENDING_QA").length;
   let readyCandidates = 0;
   let considered = 0;
   let systemBlocked = false;
   for (const candidate of candidates) {
     if ((dryRun ? readyCandidates : published) >= target || considered >= maxCandidates) break;
+    const previousRecord = previousRecords[candidate.topic_key];
+    if (!dryRun && !previousRecord && pendingQa >= maxPendingQa) break;
     considered += 1;
-    const wasPublished = previousRecords[candidate.topic_key]?.state === "PUBLISHED";
+    const wasPublished = verifiedStates.has(previousRecord?.state);
+    const wasPending = previousRecord?.state === "PUBLISHED_PENDING_QA";
     let record;
     try {
       record = await processCandidate({ candidate, publishedContents, previousRecord: previousRecords[candidate.topic_key], retryHold, retrySystem, dryRun, classifyTopicRisk, stages });
@@ -274,7 +303,9 @@ async function runAutonomousBatch({ batchId = null, target, maxCandidates, candi
       record = checkpointSystemBlock(record, record.candidate ?? candidate, `STAGE_ERROR:${error instanceof Error ? error.message : String(error)}`, failedStage);
     }
     recordsByKey.set(record.originalTopicKey, record);
-    if (record.state === "PUBLISHED" && !wasPublished) published += 1;
+    if (verifiedStates.has(record.state) && !wasPublished) published += 1;
+    if (record.state === "PUBLISHED_PENDING_QA" && !wasPending) pendingQa += 1;
+    if (wasPending && record.state !== "PUBLISHED_PENDING_QA") pendingQa -= 1;
     if (record.state === "DRY_RUN_READY") readyCandidates += 1;
     if (!dryRun && onRecord) await onRecord(candidate, record, { batchId, target, publishedCount: published, considered });
     if (record.state === "BLOCKED_SYSTEM") {
@@ -283,6 +314,7 @@ async function runAutonomousBatch({ batchId = null, target, maxCandidates, candi
     }
   }
   const records = [...recordsByKey.values()];
+  const actualPublished = records.filter((record) => verifiedStates.has(record.state) || ["PUBLISHED_PENDING_QA", "PRODUCTION_QA_FAILED"].includes(record.state)).length;
   return {
     status: dryRun ? "DRY_RUN" : systemBlocked ? "BLOCKED_SYSTEM" : published >= target ? "SUCCESS" : "PARTIAL",
     batchId,
@@ -291,6 +323,9 @@ async function runAutonomousBatch({ batchId = null, target, maxCandidates, candi
     considered,
     publishedAtStart,
     published,
+    verified: published,
+    pendingQa,
+    actualPublished,
     readyCandidates,
     mutation: dryRun ? "NONE" : "PRODUCTION",
     records

@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import { classifyTopicRisk } from "./automation-policy.mjs";
 import { runAutonomousBatch } from "./autonomous-batch-engine.mjs";
 import { decideVisual, deriveModelCandidates, evaluateAutoClearance, evaluateDuplicate, redefineCandidate, reclassifyAfterRedefinition, shouldSkipCandidate } from "./autonomous-policy.mjs";
-import { inspectDetailHtml } from "./production-content-qa.mjs";
-import { normalizeLegacyRetryHoldPublishRecord, verifyPublishedContentForProductionQaResume } from "./autonomous-batch.mjs";
+import { inspectDetailHtml, runChecks } from "./production-content-qa.mjs";
+import { normalizeLegacyRetryHoldPublishRecord, normalizeProductionQaRecord, verifyPublishedContentForProductionQaResume } from "./autonomous-batch.mjs";
 
 const topic15 = { content_topic_id: 15, topic_key: "brake-pad-pre-replacement-check", topic: "브레이크 패드 교체 전 확인할 것", content_type: "MAINTENANCE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "REPLACE", normalized_scope: "GENERIC", risk_level: "MEDIUM", automation_level: "L1" };
 const topic14 = { content_key: "motorcycle-brake-check", title: "오토바이 브레이크 패드 마모 확인 방법", summary: "브레이크 패드 마찰재의 마모 상태를 관찰하고 교체 필요 여부를 판단합니다.", part_types: ["BRAKE"], body_blocks: [{ type: "paragraph", text: "브레이크 패드 위치와 마찰재 잔량, 편마모, 이상 징후를 확인하고 제조사 기준으로 교체 필요 여부를 판단합니다." }] };
@@ -51,7 +51,7 @@ test("HOLD Candidate 뒤에도 Batch가 계속된다", async () => {
   stages.RESEARCH = async () => ++calls === 1 ? { gates: passGates(), holdSignals: { SOURCE_CONFLICT: true } } : { gates: passGates(), holdSignals: {} };
   const result = await runAutonomousBatch({ target: 1, maxCandidates: 2, candidates, classifyTopicRisk, stages });
   assert.equal(result.records[0].state, "HOLD_CONTENT");
-  assert.equal(result.records[1].state, "PUBLISHED");
+  assert.equal(result.records[1].state, "PUBLISHED_VERIFIED");
 });
 test("PUBLISHED와 DROP과 HOLD는 Resume 시 재처리하지 않는다", () => {
   assert.equal(shouldSkipCandidate({ state: "PUBLISHED" }), true);
@@ -86,7 +86,7 @@ test("BLOCKED_SYSTEM은 명시적 retry에서만 저장된 Asset 단계부터 �
   assert.equal(shouldSkipCandidate(previousRecord, { retrySystem: true }), false);
   const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { resume: previousRecord }, retrySystem: true, classifyTopicRisk, stages });
   assert.deepEqual(calls, ["ASSET", "CONTENT_QA", "IMAGE_QA"]);
-  assert.equal(result.records[0].state, "PUBLISHED");
+  assert.equal(result.records[0].state, "PUBLISHED_VERIFIED");
 });
 test("BLOCKED_SYSTEM 발생 즉시 Batch를 중단하고 다음 Candidate를 평가하지 않는다", async () => {
   const candidates = [
@@ -184,7 +184,7 @@ test("retry-hold는 저장된 Content QA 단계부터 재개하고 이전 단계
   for (const state of ["RESEARCH", "FACT_QA", "CONTENT_GENERATION", "VISUAL_PLANNING", "ASSET_GENERATION_OR_SELECTION", "CONTENT_QA", "IMAGE_QA"]) stages[state] = async (current, context) => { calls.push(state); return { ...context, gates: passGates(), holdSignals: {} }; };
   const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, retryHold: true, classifyTopicRisk, stages });
   assert.deepEqual(calls, ["CONTENT_QA", "IMAGE_QA"]);
-  assert.equal(result.records[0].state, "PUBLISHED");
+  assert.equal(result.records[0].state, "PUBLISHED_VERIFIED");
 });
 test("retry-hold Fact 재평가 후 Evidence가 부족하면 HOLD_CONTENT를 유지한다", async () => {
   const candidate = { ...topic15, topic_key: "hold-still-missing", topic: "고유한 브레이크 확인" };
@@ -271,7 +271,7 @@ test("retry-hold PUBLISH 재개는 이전 QA 단계를 실행하지 않고 게�
   stages.PRODUCTION_QA = async () => { calls.push("PRODUCTION_QA"); return { status: "PASS" }; };
   const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, retryHold: true, classifyTopicRisk, stages });
   assert.deepEqual(calls, ["PUBLISH", "PRODUCTION_QA"]);
-  assert.equal(result.records[0].state, "PUBLISHED");
+  assert.equal(result.records[0].state, "PUBLISHED_VERIFIED");
 });
 
 function productionQaCheckpoint(candidate, context = { gates: passGates(), holdSignals: {}, publish: { status: "PUBLISHED" } }) {
@@ -308,7 +308,7 @@ test("PRODUCTION_QA Resume은 Publish를 건너뛰고 존재 확인과 QA만 실
   const previous = productionQaCheckpoint(candidate);
   const result = await runAutonomousBatch({ batchId: "canary-3-6898291", target: 3, maxCandidates: 3, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, retrySystem: true, classifyTopicRisk, stages });
   assert.deepEqual(calls, ["EXISTENCE_CHECK", "PRODUCTION_QA"]);
-  assert.equal(result.records[0].state, "PUBLISHED");
+  assert.equal(result.records[0].state, "PUBLISHED_VERIFIED");
   assert.equal(result.records[0].checkpoint, undefined);
   assert.equal(result.published, 1);
   assert.equal(result.status, "PARTIAL");
@@ -363,4 +363,93 @@ test("Production 존재 검증은 receipt의 Content ID와 Registry Published �
   const verified = await verifyPublishedContentForProductionQaResume(candidate, context, async () => [validRow]);
   assert.equal(verified.productionExistence.status, "PASS");
   await assert.rejects(() => verifyPublishedContentForProductionQaResume(candidate, context, async () => [{ ...validRow, registry_status: "APPROVED" }]), /PUBLISHED_CONTENT_MISSING/);
+});
+
+test("Publish PASS와 immediate Production QA PASS는 PUBLISHED_VERIFIED가 된다", async () => {
+  const candidate = { ...topic15, topic_key: "immediate-verified", topic: "immediate verified" };
+  const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], classifyTopicRisk, stages: passingStages() });
+  assert.equal(result.records[0].state, "PUBLISHED_VERIFIED");
+  assert.equal(result.verified, 1);
+  assert.equal(result.pendingQa, 0);
+});
+
+test("Cache pending은 PUBLISHED_PENDING_QA로 남고 다음 Candidate를 계속 처리한다", async () => {
+  const pending = { ...topic15, topic_key: "cache-pending", topic: "cache pending" };
+  const next = { ...topic15, topic_key: "pending-next", topic: "pending next", normalized_subject: "NEXT" };
+  const stages = passingStages();
+  stages.PRODUCTION_QA = async (candidate) => candidate.topic_key === pending.topic_key ? { status: "PRODUCTION_QA_PENDING", checks: { sitemapExposure: false } } : { status: "PASS" };
+  const result = await runAutonomousBatch({ target: 2, maxCandidates: 2, candidates: [pending, next], classifyTopicRisk, stages });
+  assert.equal(result.records.find((record) => record.originalTopicKey === pending.topic_key).state, "PUBLISHED_PENDING_QA");
+  assert.equal(result.records.find((record) => record.originalTopicKey === next.topic_key).state, "PUBLISHED_VERIFIED");
+  assert.equal(result.pendingQa, 1);
+  assert.equal(result.verified, 1);
+});
+
+test("Pending QA가 나중에 PASS하면 Publish 없이 Verified Counter를 한 번 증가시킨다", async () => {
+  const candidate = { ...topic15, topic_key: "pending-later-pass", topic: "pending later pass" };
+  const previous = { topicKey: candidate.topic_key, originalTopicKey: candidate.topic_key, state: "PUBLISHED_PENDING_QA", history: [{ state: "PUBLISHED_PENDING_QA" }], candidate, classification: classifyTopicRisk(candidate), visual: { type: "EDUCATIONAL" }, qaContext: { publish: { status: "PUBLISHED" }, gates: passGates(), holdSignals: {} } };
+  let publishCalls = 0;
+  const stages = passingStages();
+  stages.PUBLISH = async () => { publishCalls += 1; return { status: "PUBLISHED" }; };
+  const first = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, classifyTopicRisk, stages });
+  const second = await runAutonomousBatch({ target: 2, maxCandidates: 2, candidates: [candidate], previousRecords: { [candidate.topic_key]: first.records[0] }, classifyTopicRisk, stages });
+  assert.equal(first.records[0].state, "PUBLISHED_VERIFIED");
+  assert.equal(first.verified, 1);
+  assert.equal(second.verified, 1);
+  assert.equal(publishCalls, 0);
+});
+
+function qaFetcher({ directoryVisible = true, sitemapVisible = true } = {}) {
+  return async (url, options = {}) => {
+    if (options.method === "HEAD") return { response: new Response(null, { status: 200, headers: { "content-type": "image/webp" } }), text: "" };
+    if (url.endsWith("/contents")) return { response: new Response(), text: directoryVisible ? '<a href="/contents/example">example</a>' : "empty" };
+    if (url.endsWith("/sitemap.xml")) return { response: new Response(), text: sitemapVisible ? "https://fitbike.co.kr/contents/example" : "empty" };
+    if (url.endsWith("/robots.txt")) return { response: new Response(), text: "User-agent: *\nAllow: /" };
+    return { response: new Response(), text: '<meta name="viewport"><link rel="canonical" href="https://fitbike.co.kr/contents/example"><script type="application/ld+json">{"@type":"Article"}</script>' + "content".repeat(200) };
+  };
+}
+
+test("Sitemap cache 미반영은 BLOCKED_SYSTEM이 아닌 PRODUCTION_QA_PENDING이다", async () => {
+  const result = await runChecks({ origin: "https://fitbike.co.kr", contentKey: "example", assetUrls: ["asset"], fetcher: qaFetcher({ sitemapVisible: false }) });
+  assert.equal(result.status, "PRODUCTION_QA_PENDING");
+});
+
+test("Contents ISR 미반영은 BLOCKED_SYSTEM이 아닌 PRODUCTION_QA_PENDING이다", async () => {
+  const result = await runChecks({ origin: "https://fitbike.co.kr", contentKey: "example", assetUrls: ["asset"], fetcher: qaFetcher({ directoryVisible: false }) });
+  assert.equal(result.status, "PRODUCTION_QA_PENDING");
+});
+
+test("Production QA Runtime 예외만 BLOCKED_SYSTEM으로 중단한다", async () => {
+  const candidate = { ...topic15, topic_key: "qa-runtime-failure", topic: "qa runtime failure" };
+  const stages = passingStages();
+  stages.PRODUCTION_QA = async () => { throw new Error("PRODUCTION_HTTP_RUNTIME_DOWN"); };
+  const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], classifyTopicRisk, stages });
+  assert.equal(result.status, "BLOCKED_SYSTEM");
+  assert.equal(result.records[0].checkpoint.failedStage, "PRODUCTION_QA");
+});
+
+test("실제 Content 무결성 실패는 PRODUCTION_QA_FAILED이고 Batch System Block이 아니다", async () => {
+  const candidate = { ...topic15, topic_key: "qa-final-failure", topic: "qa final failure" };
+  const stages = passingStages();
+  stages.PRODUCTION_QA = async () => ({ status: "PRODUCTION_QA_FAILED", checks: { detailHttp200: false } });
+  const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], classifyTopicRisk, stages });
+  assert.equal(result.status, "PARTIAL");
+  assert.equal(result.records[0].state, "PRODUCTION_QA_FAILED");
+});
+
+test("Pending Limit에 도달하기 전에는 Pending Candidate가 있어도 다음 Candidate를 게시할 수 있다", async () => {
+  const candidates = ["one", "two", "three"].map((key) => ({ ...topic15, topic_key: `pending-${key}`, topic: `pending ${key}`, normalized_subject: key }));
+  const stages = passingStages();
+  stages.PRODUCTION_QA = async () => ({ status: "PRODUCTION_QA_PENDING", checks: { directoryExposure: false } });
+  const result = await runAutonomousBatch({ target: 3, maxCandidates: 3, candidates, classifyTopicRisk, stages, maxPendingQa: 2 });
+  assert.equal(result.considered, 2);
+  assert.equal(result.pendingQa, 2);
+  assert.equal(result.records.some((record) => record.originalTopicKey === "pending-three"), false);
+});
+
+test("현재 CBR650R PRODUCTION_QA Checkpoint는 재Publish 없이 Pending QA로 정규화한다", () => {
+  const record = normalizeProductionQaRecord({ topicKey: "cbr650r-tire-size-guide", originalTopicKey: "cbr650r-tire-size-guide", state: "BLOCKED_SYSTEM", history: [], resumeFrom: "PRODUCTION_QA", resumeContext: { publish: { status: "PUBLISHED", contentKey: "cbr650r-tire-specification", database: { contentId: 12 } } }, checkpoint: { failedStage: "PRODUCTION_QA" } });
+  assert.equal(record.state, "PUBLISHED_PENDING_QA");
+  assert.equal(record.qaContext.publish.database.contentId, 12);
+  assert.equal(record.checkpoint, undefined);
 });
