@@ -127,7 +127,7 @@ Content/topic/image execution remains runtime data and is not committed. Only Fa
 
 ### Image execution handoff and resume
 
-Production Image 단계는 `images/generate-images.mjs --mode prepare` 뒤 `images/asset-executor.mjs`를 실행한다. 승인 제품 이미지는 Production DB 관계를 read-only로 조회하여 MAXXIS 또는 POWEROAD 원본을 확인·선택하고, Educational 이미지는 `content-work/{contentKey}/image-execution-request.json`에 생성 Prompt와 출력 위치 및 QA sidecar 요구사항을 남긴다. Codex image generation이 지정된 `image-sources/{assetId}.{png|webp|jpg|jpeg}`와 `{assetId}.qa.json`을 준비한 후 다음 명령으로 Asset 단계부터 재개한다.
+Production Image 단계는 `images/generate-images.mjs --mode prepare` 뒤 `images/asset-executor.mjs`를 실행한다. 승인 제품 이미지는 Production DB 관계를 read-only로 조회하여 MAXXIS 또는 POWEROAD 원본을 확인·선택한다. Educational 이미지는 Canary, NEW_BATCH, RESUME_BATCH가 모두 동일한 Executor에서 Codex built-in image generation을 호출하고 실제 `image-sources/{assetId}.{png|webp|jpg|jpeg}`, QA sidecar, runtime receipt를 획득한 뒤에만 다음 단계로 진행한다. 출력과 유효한 QA가 이미 있으면 재생성하지 않으며, 비동기 Pending은 제한된 poll/acquire 범위에서 재확인하고 상한 이후에만 `BLOCKED_SYSTEM`으로 분류한다. Candidate 자체의 Visual QA 실패는 `HOLD_CONTENT`로 분리한다.
 
 ```bash
 node scripts/content-factory/autonomous-batch.mjs --target 3 --mode production --batch-id {same-batch-id} --retry-system true

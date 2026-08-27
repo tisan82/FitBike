@@ -62,7 +62,7 @@ Image QA는 Subject/Role 일치, Brand Asset First, Product/Model 일치, 기술
 
 승인 Brand Asset은 관계 기반 선택과 Object 획득 직후 공통 Image QA Runtime에서 Asset 무결성, Product Identity, 역할 적합성, 시각 품질, 기술적 오인 여부와 Brand Asset First 준수를 자동 검사한다. 결과는 Educational Visual과 동일한 `image-sources/{asset-id}.qa.json` Sidecar 계약으로 저장하며 별도 수동 승인 파일을 Source of Truth로 두지 않는다. Candidate/Asset 자체의 누락·관계 불일치·역할 부적합은 `HOLD_CONTENT`, Reader·Storage·QA Runtime 장애나 결과 저장 실패는 `BLOCKED_SYSTEM`으로 분리한다. Thumbnail과 Hero가 같은 원본을 사용해도 역할별 QA Artifact를 각각 생성한다.
 
-`HOLD_CONTENT`는 해당 Candidate만 보류하고 Batch를 계속하지만, `BLOCKED_SYSTEM`은 현재 Candidate의 실패 단계와 완료 단계를 저장한 즉시 Batch 전체를 종료하며 이후 Candidate 평가와 Production Mutation을 금지한다. 동일 Batch 재개 시 완료된 단계를 반복하지 않고 실패 단계부터 진행하며, 재개 전 Published 수를 Target 계산에 그대로 포함한다.
+`HOLD_CONTENT`는 해당 Candidate만 보류하고 Batch를 계속하지만, `BLOCKED_SYSTEM`은 현재 Candidate의 실패 단계와 완료 단계를 저장한 즉시 Batch 전체를 종료하며 이후 Candidate 평가와 Production Mutation을 금지한다. 동일 Batch 재개 시 완료된 단계를 반복하지 않고 실패 단계부터 진행하며, 재개 전 Published 수를 Target 계산에 그대로 포함한다. Educational Visual은 Canary, NEW_BATCH, RESUME_BATCH가 동일한 built-in Image Executor를 사용하여 Prompt, 실제 출력, QA sidecar와 runtime receipt를 한 흐름에서 획득한다. 유효한 출력이 존재하면 재생성하지 않고, 정상 비동기 Pending은 제한된 poll/acquire 후 계속하며 상한 이후의 Generation 또는 Output Acquisition 장애만 `BLOCKED_SYSTEM`으로 분류한다. 출력의 Candidate-specific Visual QA 실패는 `HOLD_CONTENT`다.
 
 `PARTIAL` Batch의 `HOLD_CONTENT`는 명시적 `--retry-hold true`에서만 재평가한다. Hold 사유가 Content QA이면 유효한 Research·Content·Visual·Asset·Image QA Artifact를 복원해 `CONTENT_QA`부터 재개하고, Critical Fact 미검증이면 개선된 Research/Evidence 단계부터 재개한다. 플래그가 없으면 Hold를 그대로 유지하며 `PUBLISHED`와 `DROP`은 항상 건너뛴다. 재평가 결과가 여전히 미검증이면 Candidate만 다시 `HOLD_CONTENT`가 되고 기존 Published Target Count는 보존된다.
 
