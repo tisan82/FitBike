@@ -133,6 +133,8 @@ Production Image 단계는 `images/generate-images.mjs --mode prepare` 뒤 `imag
 node scripts/content-factory/autonomous-batch.mjs --target 3 --mode production --batch-id {same-batch-id} --retry-system true
 ```
 
+Publish 완료 후 `PRODUCTION_QA`에서 중단된 System Checkpoint는 `--retry-system true`로 재개한다. 이 경로는 Production DB의 Content/Registry 연결과 로컬 Publish receipt를 먼저 대조하고, 이미 게시된 Content에는 Publish나 Asset Upload를 다시 실행하지 않은 채 Production QA만 재시도한다. QA PASS 후 Checkpoint와 Published Counter는 정확히 한 번 완료된다.
+
 `BLOCKED_SYSTEM`은 시스템 실행 대기 상태로 Topic Registry를 변경하지 않고, 체크포인트 저장 직후 Batch 전체를 중단하여 이후 Candidate 평가와 Mutation을 막는다. 동일 Batch ID와 `--retry-system true`로 실패한 Asset 단계부터 재개하며 이전 Published 수를 Target에 포함한다. `HOLD_CONTENT`는 `ASSET_DATA_ISSUE`, 제품/모델 불일치, Image QA 실패 등 Candidate 자체의 검토 상태이며 기존 `--retry-hold true` 정책에 따라 다음 Candidate 처리를 계속한다. Asset Selector API/Resolver 자체의 예외는 `BLOCKED_SYSTEM`이고, 특정 승인 Object 누락이나 경로·관계 문제는 Batch 전체 장애가 아니다.
 
 `PARTIAL` Checkpoint의 Hold Candidate는 `--retry-hold true`가 있을 때만 다시 평가한다. Content QA Hold는 검증된 기존 Runtime Artifact를 복원해 Content QA/Repair부터, Critical Fact Hold는 Research/Evidence부터 재개한다. 플래그가 없으면 Hold 상태를 유지하고 `PUBLISHED`/`DROP`은 재처리하지 않으며, 기존 Published Count는 Target 계산에 유지한다.

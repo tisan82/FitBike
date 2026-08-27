@@ -98,8 +98,24 @@ function normalizeLegacyRetryHoldPublishRecord(record) {
   };
 }
 
+async function verifyPublishedContentForProductionQaResume(candidate, context, query = managementQuery) {
+  const contentDirectory = context.contentDirectory ?? await findCandidateContentDirectory(candidate);
+  if (!contentDirectory) throw new Error("PRODUCTION_QA_RESUME_CONTENT_DIRECTORY_MISSING");
+  const publish = await readRuntimeJson(contentDirectory, "publish-result.json");
+  const contentKey = publish?.contentKey;
+  const contentId = publish?.database?.contentId;
+  if (publish?.status !== "PUBLISHED" || !contentKey || !Number.isInteger(contentId)) throw new Error("PRODUCTION_QA_RESUME_PUBLISH_RECEIPT_INVALID");
+  const rows = await query(`select c.content_id,c.content_key,c.is_active,c.published_at,t.status as registry_status,t.content_id as registry_content_id from public."12_content" c join public."16_content_topic" t on t.content_id=c.content_id where c.content_key=$1 and t.topic_key=$2`, [contentKey, candidate.topic_key]);
+  const published = rows.length === 1 && Number(rows[0].content_id) === contentId && Number(rows[0].registry_content_id) === contentId && rows[0].is_active === true && rows[0].published_at && rows[0].registry_status === "PUBLISHED";
+  if (!published) throw new Error("PRODUCTION_QA_RESUME_PUBLISHED_CONTENT_MISSING");
+  return { ...context, contentDirectory, publish, productionExistence: { status: "PASS", contentKey, contentId, registryStatus: rows[0].registry_status, productionUrl: `https://fitbike.co.kr/contents/${contentKey}` } };
+}
+
 function createProductionStages() {
   return {
+    async PREPARE_PRODUCTION_QA_RESUME(candidate, context) {
+      return verifyPublishedContentForProductionQaResume(candidate, context);
+    },
     async PREPARE_HOLD_RETRY(candidate, record) {
       const reason = record.history.at(-1)?.reason;
       const publishRetry = record.retryFrom === "PUBLISH" || reason === "RETRY_HOLD_REGISTRY_RESTORE_REQUIRED";
@@ -281,4 +297,4 @@ if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main
   process.exitCode = 1;
 });
 
-export { createProductionStages, isLegacyRetryHoldPublishFailure, normalizeLegacyRetryHoldPublishRecord };
+export { createProductionStages, isLegacyRetryHoldPublishFailure, normalizeLegacyRetryHoldPublishRecord, verifyPublishedContentForProductionQaResume };

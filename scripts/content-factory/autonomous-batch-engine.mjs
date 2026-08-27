@@ -52,6 +52,15 @@ function resumableContext(stageResult) {
   return context;
 }
 
+function clearResumeCheckpoint(record) {
+  delete record.resumeContext;
+  delete record.resumeFrom;
+  delete record.retryContext;
+  delete record.retryFrom;
+  delete record.holdCheckpoint;
+  delete record.checkpoint;
+}
+
 function checkpointSystemBlock(record, candidate, reason, failedStage) {
   record.resumeFrom = failedStage;
   record.checkpoint = {
@@ -111,14 +120,33 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
     const preparedHold = resumingContentHold && stages.PREPARE_HOLD_RETRY ? await stages.PREPARE_HOLD_RETRY(workingCandidate, record) : null;
     const resumeFrom = resumingSystemBlock ? record.resumeFrom : preparedHold?.resumeFrom ?? record.retryFrom ?? "RESEARCH";
     const resumeIndex = stateOrder.indexOf(resumeFrom);
-    if (resumeIndex < 2 || resumeIndex > stateOrder.indexOf("PUBLISH")) throw new Error("INVALID_RESUME_STATE");
+    if (resumeIndex < 2 || resumeIndex > stateOrder.indexOf("PRODUCTION_QA")) throw new Error("INVALID_RESUME_STATE");
     let stageResult = resumingSystemBlock ? record.resumeContext ?? { gates: {}, holdSignals: {} } : preparedHold?.context ?? record.retryContext ?? { gates: {}, holdSignals: {} };
+    if (resumeFrom === "PRODUCTION_QA") {
+      transition(record, "PRODUCTION_QA", { resumed: true, retryType: "SYSTEM", publish: "SKIPPED_ALREADY_PUBLISHED" });
+      try {
+        if (typeof stages.PREPARE_PRODUCTION_QA_RESUME !== "function") throw new Error("PRODUCTION_QA_RESUME_VERIFIER_UNAVAILABLE");
+        stageResult = await stages.PREPARE_PRODUCTION_QA_RESUME(workingCandidate, { ...stageResult, classification, visual, record });
+      } catch (error) {
+        if (error && typeof error === "object") {
+          error.pipelineStage = "PRODUCTION_QA";
+          error.pipelineRecord = record;
+          error.resumeContext = resumableContext(stageResult);
+        }
+        throw error;
+      }
+      const productionQa = await executeStage(stages, "PRODUCTION_QA", workingCandidate, { ...stageResult, classification, visual, record }, record);
+      if (productionQa.status !== "PASS") {
+        transition(record, "HOLD_CONTENT", { reason: "PRODUCTION_INTEGRITY_UNCERTAINTY" });
+        return record;
+      }
+      record.productionQa = productionQa;
+      clearResumeCheckpoint(record);
+      transition(record, "PUBLISHED", { resumedFrom: "PRODUCTION_QA", publish: "SKIPPED_ALREADY_PUBLISHED" });
+      return record;
+    }
     if (resumeFrom === "PUBLISH") {
-      delete record.resumeContext;
-      delete record.resumeFrom;
-      delete record.retryContext;
-      delete record.retryFrom;
-      delete record.holdCheckpoint;
+      clearResumeCheckpoint(record);
       return finalizeCandidate({ record, workingCandidate, classification, visual, stageResult, stages, publishResume: true });
     }
     for (const state of stateOrder.slice(resumeIndex, stateOrder.indexOf("RISK_GATE"))) {
@@ -137,11 +165,7 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
         return record;
       }
     }
-    delete record.resumeContext;
-    delete record.resumeFrom;
-    delete record.retryContext;
-    delete record.retryFrom;
-    delete record.holdCheckpoint;
+    clearResumeCheckpoint(record);
     return finalizeCandidate({ record, workingCandidate, classification, visual, stageResult, stages });
   }
   transition(record, "DUPLICATE_CHECK");

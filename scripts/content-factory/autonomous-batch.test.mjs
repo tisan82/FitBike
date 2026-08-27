@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { classifyTopicRisk } from "./automation-policy.mjs";
 import { runAutonomousBatch } from "./autonomous-batch-engine.mjs";
 import { decideVisual, deriveModelCandidates, evaluateAutoClearance, evaluateDuplicate, redefineCandidate, reclassifyAfterRedefinition, shouldSkipCandidate } from "./autonomous-policy.mjs";
 import { inspectDetailHtml } from "./production-content-qa.mjs";
-import { normalizeLegacyRetryHoldPublishRecord } from "./autonomous-batch.mjs";
+import { normalizeLegacyRetryHoldPublishRecord, verifyPublishedContentForProductionQaResume } from "./autonomous-batch.mjs";
 
 const topic15 = { content_topic_id: 15, topic_key: "brake-pad-pre-replacement-check", topic: "브레이크 패드 교체 전 확인할 것", content_type: "MAINTENANCE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "REPLACE", normalized_scope: "GENERIC", risk_level: "MEDIUM", automation_level: "L1" };
 const topic14 = { content_key: "motorcycle-brake-check", title: "오토바이 브레이크 패드 마모 확인 방법", summary: "브레이크 패드 마찰재의 마모 상태를 관찰하고 교체 필요 여부를 판단합니다.", part_types: ["BRAKE"], body_blocks: [{ type: "paragraph", text: "브레이크 패드 위치와 마찰재 잔량, 편마모, 이상 징후를 확인하고 제조사 기준으로 교체 필요 여부를 판단합니다." }] };
@@ -19,6 +21,7 @@ function passingStages(holdAt = null) {
   const stages = {};
   for (const state of ["RESEARCH", "FACT_QA", "CONTENT_GENERATION", "VISUAL_PLANNING", "ASSET_GENERATION_OR_SELECTION", "CONTENT_QA", "IMAGE_QA"]) stages[state] = async () => state === holdAt ? { ...result, holdSignals: { SOURCE_CONFLICT: true } } : result;
   stages.PUBLISH = async () => ({ status: "PUBLISHED" });
+  stages.PREPARE_PRODUCTION_QA_RESUME = async (candidate, context) => ({ ...context, publish: { status: "PUBLISHED" }, productionExistence: { status: "PASS" } });
   stages.PRODUCTION_QA = async () => ({ status: "PASS" });
   return stages;
 }
@@ -269,4 +272,95 @@ test("retry-hold PUBLISH 재개는 이전 QA 단계를 실행하지 않고 게�
   const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, retryHold: true, classifyTopicRisk, stages });
   assert.deepEqual(calls, ["PUBLISH", "PRODUCTION_QA"]);
   assert.equal(result.records[0].state, "PUBLISHED");
+});
+
+function productionQaCheckpoint(candidate, context = { gates: passGates(), holdSignals: {}, publish: { status: "PUBLISHED" } }) {
+  return {
+    topicKey: candidate.topic_key,
+    originalTopicKey: candidate.topic_key,
+    state: "BLOCKED_SYSTEM",
+    history: [{ state: "PUBLISH" }, { state: "PRODUCTION_QA" }, { state: "BLOCKED_SYSTEM", reason: "STAGE_ERROR:PRODUCTION_QA_RETRY_TIMEOUT", resumeFrom: "PRODUCTION_QA" }],
+    candidate,
+    classification: classifyTopicRisk(candidate),
+    visual: { type: "EDUCATIONAL" },
+    resumeFrom: "PRODUCTION_QA",
+    resumeContext: context,
+    checkpoint: { failedStage: "PRODUCTION_QA", blockerType: "BLOCKED_SYSTEM", retryEligible: true, resumeEligible: true }
+  };
+}
+
+test("Publish 성공 뒤 Production QA 예외는 PRODUCTION_QA 단계로 Checkpoint한다", async () => {
+  const candidate = { ...topic15, topic_key: "production-qa-stage" };
+  const stages = passingStages();
+  stages.PRODUCTION_QA = async () => { throw new Error("PRODUCTION_QA_RETRY_TIMEOUT"); };
+  const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], classifyTopicRisk, stages });
+  assert.equal(result.records[0].checkpoint.failedStage, "PRODUCTION_QA");
+  assert.equal(result.records[0].resumeFrom, "PRODUCTION_QA");
+});
+
+test("PRODUCTION_QA Resume은 Publish를 건너뛰고 존재 확인과 QA만 실행한다", async () => {
+  const candidate = { ...topic15, topic_key: "production-qa-resume" };
+  const calls = [];
+  const stages = passingStages();
+  stages.PUBLISH = async () => { calls.push("PUBLISH"); throw new Error("MUST_NOT_RUN"); };
+  stages.PREPARE_PRODUCTION_QA_RESUME = async (current, context) => { calls.push("EXISTENCE_CHECK"); return { ...context, publish: { status: "PUBLISHED" } }; };
+  stages.PRODUCTION_QA = async () => { calls.push("PRODUCTION_QA"); return { status: "PASS" }; };
+  const previous = productionQaCheckpoint(candidate);
+  const result = await runAutonomousBatch({ batchId: "canary-3-6898291", target: 3, maxCandidates: 3, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, retrySystem: true, classifyTopicRisk, stages });
+  assert.deepEqual(calls, ["EXISTENCE_CHECK", "PRODUCTION_QA"]);
+  assert.equal(result.records[0].state, "PUBLISHED");
+  assert.equal(result.records[0].checkpoint, undefined);
+  assert.equal(result.published, 1);
+  assert.equal(result.status, "PARTIAL");
+});
+
+test("Production Content가 없으면 Publish 없이 PRODUCTION_QA BLOCKED_SYSTEM을 유지한다", async () => {
+  const candidate = { ...topic15, topic_key: "production-missing" };
+  let publishCalls = 0;
+  const stages = passingStages();
+  stages.PUBLISH = async () => { publishCalls += 1; return { status: "PUBLISHED" }; };
+  stages.PREPARE_PRODUCTION_QA_RESUME = async () => { throw new Error("PRODUCTION_QA_RESUME_PUBLISHED_CONTENT_MISSING"); };
+  const previous = productionQaCheckpoint(candidate);
+  const result = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, retrySystem: true, classifyTopicRisk, stages });
+  assert.equal(result.status, "BLOCKED_SYSTEM");
+  assert.equal(result.records[0].checkpoint.failedStage, "PRODUCTION_QA");
+  assert.match(result.records[0].checkpoint.blockerReason, /PUBLISHED_CONTENT_MISSING/);
+  assert.equal(publishCalls, 0);
+});
+
+test("완료된 PRODUCTION_QA Resume 반복 실행은 게시와 Counter를 중복시키지 않는다", async () => {
+  const candidate = { ...topic15, topic_key: "production-qa-idempotent" };
+  let mutationCalls = 0;
+  const stages = passingStages();
+  stages.PUBLISH = async () => { mutationCalls += 1; return { status: "PUBLISHED" }; };
+  const first = await runAutonomousBatch({ target: 1, maxCandidates: 1, candidates: [candidate], previousRecords: { [candidate.topic_key]: productionQaCheckpoint(candidate) }, retrySystem: true, classifyTopicRisk, stages });
+  const publishedRecord = first.records[0];
+  const second = await runAutonomousBatch({ target: 2, maxCandidates: 2, candidates: [candidate], previousRecords: { [candidate.topic_key]: publishedRecord }, retrySystem: true, classifyTopicRisk, stages });
+  assert.equal(first.published, 1);
+  assert.equal(second.publishedAtStart, 1);
+  assert.equal(second.published, 1);
+  assert.equal(second.records[0].skipped, true);
+  assert.equal(mutationCalls, 0);
+});
+
+test("PRODUCTION_QA Resume 완료 뒤 남은 Target의 다음 Candidate를 계속 처리한다", async () => {
+  const resumed = { ...topic15, topic_key: "brake-specification-check" };
+  const next = { ...topic15, topic_key: "next-candidate", topic: "next unique topic", normalized_subject: "NEXT_UNIQUE" };
+  const calls = [];
+  const stages = passingStages();
+  stages.PREPARE_PRODUCTION_QA_RESUME = async (candidate, context) => { calls.push(`VERIFY:${candidate.topic_key}`); return { ...context, publish: { status: "PUBLISHED" } }; };
+  stages.RESEARCH = async (candidate) => { calls.push(`RESEARCH:${candidate.topic_key}`); return { gates: passGates(), holdSignals: {} }; };
+  const result = await runAutonomousBatch({ batchId: "canary-3-6898291", target: 2, maxCandidates: 2, candidates: [resumed, next], previousRecords: { [resumed.topic_key]: productionQaCheckpoint(resumed) }, retrySystem: true, classifyTopicRisk, stages });
+  assert.equal(result.published, 2);
+  assert.equal(result.status, "SUCCESS");
+  assert.deepEqual(calls, ["VERIFY:brake-specification-check", "RESEARCH:next-candidate"]);
+});
+
+test("Production 존재 검증은 receipt의 Content ID와 Registry Published 연결을 모두 요구한다", async () => {
+  const candidate = { ...topic15, topic_key: "brake-specification-check" };
+  const context = { contentDirectory: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../content-work/brake-specification-check") };
+  const validRow = { content_id: 11, content_key: "brake-specification-check", is_active: true, published_at: "2026-08-27T00:00:00Z", registry_status: "PUBLISHED", registry_content_id: 11 };
+  const verified = await verifyPublishedContentForProductionQaResume(candidate, context, async () => [validRow]);
+  assert.equal(verified.productionExistence.status, "PASS");
+  await assert.rejects(() => verifyPublishedContentForProductionQaResume(candidate, context, async () => [{ ...validRow, registry_status: "APPROVED" }]), /PUBLISHED_CONTENT_MISSING/);
 });
