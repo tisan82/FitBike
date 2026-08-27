@@ -98,7 +98,10 @@ function redefineCandidate(candidate) {
 
 function decideVisual(candidate) {
   const text = `${candidate.topic ?? ""} ${candidate.normalized_subject ?? ""} ${candidate.normalized_action ?? ""}`;
-  const productRelated = /구매|호환|제품|모델|규격|SELECT|COMPATIBILITY|SIZE/i.test(text);
+  const productRelated = /구매|호환|제품|규격|SELECT|COMPATIBILITY|SIZE/i.test(text);
+  if (candidate.content_type === "MODEL_GUIDE") {
+    return { type: "MODEL_REPRESENTATION", brand: null, brandAssetRequired: false, subject: "BIKE_MODEL" };
+  }
   if (candidate.part_type === "BRAKE") return { type: "EDUCATIONAL", brand: null, brandAssetRequired: false };
   if (candidate.part_type === "TIRE" && productRelated) return { type: "PRODUCT_REPRESENTATION", brand: "MAXXIS", brandAssetRequired: true };
   if (candidate.part_type === "BATTERY" && productRelated) return { type: "PRODUCT_REPRESENTATION", brand: "POWEROAD", brandAssetRequired: true };
@@ -111,38 +114,10 @@ function reclassifyAfterRedefinition(candidate, classifyTopicRisk) {
   return { ...classification, reEvaluated: Boolean(candidate.redefined_from), source: "REDEFINED_SUBJECT_INTENT_ACTION_SAFETY" };
 }
 
-function deriveModelCandidates(models, existingTopicKeys = new Set()) {
-  const candidates = [];
-  const definitions = [
-    { available: "has_tire_data", part: "TIRE", suffix: "tire-size-guide", label: "타이어 규격 가이드", subject: "TIRE_SIZE" },
-    { available: "has_battery_data", part: "BATTERY", suffix: "battery-guide", label: "배터리 가이드", subject: "BATTERY" },
-    { available: "has_brake_data", part: "BRAKE", suffix: "brake-pad-guide", label: "브레이크 패드 가이드", subject: "BRAKE" }
-  ];
-  for (const model of models) {
-    const baseKey = model.model_key.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const modelName = model.model_name_ko || model.model_name_en;
-    for (const definition of definitions) {
-      const topicKey = `${baseKey}-${definition.suffix}`;
-      if (!model[definition.available] || existingTopicKeys.has(topicKey)) continue;
-      candidates.push({
-        topic_key: topicKey,
-        topic: `${modelName} ${definition.label}`,
-        content_type: "MODEL_GUIDE",
-        part_type: definition.part,
-        bike_model_id: model.bike_model_id,
-        bike_model_key: model.model_key,
-        normalized_subject: definition.subject,
-        normalized_action: "UNDERSTAND",
-        normalized_scope: "MODEL",
-        status: "CANDIDATE",
-        priority: 3,
-        risk_level: "MEDIUM",
-        automation_level: "L1",
-        generated_candidate: true
-      });
-    }
-  }
-  return candidates;
+function deriveModelCandidates() {
+  // Model-specific part guides are intentionally not generated from FitBike fitment data.
+  // Model content must begin with a user-interest topic and independently verified official sources.
+  return [];
 }
 
 function evaluateAutoClearance({ riskLevel, gates = {} }) {
