@@ -11,6 +11,7 @@ import { deriveModelCandidates } from "./autonomous-policy.mjs";
 import { evaluateCapabilities } from "./production-capabilities.mjs";
 import { repairContentDirectory } from "./content-repair.mjs";
 import { synchronizePublishArtifacts } from "./artifact-synchronization.mjs";
+import { isHoldResumeStateMachineFailure, resolveHoldResumePolicy } from "./hold-resume-policy.mjs";
 
 const execute = promisify(execFile);
 const factoryDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -123,6 +124,22 @@ function normalizeProductionQaRecord(record) {
   return normalized;
 }
 
+function normalizeHoldResumeStateMachineRecord(record) {
+  if (!isHoldResumeStateMachineFailure(record)) return record;
+  const policy = resolveHoldResumePolicy(record);
+  const normalized = {
+    ...record,
+    state: "HOLD_CONTENT",
+    retryFrom: policy.resumeStage ?? "RESEARCH",
+    history: [...(record.history ?? []), { state: "HOLD_CONTENT", reason: policy.reason, retryFrom: policy.resumeStage ?? "RESEARCH", recoveredCheckpoint: true }],
+    holdCheckpoint: { failedStage: policy.resumeStage ?? "RESEARCH", blockerType: "HOLD_CONTENT", blockerReason: policy.reason, retryEligible: policy.retryable, resumeEligible: policy.retryable }
+  };
+  delete normalized.resumeFrom;
+  delete normalized.resumeContext;
+  delete normalized.checkpoint;
+  return normalized;
+}
+
 async function verifyPublishedContentForProductionQaResume(candidate, context, query = managementQuery) {
   const contentDirectory = context.contentDirectory ?? await findCandidateContentDirectory(candidate);
   if (!contentDirectory) throw new Error("PRODUCTION_QA_RESUME_CONTENT_DIRECTORY_MISSING");
@@ -136,48 +153,57 @@ async function verifyPublishedContentForProductionQaResume(candidate, context, q
   return { ...context, contentDirectory, publish, productionExistence: { status: "PASS", contentKey, contentId, registryStatus: rows[0].registry_status, productionUrl: `https://fitbike.co.kr/contents/${contentKey}` } };
 }
 
-function createProductionStages() {
+function createProductionStages({ scriptRunner = runScript, contentDirectoryFinder = findCandidateContentDirectory, runtimeReader = readRuntimeJson } = {}) {
   return {
     async PREPARE_PRODUCTION_QA_RESUME(candidate, context) {
       return verifyPublishedContentForProductionQaResume(candidate, context);
     },
     async PREPARE_HOLD_RETRY(candidate, record) {
-      const reason = record.history.at(-1)?.reason;
-      const publishRetry = record.retryFrom === "PUBLISH" || reason === "RETRY_HOLD_REGISTRY_RESTORE_REQUIRED";
-      if (reason !== "FACT_QA_FAILED" && !publishRetry) return { resumeFrom: "RESEARCH", context: { gates: {}, holdSignals: {} } };
-      const contentDirectory = await findCandidateContentDirectory(candidate);
-      if (!contentDirectory) return { resumeFrom: "RESEARCH", context: { gates: {}, holdSignals: {} } };
+      const policy = resolveHoldResumePolicy(record);
+      if (!policy.retryable || !policy.resumeStage) return { terminalHold: true, reason: policy.reason, resumeFrom: record.retryFrom ?? "RESEARCH" };
+      const prepared = await scriptRunner("topic-registry.mjs", ["--operation", "prepare-topic-for-hold-resume", "--topic-key", candidate.topic_key, "--count-attempt", String(policy.countAttempt)]);
+      if (prepared.result === "TERMINAL_HOLD") return { terminalHold: true, reason: "AUTOMATION_ATTEMPT_LIMIT", resumeFrom: policy.resumeStage };
+      if (!["PREPARED", "ALREADY_PREPARED"].includes(prepared.result)) throw new Error(`HOLD_RESUME_REGISTRY_${prepared.result}`);
+      const baseContext = { gates: {}, holdSignals: {}, holdResume: { reason: policy.reason, attemptRecorded: prepared.attemptRecorded, registryState: prepared.topic?.status ?? prepared.status, policy } };
+      if (policy.resumeStage === "RESEARCH") return { resumeFrom: "RESEARCH", context: { ...baseContext, automationAttemptPrepared: true } };
+      const contentDirectory = await contentDirectoryFinder(candidate);
+      if (!contentDirectory) return { terminalHold: true, reason: "HOLD_ARTIFACT_MISSING", resumeFrom: policy.resumeStage };
       const [evidence, imagePlan, imageRequest, imageResult, qa] = await Promise.all([
-        readRuntimeJson(contentDirectory, "evidence.json"),
-        readRuntimeJson(contentDirectory, "image-plan.json"),
-        readRuntimeJson(contentDirectory, "image-generation-request.json"),
-        readRuntimeJson(contentDirectory, "image-result.json"),
-        readRuntimeJson(contentDirectory, "qa.json")
+        runtimeReader(contentDirectory, "evidence.json"),
+        runtimeReader(contentDirectory, "image-plan.json"),
+        runtimeReader(contentDirectory, "image-generation-request.json"),
+        runtimeReader(contentDirectory, "image-result.json"),
+        runtimeReader(contentDirectory, "qa.json")
       ]);
-      if (!evidence || !imagePlan || !imageRequest || imageResult?.status !== "READY_FOR_VISUAL_REVIEW") return { resumeFrom: "RESEARCH", context: { gates: {}, holdSignals: {} } };
-      if (publishRetry) {
+      const artifactContext = { ...baseContext, gates: record.gates ?? {}, contentDirectory, evidence, imagePlan, imageRequest, imageResult, qa, generation: { status: "REUSED" } };
+      if (policy.resumeStage === "PUBLISH") {
+        if (!evidence || !imagePlan || !imageRequest || imageResult?.status !== "READY_FOR_VISUAL_REVIEW") return { terminalHold: true, reason: "HOLD_ARTIFACT_MISSING", resumeFrom: policy.resumeStage };
         const contentPass = qa?.status === "READY_FOR_REVIEW" && qa.checks?.unsupportedClaims === 0 && qa.checks?.subjectDrift === true;
         const imagePass = imageResult.assets?.every((asset) => asset.status === "PASS") === true;
         const criticalFact = ["VERIFIED", "VERIFIED_DB", "NOT_REQUIRED"].includes(evidence.status) ? "VERIFIED" : "UNVERIFIED";
-        if (!contentPass || !imagePass || criticalFact !== "VERIFIED") return { resumeFrom: "CONTENT_QA", context: { gates: record.gates ?? {}, holdSignals: {}, contentDirectory, evidence, imagePlan, imageRequest, imageResult, generation: { status: "REUSED" } } };
+        if (!contentPass || !imagePass || criticalFact !== "VERIFIED") return { resumeFrom: "CONTENT_QA", context: artifactContext };
         const gates = { criticalFact, sourceConflict: evidence.conflicts?.length ? "PRESENT" : "NONE", criticalUnverifiedClaim: "NONE", unsupportedNumericClaim: "NONE", unsupportedServiceLimit: "NONE", safetyQa: "PASS", technicalMisrepresentation: "NONE", productModelMismatch: "NONE", duplicateIntentGate: qa.checks?.postGenerationDuplicate?.status === "CONTENT_DUPLICATE" ? "FAIL" : "PASS", contentQa: "PASS", imageQa: "PASS", mandatoryHumanReview: "NONE" };
-        return { resumeFrom: "PUBLISH", context: { gates, holdSignals: {}, contentDirectory, evidence, imagePlan, imageRequest, imageResult, qa, generation: { status: "REUSED" } } };
+        return { resumeFrom: "PUBLISH", context: { ...artifactContext, gates } };
       }
-      return { resumeFrom: "CONTENT_QA", context: { gates: record.gates ?? {}, holdSignals: {}, contentDirectory, evidence, imagePlan, imageRequest, imageResult, generation: { status: "REUSED" } } };
+      const required = policy.resumeStage === "CONTENT_QA" ? evidence && imagePlan && imageRequest && imageResult : evidence && imagePlan;
+      if (!required) return { terminalHold: true, reason: "HOLD_ARTIFACT_MISSING", resumeFrom: policy.resumeStage };
+      return { resumeFrom: policy.resumeStage, context: artifactContext };
     },
     async RESEARCH(candidate, context) {
       if (candidate.generated_candidate) {
-        const registered = await runScript("topic-registry.mjs", ["--operation", "register-topic", "--topic-key", candidate.topic_key, "--topic", candidate.topic, "--content-type", candidate.content_type, "--part-type", candidate.part_type, "--bike-model-key", candidate.bike_model_key, "--priority", String(candidate.priority)]);
+        const registered = await scriptRunner("topic-registry.mjs", ["--operation", "register-topic", "--topic-key", candidate.topic_key, "--topic", candidate.topic, "--content-type", candidate.content_type, "--part-type", candidate.part_type, "--bike-model-key", candidate.bike_model_key, "--priority", String(candidate.priority)]);
         if (registered.result !== "REGISTERED") throw new Error(`GENERATED_CANDIDATE_${registered.result}`);
-        await runScript("topic-registry.mjs", ["--operation", "classify-topic", "--topic-key", candidate.topic_key, "--apply", "true"]);
+        await scriptRunner("topic-registry.mjs", ["--operation", "classify-topic", "--topic-key", candidate.topic_key, "--apply", "true"]);
       }
       if (context.record.redefinition) {
-        await runScript("topic-registry.mjs", ["--operation", "redefine-topic", "--topic-key", candidate.topic_key, "--topic", candidate.topic, "--subject", candidate.normalized_subject, "--action", candidate.normalized_action, "--risk", context.classification.riskLevel, "--automation", context.classification.automationLevel]);
+        await scriptRunner("topic-registry.mjs", ["--operation", "redefine-topic", "--topic-key", candidate.topic_key, "--topic", candidate.topic, "--subject", candidate.normalized_subject, "--action", candidate.normalized_action, "--risk", context.classification.riskLevel, "--automation", context.classification.automationLevel]);
       }
-      await runScript("topic-registry.mjs", ["--operation", "record-automation-attempt", "--topic-key", candidate.topic_key]);
-      await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "GENERATING"]);
+      if (!context.automationAttemptPrepared) {
+        await scriptRunner("topic-registry.mjs", ["--operation", "record-automation-attempt", "--topic-key", candidate.topic_key]);
+        await scriptRunner("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "GENERATING"]);
+      }
       const generationArgs = ["--topic", candidate.topic, "--type", candidate.content_type, ...(candidate.part_type ? ["--part", candidate.part_type] : []), ...(candidate.bike_model_key ? ["--bike-model-key", candidate.bike_model_key] : [])];
-      const generation = await runScript("generate-content.mjs", generationArgs);
+      const generation = await scriptRunner("generate-content.mjs", generationArgs);
       if (!generation.outputDirectory) return { ...context, holdSignals: { ...context.holdSignals, UNRESOLVED_DUPLICATE: true }, generation };
       return { ...context, generation, contentDirectory: generation.outputDirectory };
     },
@@ -265,7 +291,7 @@ async function readPreviousRecords(batchFile) {
   if (!existsSync(batchFile)) return {};
   const batch = JSON.parse(await readFile(batchFile, "utf8"));
   return Object.fromEntries((batch.records ?? []).map((record) => {
-    const normalized = normalizeProductionQaRecord(normalizeLegacyRetryHoldPublishRecord(record));
+    const normalized = normalizeProductionQaRecord(normalizeHoldResumeStateMachineRecord(normalizeLegacyRetryHoldPublishRecord(record)));
     return [normalized.originalTopicKey, normalized];
   }));
 }
@@ -304,8 +330,7 @@ async function main() {
       if (!record.skipped && record.state === "DROP" && !candidate.generated_candidate) {
         await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "DUPLICATE"]);
       } else if (!record.skipped && ["HOLD", "HOLD_CONTENT"].includes(record.state)) {
-        await runScript("topic-registry.mjs", ["--operation", "record-automation-error", "--topic-key", candidate.topic_key, "--error", record.history.at(-1)?.reason ?? "AUTONOMOUS_HOLD"]);
-        await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "BLOCKED"]);
+        await runScript("topic-registry.mjs", ["--operation", "finalize-topic-hold", "--topic-key", candidate.topic_key, "--error", record.history.at(-1)?.reason ?? "AUTONOMOUS_HOLD"]);
       }
     } catch (error) {
       record.registryCheckpoint = { status: "FAILED", error: error instanceof Error ? error.message : String(error) };
@@ -325,4 +350,4 @@ if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main
   process.exitCode = 1;
 });
 
-export { createProductionStages, isLegacyRetryHoldPublishFailure, normalizeLegacyRetryHoldPublishRecord, normalizeProductionQaRecord, verifyPublishedContentForProductionQaResume };
+export { createProductionStages, isLegacyRetryHoldPublishFailure, normalizeHoldResumeStateMachineRecord, normalizeLegacyRetryHoldPublishRecord, normalizeProductionQaRecord, verifyPublishedContentForProductionQaResume };

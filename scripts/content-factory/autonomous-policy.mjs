@@ -172,7 +172,7 @@ function mandatoryHoldReason(signals = {}) {
 }
 
 function shouldSkipCandidate(record, { retryHold = false, retrySystem = false } = {}) {
-  if (record?.state === "HOLD" || record?.state === "HOLD_CONTENT") return !retryHold;
+  if (record?.state === "HOLD" || record?.state === "HOLD_CONTENT") return record.holdCheckpoint?.retryEligible === false || !retryHold;
   if (record?.state === "BLOCKED_SYSTEM") return !retrySystem;
   return terminalStates.has(record?.state);
 }

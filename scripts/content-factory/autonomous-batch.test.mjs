@@ -7,7 +7,7 @@ import { classifyTopicRisk } from "./automation-policy.mjs";
 import { runAutonomousBatch } from "./autonomous-batch-engine.mjs";
 import { decideVisual, deriveModelCandidates, evaluateAutoClearance, evaluateDuplicate, redefineCandidate, reclassifyAfterRedefinition, shouldSkipCandidate } from "./autonomous-policy.mjs";
 import { inspectDetailHtml, runChecks } from "./production-content-qa.mjs";
-import { normalizeLegacyRetryHoldPublishRecord, normalizeProductionQaRecord, verifyPublishedContentForProductionQaResume } from "./autonomous-batch.mjs";
+import { createProductionStages, normalizeHoldResumeStateMachineRecord, normalizeLegacyRetryHoldPublishRecord, normalizeProductionQaRecord, verifyPublishedContentForProductionQaResume } from "./autonomous-batch.mjs";
 
 const topic15 = { content_topic_id: 15, topic_key: "brake-pad-pre-replacement-check", topic: "브레이크 패드 교체 전 확인할 것", content_type: "MAINTENANCE", part_type: "BRAKE", normalized_subject: "BRAKE", normalized_action: "REPLACE", normalized_scope: "GENERIC", risk_level: "MEDIUM", automation_level: "L1" };
 const topic14 = { content_key: "motorcycle-brake-check", title: "오토바이 브레이크 패드 마모 확인 방법", summary: "브레이크 패드 마찰재의 마모 상태를 관찰하고 교체 필요 여부를 판단합니다.", part_types: ["BRAKE"], body_blocks: [{ type: "paragraph", text: "브레이크 패드 위치와 마찰재 잔량, 편마모, 이상 징후를 확인하고 제조사 기준으로 교체 필요 여부를 판단합니다." }] };
@@ -452,4 +452,53 @@ test("현재 CBR650R PRODUCTION_QA Checkpoint는 재Publish 없이 Pending QA로
   assert.equal(record.state, "PUBLISHED_PENDING_QA");
   assert.equal(record.qaContext.publish.database.contentId, 12);
   assert.equal(record.checkpoint, undefined);
+});
+
+test("현재 PCX125 State Machine Block은 공통 HOLD Resume으로 복원한다", () => {
+  const record = normalizeHoldResumeStateMachineRecord({ topicKey: "pcx125-brake-pad-guide", originalTopicKey: "pcx125-brake-pad-guide", state: "BLOCKED_SYSTEM", history: [{ state: "HOLD_CONTENT", reason: "CRITICAL_CLAIM_UNVERIFIED" }, { state: "RESEARCH", resumed: true }], checkpoint: { failedStage: "RESEARCH", blockerReason: "STAGE_ERROR:AUTOMATION_ATTEMPT_LIMIT_OR_INVALID_STATE" }, resumeFrom: "RESEARCH" });
+  assert.equal(record.state, "HOLD_CONTENT");
+  assert.equal(record.retryFrom, "RESEARCH");
+  assert.equal(record.holdCheckpoint.retryEligible, true);
+  assert.equal(record.checkpoint, undefined);
+});
+
+test("FACT QA HOLD Registry 준비 후 Research는 PLANNED-only Action을 반복하지 않는다", async () => {
+  const calls = [];
+  const stages = createProductionStages({ scriptRunner: async (script, args) => {
+    calls.push([script, ...args]);
+    if (args.includes("prepare-topic-for-hold-resume")) return { result: "PREPARED", attemptRecorded: true, topic: { status: "GENERATING", attempt_count: 2 } };
+    if (script === "generate-content.mjs") return { outputDirectory: "runtime" };
+    throw new Error(`UNEXPECTED_CALL:${script}:${args.join(":")}`);
+  } });
+  const candidate = { ...topic15, topic_key: "pcx125-brake-pad-guide", topic: "PCX125 brake guide" };
+  const record = { state: "HOLD_CONTENT", history: [{ state: "HOLD_CONTENT", reason: "CRITICAL_CLAIM_UNVERIFIED" }] };
+  const prepared = await stages.PREPARE_HOLD_RETRY(candidate, record);
+  await stages.RESEARCH(candidate, { ...prepared.context, classification: classifyTopicRisk(candidate), record });
+  assert.equal(prepared.resumeFrom, "RESEARCH");
+  assert.equal(calls.filter((call) => call.includes("record-automation-attempt")).length, 0);
+  assert.equal(calls.filter((call) => call.includes("prepare-topic-for-hold-resume")).length, 1);
+});
+
+test("Attempt Limit Terminal HOLD는 다음 Candidate 처리를 계속한다", async () => {
+  const terminal = { ...topic15, topic_key: "terminal-hold", topic: "terminal hold" };
+  const next = { ...topic15, topic_key: "after-terminal", topic: "after terminal", normalized_subject: "AFTER_TERMINAL" };
+  const previous = { topicKey: terminal.topic_key, originalTopicKey: terminal.topic_key, state: "HOLD_CONTENT", history: [{ state: "HOLD_CONTENT", reason: "CRITICAL_CLAIM_UNVERIFIED" }], candidate: terminal };
+  const stages = passingStages();
+  stages.PREPARE_HOLD_RETRY = async () => ({ terminalHold: true, reason: "AUTOMATION_ATTEMPT_LIMIT", resumeFrom: "RESEARCH" });
+  const result = await runAutonomousBatch({ target: 1, maxCandidates: 2, candidates: [terminal, next], previousRecords: { [terminal.topic_key]: previous }, retryHold: true, classifyTopicRisk, stages });
+  assert.equal(result.status, "SUCCESS");
+  assert.equal(result.records.find((record) => record.originalTopicKey === terminal.topic_key).holdCheckpoint.retryEligible, false);
+  assert.equal(result.records.find((record) => record.originalTopicKey === next.topic_key).state, "PUBLISHED_VERIFIED");
+});
+
+test("Published, Drop, Pending QA는 HOLD retry 경로에 진입하지 않는다", async () => {
+  for (const state of ["PUBLISHED_VERIFIED", "DROP", "PUBLISHED_PENDING_QA"]) {
+    const candidate = { ...topic15, topic_key: `skip-${state}`, topic: `skip ${state}` };
+    let holdPrepareCalls = 0;
+    const stages = passingStages();
+    stages.PREPARE_HOLD_RETRY = async () => { holdPrepareCalls += 1; throw new Error("SHOULD_NOT_RUN"); };
+    const previous = { topicKey: candidate.topic_key, originalTopicKey: candidate.topic_key, state, history: [{ state }], candidate, classification: classifyTopicRisk(candidate), visual: { type: "EDUCATIONAL" }, qaContext: { publish: { status: "PUBLISHED" }, gates: passGates(), holdSignals: {} } };
+    await runAutonomousBatch({ target: 2, maxCandidates: 2, candidates: [candidate], previousRecords: { [candidate.topic_key]: previous }, retryHold: true, classifyTopicRisk, stages });
+    assert.equal(holdPrepareCalls, 0);
+  }
 });

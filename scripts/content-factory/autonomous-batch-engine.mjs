@@ -165,6 +165,12 @@ async function processCandidate({ candidate, publishedContents, previousRecord, 
     const classification = record.classification ?? reclassifyAfterRedefinition(workingCandidate, classifyTopicRisk);
     const visual = record.visual ?? decideVisual(workingCandidate);
     const preparedHold = resumingContentHold && stages.PREPARE_HOLD_RETRY ? await stages.PREPARE_HOLD_RETRY(workingCandidate, record) : null;
+    if (preparedHold?.terminalHold) {
+      clearResumeCheckpoint(record);
+      record.holdCheckpoint = { failedStage: preparedHold.resumeFrom ?? record.retryFrom ?? "RESEARCH", blockerType: "HOLD_CONTENT", blockerReason: preparedHold.reason, retryEligible: false, resumeEligible: false, terminal: true };
+      transition(record, "HOLD_CONTENT", { reason: preparedHold.reason, terminal: true, retryEligible: false });
+      return record;
+    }
     const resumeFrom = resumingSystemBlock ? record.resumeFrom : preparedHold?.resumeFrom ?? record.retryFrom ?? "RESEARCH";
     const resumeIndex = stateOrder.indexOf(resumeFrom);
     if (resumeIndex < 2 || resumeIndex > stateOrder.indexOf("PRODUCTION_QA")) throw new Error("INVALID_RESUME_STATE");

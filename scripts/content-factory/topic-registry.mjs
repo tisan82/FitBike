@@ -24,6 +24,13 @@ function retryHoldRestorePath(status) {
   throw new Error(`INVALID_RETRY_HOLD_RESTORE_STATE:${status}`);
 }
 
+function prepareHoldResumeDecision({ status, attemptCount, countAttempt }) {
+  if (!["BLOCKED", "GENERATING"].includes(status)) return { result: "INVALID_STATE", status, attemptCount };
+  if (status === "GENERATING") return { result: "ALREADY_PREPARED", status, attemptCount, attemptRecorded: false };
+  if (countAttempt && attemptCount >= 2) return { result: "TERMINAL_HOLD", status, attemptCount, attemptRecorded: false };
+  return { result: "PREPARE", from: status, to: "GENERATING", attemptCount: attemptCount + (countAttempt ? 1 : 0), attemptRecorded: countAttempt };
+}
+
 function parseArguments(argv) {
   const result = {};
   for (let index = 0; index < argv.length; index += 2) {
@@ -200,6 +207,21 @@ async function restoreTopicForRetryHold(args) {
   return { result: "RESTORED", dryRun: false, from: current.status, to: nextStatus, path, topic: updated[0] };
 }
 
+async function prepareTopicForHoldResume(args) {
+  const topicKey = args["topic-key"];
+  const countAttempt = args["count-attempt"] === "true";
+  if (!topicKey) throw new Error("INVALID_TOPIC_INPUT");
+  const rows = await managementQuery(`select content_topic_id,topic_key,status,attempt_count,last_error,content_id from public."16_content_topic" where topic_key=$1`, [topicKey]);
+  if (rows.length !== 1) throw new Error("TOPIC_NOT_FOUND");
+  const current = rows[0];
+  const decision = prepareHoldResumeDecision({ status: current.status, attemptCount: current.attempt_count, countAttempt });
+  if (decision.result !== "PREPARE" || args["dry-run"] === "true") return { ...decision, dryRun: args["dry-run"] === "true" };
+  if (!transitions[current.status]?.includes("GENERATING")) throw new Error(`INVALID_STATUS_TRANSITION:${current.status}->GENERATING`);
+  const updated = await managementQuery(`update public."16_content_topic" set status='GENERATING',attempt_count=attempt_count+$2,last_error=null where content_topic_id=$1 and status='BLOCKED' and attempt_count=$3 returning content_topic_id,topic_key,status,attempt_count,last_error,content_id`, [current.content_topic_id, countAttempt ? 1 : 0, current.attempt_count], false);
+  if (updated.length !== 1) throw new Error("HOLD_RESUME_PREPARE_CONFLICT");
+  return { result: "PREPARED", from: current.status, to: updated[0].status, attemptRecorded: countAttempt, topic: updated[0] };
+}
+
 async function recordAutomationAttempt(args) {
   const topicKey = args["topic-key"];
   if (!topicKey) throw new Error("INVALID_AUTOMATION_ATTEMPT");
@@ -230,6 +252,23 @@ async function recordAutomationError(args) {
   return { result: "RECORDED", topic: updated[0] };
 }
 
+async function finalizeTopicHold(args) {
+  const topicKey = args["topic-key"];
+  const error = args.error?.slice(0, 1000);
+  if (!topicKey || !error) throw new Error("INVALID_AUTOMATION_ERROR");
+  const rows = await managementQuery(`select content_topic_id,topic_key,status from public."16_content_topic" where topic_key=$1`, [topicKey]);
+  if (rows.length !== 1) throw new Error("TOPIC_NOT_FOUND");
+  const current = rows[0];
+  if (current.status === "BLOCKED") {
+    const updated = await managementQuery(`update public."16_content_topic" set last_error=$2 where content_topic_id=$1 and status='BLOCKED' returning content_topic_id,topic_key,status,attempt_count,last_error`, [current.content_topic_id, error], false);
+    return { result: "HOLD_RECORDED", transition: "NONE", topic: updated[0] };
+  }
+  if (!transitions[current.status]?.includes("BLOCKED")) throw new Error(`INVALID_STATUS_TRANSITION:${current.status}->BLOCKED`);
+  const updated = await managementQuery(`update public."16_content_topic" set status='BLOCKED',last_error=$2 where content_topic_id=$1 and status=$3 returning content_topic_id,topic_key,status,attempt_count,last_error`, [current.content_topic_id, error, current.status], false);
+  if (updated.length !== 1) throw new Error("HOLD_FINALIZE_CONFLICT");
+  return { result: "HOLD_RECORDED", transition: `${current.status}->BLOCKED`, topic: updated[0] };
+}
+
 async function redefineTopic(args) {
   const topicKey = args["topic-key"];
   const topic = args.topic;
@@ -251,11 +290,13 @@ async function main() {
   else if (args.operation === "get-next-topic") result = await getNextTopic();
   else if (args.operation === "update-topic-status") result = await updateTopicStatus(args);
   else if (args.operation === "restore-topic-for-retry-hold") result = await restoreTopicForRetryHold(args);
+  else if (args.operation === "prepare-topic-for-hold-resume") result = await prepareTopicForHoldResume(args);
   else if (args.operation === "record-automation-attempt") result = await recordAutomationAttempt(args);
   else if (args.operation === "record-automation-error") result = await recordAutomationError(args);
+  else if (args.operation === "finalize-topic-hold") result = await finalizeTopicHold(args);
   else if (args.operation === "classify-topic") result = await classifyStoredTopic(args);
   else if (args.operation === "redefine-topic") result = await redefineTopic(args);
-  else throw new Error("--operation register-topic|get-next-topic|update-topic-status|restore-topic-for-retry-hold|record-automation-attempt|record-automation-error|classify-topic|redefine-topic is required");
+  else throw new Error("--operation register-topic|get-next-topic|update-topic-status|restore-topic-for-retry-hold|prepare-topic-for-hold-resume|record-automation-attempt|record-automation-error|finalize-topic-hold|classify-topic|redefine-topic is required");
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -264,4 +305,4 @@ if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main
   process.exitCode = 1;
 });
 
-export { retryHoldRestorePath };
+export { prepareHoldResumeDecision, retryHoldRestorePath };

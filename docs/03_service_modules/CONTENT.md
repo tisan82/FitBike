@@ -66,6 +66,8 @@ Image QA는 Subject/Role 일치, Brand Asset First, Product/Model 일치, 기술
 
 `PARTIAL` Batch의 `HOLD_CONTENT`는 명시적 `--retry-hold true`에서만 재평가한다. Hold 사유가 Content QA이면 유효한 Research·Content·Visual·Asset·Image QA Artifact를 복원해 `CONTENT_QA`부터 재개하고, Critical Fact 미검증이면 개선된 Research/Evidence 단계부터 재개한다. 플래그가 없으면 Hold를 그대로 유지하며 `PUBLISHED`와 `DROP`은 항상 건너뛴다. 재평가 결과가 여전히 미검증이면 Candidate만 다시 `HOLD_CONTENT`가 되고 기존 Published Target Count는 보존된다.
 
+HOLD 재평가는 사유별 Resume Matrix를 따른다. Critical Claim과 Source Conflict는 `RESEARCH`부터 새 Evidence Attempt를 정확히 한 번 기록하고, Content/Subject/Unsupported Claim 문제는 기존 Artifact를 재사용해 `CONTENT_QA`부터, Image·Asset Data·Product 관계 문제는 `ASSET_GENERATION_OR_SELECTION`부터 재개한다. Registry가 `BLOCKED`이면 기존 합법 전이 `BLOCKED → GENERATING`을 먼저 원자적으로 적용하며, 동일 Checkpoint 재개는 attempt_count를 중복 증가시키지 않는다. Attempt Limit 도달과 현재 입력으로 개선 불가능한 Terminal HOLD는 Candidate만 비재시도 HOLD로 유지하고 Batch를 계속하며 `BLOCKED_SYSTEM`으로 분류하지 않는다.
+
 Retry-Hold Candidate가 검증 Gate를 통과해 게시를 재개할 때 Registry의 `BLOCKED` 상태는 기존 합법 전이인 `BLOCKED → GENERATING`으로 먼저 복원한 뒤 `REVIEW_REQUIRED → APPROVED → PUBLISHED` 게시 흐름을 따른다. `BLOCKED → REVIEW_REQUIRED` 직접 전이는 허용하지 않는다. Runtime 예외 Checkpoint는 fallback 단계가 아니라 실제 실행 중이던 `PUBLISH` 또는 `PRODUCTION_QA`를 포함한 정확한 Pipeline Stage를 기록하며, 유효한 기존 Artifact와 QA 결과는 해당 단계 재개 시 반복 생성하지 않는다.
 
 `PUBLISH`는 Candidate별 exactly-once 단계이고 `PRODUCTION_QA`는 Publish와 분리된 재시도·reconciliation 단계다. Publish와 Registry 연결이 성공하면 Batch Checkpoint를 `PUBLISHED_PENDING_QA`로 기록하고 Publish·Registry 전이·DB Insert·Asset Upload를 다시 실행하지 않는다. `/contents` ISR, Sitemap 또는 Internal Discovery의 정상 Cache/CDN 전파 지연은 `PRODUCTION_QA_PENDING`으로 분류하며 `BLOCKED_SYSTEM`으로 승격하지 않는다. 안전한 동시 Pending 한도 안에서는 다음 Candidate 처리를 계속한다.

@@ -143,6 +143,8 @@ Publish 성공 직후 Candidate는 `PUBLISHED_PENDING_QA`가 되며 Production Q
 
 `PARTIAL` Checkpoint의 Hold Candidate는 `--retry-hold true`가 있을 때만 다시 평가한다. Content QA Hold는 검증된 기존 Runtime Artifact를 복원해 Content QA/Repair부터, Critical Fact Hold는 Research/Evidence부터 재개한다. 플래그가 없으면 Hold 상태를 유지하고 `PUBLISHED`/`DROP`은 재처리하지 않으며, 기존 Published Count는 Target 계산에 유지한다.
 
+HOLD Resume은 `hold-resume-policy.mjs`의 사유별 Matrix를 사용한다. Critical Fact 재평가는 Registry를 `BLOCKED → GENERATING`으로 합법 복원하면서 새 Attempt를 정확히 한 번 기록하고, Content/Image/Asset Hold는 완료 Artifact를 재사용해 필요한 QA 또는 Asset 단계부터 진행한다. 이미 `GENERATING`으로 준비된 동일 Checkpoint는 attempt를 다시 증가시키지 않는다. Attempt Limit과 Terminal HOLD는 해당 Candidate만 비재시도 상태로 남기고 다음 Candidate를 계속 처리한다. `PUBLISHED`, `DROP`, `PUBLISHED_PENDING_QA`는 HOLD Resume 경로에 진입하지 않는다.
+
 Retry-Hold가 Publish Gate까지 통과하면 Topic Registry는 전용 복원 동작으로 기존 합법 경로 `BLOCKED → GENERATING`을 거친 뒤 게시 준비 상태로 진행한다. `BLOCKED → REVIEW_REQUIRED` 직접 전이는 사용하지 않는다. Stage Adapter 예외는 실제 실행 Stage를 Checkpoint하며, 과거 Canary의 해당 전이 오류로 `RESEARCH`가 잘못 기록된 Checkpoint는 오류 서명이 일치할 때만 `PUBLISH` 재개 대상으로 정규화해 기존 QA Artifact를 재사용한다.
 
 Auto-Repair 이후 `qa.json`을 Content QA Source of Truth로 사용하고, 수정된 `content-package.json`과 함께 `content-package-with-images.json`에 동기화한다. Synchronizer는 기존 Image Metadata를 덮어쓰지 않고 Evidence Hash 및 Risk·Approval 입력을 기록하며 원자적으로 Package를 교체한다. Publish 직전 stale Package를 다시 검사해 안전하게 동기화할 수 있으면 최신화하고, Image 충돌이나 필수 Artifact 누락이면 Validator 우회 없이 `PUBLISH` 단계에서 `BLOCKED_SYSTEM` 처리한다.
