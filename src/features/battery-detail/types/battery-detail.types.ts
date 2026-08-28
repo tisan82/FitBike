@@ -1,3 +1,10 @@
+export type CompatibleBatteryModel = {
+  bikeModelYearId: number;
+  brandName: string;
+  modelName: string;
+  yearRangeLabel: string;
+};
+
 export type BatteryProductDetail = {
   batteryProductId: number;
   batteryPartKey: string;
@@ -20,6 +27,7 @@ export type BatteryProductDetail = {
   productUrl: string | null;
   sellerName: string | null;
   price: number | null;
+  compatibleModels: CompatibleBatteryModel[];
 };
 
 export type ApiSuccessResponse<T> = {
