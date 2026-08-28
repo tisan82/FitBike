@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 
 import { ContentBlockRenderer } from "@/features/content";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
-import { SITE_NAME, SITE_URL } from "@/lib/seo/site";
+import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo/site";
 import { getPublishedContentByKey } from "@/services/content.service";
 
 type Props = { params: Promise<{ contentKey: string }> };
@@ -28,18 +28,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!content) notFound();
   const path = `/contents/${encodeURIComponent(content.contentKey)}`;
   const hero = getStoragePublicUrl(content.heroImageStoragePath, "content-assets");
+  const image = hero ?? absoluteUrl(DEFAULT_OG_IMAGE);
   return {
     title: content.title,
     description: content.summary,
     alternates: { canonical: path },
+    robots: { index: true, follow: true },
     openGraph: {
       type: "article",
-      title: content.title,
+      siteName: SITE_NAME,
+      locale: "ko_KR",
+      title: `${content.title} | FitBike`,
       description: content.summary,
       url: path,
-      ...(hero && content.contentType !== "MODEL_GUIDE"
-        ? { images: [{ url: hero, alt: content.title }] }
-        : {}),
+      images: [{ url: image, alt: content.title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${content.title} | FitBike`,
+      description: content.summary,
+      images: [image],
     },
   };
 }
@@ -52,15 +60,34 @@ export default async function ContentDetailPage({ params }: Props) {
 
   const storedHero = getStoragePublicUrl(content.heroImageStoragePath, "content-assets");
   const hero = content.contentType === "MODEL_GUIDE" ? null : storedHero;
+  const url = `${SITE_URL}/contents/${encodeURIComponent(content.contentKey)}`;
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "Article",
-    headline: content.title,
-    description: content.summary,
-    datePublished: content.publishedAt,
-    dateModified: content.updatedAt,
-    publisher: { "@type": "Organization", name: SITE_NAME },
-    url: `${SITE_URL}/contents/${encodeURIComponent(content.contentKey)}`,
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": `${url}#article`,
+        headline: content.title,
+        description: content.summary,
+        articleSection: labels[content.contentType],
+        inLanguage: "ko-KR",
+        datePublished: content.publishedAt,
+        dateModified: content.updatedAt,
+        author: { "@type": "Organization", "@id": `${SITE_URL}/#organization`, name: SITE_NAME, url: SITE_URL },
+        publisher: { "@id": `${SITE_URL}/#organization` },
+        mainEntityOfPage: { "@type": "WebPage", "@id": url },
+        url,
+        ...(storedHero ? { image: [storedHero] } : {}),
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "FitBike", item: SITE_URL },
+          { "@type": "ListItem", position: 2, name: "바이크 가이드", item: `${SITE_URL}/contents` },
+          { "@type": "ListItem", position: 3, name: content.title },
+        ],
+      },
+    ],
   };
 
   return (
