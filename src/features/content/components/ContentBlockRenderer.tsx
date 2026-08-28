@@ -21,7 +21,8 @@ export function ContentBlockRenderer({ blocks }: { blocks: ContentBlock[] }) {
             return <p className="whitespace-pre-line text-pretty" key={key}>{block.text}</p>;
           case "image": {
             const src = getStoragePublicUrl(block.storagePath, "content-assets");
-            const isMobileGuide = block.storagePath.toLowerCase().endsWith(".svg");
+            const normalizedPath = block.storagePath.toLowerCase();
+            const isMobileGuide = /\/body-(01|02)\.(svg|webp)$/.test(normalizedPath);
             return src ? (
               <figure className="space-y-3 py-2" key={key}>
                 <Image
