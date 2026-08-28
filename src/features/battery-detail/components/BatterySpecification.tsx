@@ -42,13 +42,13 @@ export function BatterySpecification({ product }: Props) {
   ];
 
   return (
-    <section className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
+    <section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-8">
       <h2 className="text-xl font-bold text-zinc-950">상품 규격</h2>
-      <dl className="mt-6 grid gap-4 sm:grid-cols-2">
+      <dl className="mt-5 grid grid-cols-2 gap-2.5 sm:mt-6 sm:gap-4">
         {items.map((item) => (
-          <div className="rounded-2xl bg-zinc-50 p-4" key={item.label}>
-            <dt className="text-sm font-semibold text-zinc-500">{item.label}</dt>
-            <dd className="mt-2 font-semibold text-zinc-950">
+          <div className="min-w-0 rounded-xl bg-zinc-50 px-3 py-3.5 sm:rounded-2xl sm:p-4" key={item.label}>
+            <dt className="text-xs font-semibold leading-5 text-zinc-500 sm:text-sm">{item.label}</dt>
+            <dd className="mt-1 break-words text-sm font-bold leading-6 text-zinc-950 sm:mt-2 sm:text-base">
               {displayValue(item)}
             </dd>
           </div>
