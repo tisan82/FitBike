@@ -35,8 +35,8 @@ type NaverNamespace = {
   };
 };
 
-function getNaver() {
-  return (window as Window & { naver?: NaverNamespace }).naver;
+function getNaver(): NaverNamespace | null {
+  return (window as Window & { naver?: NaverNamespace }).naver ?? null;
 }
 
 function distanceKm(from: Coordinates, to: Coordinates) {
@@ -64,10 +64,23 @@ function serviceLabel(value: string) {
   return labels[value] ?? value;
 }
 
-function geocode(naver: NaverNamespace, query: string): Promise<Coordinates | null> {
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&#39;",
+      '"': "&quot;",
+    };
+    return entities[character] ?? character;
+  });
+}
+
+function geocode(naverApi: NaverNamespace, query: string): Promise<Coordinates | null> {
   return new Promise((resolve) => {
-    naver.maps.Service.geocode({ query }, (status, response) => {
-      if (status !== naver.maps.Service.Status.OK) return resolve(null);
+    naverApi.maps.Service.geocode({ query }, (status, response) => {
+      if (status !== naverApi.maps.Service.Status.OK) return resolve(null);
       const first = response.v2?.addresses?.[0];
       if (!first) return resolve(null);
       const lat = Number(first.y);
@@ -109,43 +122,46 @@ export function ServiceShopMap({ shops, naverMapClientId }: Props) {
 
   useEffect(() => {
     if (!mapReady || !mapElementRef.current) return;
-    const naver = getNaver();
-    if (!naver) return;
+    const naverApi = getNaver();
+    if (!naverApi) return;
 
     let cancelled = false;
     const markers: NaverMarker[] = [];
     const infoWindows: NaverInfoWindow[] = [];
-    const map = new naver.maps.Map(mapElementRef.current, {
-      center: new naver.maps.LatLng(37.5665, 126.978),
+    const map = new naverApi.maps.Map(mapElementRef.current, {
+      center: new naverApi.maps.LatLng(37.5665, 126.978),
       zoom: 11,
     });
 
     async function resolveAndDraw() {
-      const resolved = await Promise.all(
-        shops.map(async (shop) => {
+      const candidateShops = await Promise.all(
+        shops.map(async (shop): Promise<ResolvedShop | null> => {
           const coordinates =
             shop.latitude !== null && shop.longitude !== null
               ? { lat: shop.latitude, lng: shop.longitude }
-              : await geocode(naver, shop.roadAddress ?? shop.address);
+              : await geocode(naverApi, shop.roadAddress ?? shop.address);
           if (!coordinates) return null;
-          return { ...shop, ...coordinates, distanceKm: null } satisfies ResolvedShop;
+          return { ...shop, ...coordinates, distanceKm: null };
         }),
       );
 
       if (cancelled) return;
-      const available = resolved.filter((shop): shop is ResolvedShop => shop !== null);
+      const available: ResolvedShop[] = [];
+      for (const shop of candidateShops) {
+        if (shop) available.push(shop);
+      }
       setResolvedShops(available);
 
       for (const shop of available) {
-        const marker = new naver.maps.Marker({
+        const marker = new naverApi.maps.Marker({
           map,
-          position: new naver.maps.LatLng(shop.lat, shop.lng),
+          position: new naverApi.maps.LatLng(shop.lat, shop.lng),
           title: shop.shopName,
         });
-        const info = new naver.maps.InfoWindow({
-          content: `<div style="padding:10px 12px;min-width:150px;font-size:13px"><strong>${shop.shopName}</strong><br/><span>${shop.roadAddress ?? shop.address}</span></div>`,
+        const info = new naverApi.maps.InfoWindow({
+          content: `<div style="padding:10px 12px;min-width:150px;font-size:13px"><strong>${escapeHtml(shop.shopName)}</strong><br/><span>${escapeHtml(shop.roadAddress ?? shop.address)}</span></div>`,
         });
-        naver.maps.Event.addListener(marker, "click", () => {
+        naverApi.maps.Event.addListener(marker, "click", () => {
           infoWindows.forEach((item) => item.close());
           info.open(map, marker);
           setSelectedShopId(shop.serviceShopId);
@@ -176,7 +192,10 @@ export function ServiceShopMap({ shops, naverMapClientId }: Props) {
   }, [userLocation]);
 
   const visibleShops = useMemo(
-    () => (resolvedShops.length > 0 ? resolvedShops : shops.map((shop) => ({ ...shop, lat: 0, lng: 0, distanceKm: null }))),
+    () =>
+      resolvedShops.length > 0
+        ? resolvedShops
+        : shops.map((shop): ResolvedShop => ({ ...shop, lat: 0, lng: 0, distanceKm: null })),
     [resolvedShops, shops],
   );
 
