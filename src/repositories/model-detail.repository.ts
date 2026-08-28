@@ -86,6 +86,8 @@ export type ProductRow = {
   voltage?: string | null;
   capacity_ah?: number | null;
   battery_type?: string | null;
+  product_image_url?: string | null;
+  price?: number | null;
   brake_type?: string | null;
   compatible_code?: string | null;
 };
@@ -188,5 +190,5 @@ export const findTireMappings = (id: number) => findMappings("07_bike_model_year
 export const findBatteryMappings = (code: string) => findMappings("08_battery_standard_product", "id, battery_product_id, display_order", "battery_standard_code", code);
 export const findBrakeMappings = (id: number) => findMappings("09_bike_model_year_brake_product", "id, brake_product_id, position_type, display_order", "bike_model_year_id", id);
 export const findTireProducts = (ids: number[]) => findProducts("04_tire_product", "tire_product_id, brand_name, product_name, tire_size_full, load_index, speed_index, tube_type", "tire_product_id", ids);
-export const findBatteryProducts = (ids: number[]) => findProducts("05_battery_product", "battery_product_id, brand_name, spec_code, voltage, capacity_ah, battery_type", "battery_product_id", ids);
+export const findBatteryProducts = (ids: number[]) => findProducts("05_battery_product", "battery_product_id, brand_name, spec_code, voltage, capacity_ah, battery_type, product_image_url, price", "battery_product_id", ids);
 export const findBrakeProducts = (ids: number[]) => findProducts("06_brake_product", "brake_product_id, brand_name, product_name, brake_type, compatible_code", "brake_product_id", ids);
