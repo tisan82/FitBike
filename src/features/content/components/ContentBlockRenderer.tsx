@@ -21,10 +21,22 @@ export function ContentBlockRenderer({ blocks }: { blocks: ContentBlock[] }) {
             return <p className="whitespace-pre-line text-pretty" key={key}>{block.text}</p>;
           case "image": {
             const src = getStoragePublicUrl(block.storagePath, "content-assets");
+            const isMobileGuide = block.storagePath.toLowerCase().endsWith(".svg");
             return src ? (
               <figure className="space-y-3 py-2" key={key}>
-                <Image alt={block.alt} className="h-auto w-full rounded-2xl" height={900} src={src} unoptimized width={1200} />
-                {block.caption ? <figcaption className="text-sm leading-6 text-foreground-secondary">{block.caption}</figcaption> : null}
+                <Image
+                  alt={block.alt}
+                  className={isMobileGuide ? "mx-auto h-auto w-full max-w-md rounded-2xl" : "h-auto w-full rounded-2xl"}
+                  height={isMobileGuide ? 1000 : 900}
+                  src={src}
+                  unoptimized
+                  width={isMobileGuide ? 800 : 1200}
+                />
+                {block.caption ? (
+                  <figcaption className={isMobileGuide ? "mx-auto max-w-md text-sm leading-6 text-foreground-secondary" : "text-sm leading-6 text-foreground-secondary"}>
+                    {block.caption}
+                  </figcaption>
+                ) : null}
               </figure>
             ) : null;
           }
