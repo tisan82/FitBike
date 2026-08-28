@@ -21,6 +21,8 @@ export type ConnectedProduct = {
   productName: string;
   secondaryInformation: string | null;
   detailHref: string | null;
+  imageUrl?: string | null;
+  price?: number | null;
 };
 
 export type RelatedGuide = {
