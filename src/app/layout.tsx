@@ -10,7 +10,6 @@ export const metadata: Metadata = {
   title: { default: DEFAULT_TITLE, template: "%s | FitBike" },
   description: DEFAULT_DESCRIPTION,
   applicationName: SITE_NAME,
-  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     locale: "ko_KR",
