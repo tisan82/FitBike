@@ -123,7 +123,15 @@ export async function getModelDetailProducts(bikeModelYearId: number): Promise<M
     findBrakeProducts(brakeMappings.flatMap((item) => item.brake_product_id ?? [])),
   ]);
   const tireMap = new Map(tires.map((p) => [p.tire_product_id as number, { id: p.tire_product_id as number, brandName: p.brand_name, productName: p.product_name as string, secondaryInformation: joinParts([p.tire_size_full, p.load_index, p.speed_index, p.tube_type]), detailHref: `/tire-detail/${p.tire_product_id}` }]));
-  const batteryMap = new Map(batteries.map((p) => [p.battery_product_id as number, { id: p.battery_product_id as number, brandName: p.brand_name, productName: p.spec_code as string, secondaryInformation: joinParts([p.voltage, p.capacity_ah === null || p.capacity_ah === undefined ? null : `${p.capacity_ah}Ah`, p.battery_type]), detailHref: `/battery-detail/${p.battery_product_id}` }]));
+  const batteryMap = new Map(batteries.map((p) => [p.battery_product_id as number, {
+    id: p.battery_product_id as number,
+    brandName: p.brand_name,
+    productName: p.spec_code as string,
+    secondaryInformation: joinParts([p.voltage, p.capacity_ah === null || p.capacity_ah === undefined ? null : `${p.capacity_ah}Ah`, p.battery_type]),
+    detailHref: `/battery-detail/${p.battery_product_id}`,
+    imageUrl: p.product_image_url ?? null,
+    price: p.price ?? null,
+  }]));
   const brakeMap = new Map(brakes.map((p) => [p.brake_product_id as number, { id: p.brake_product_id as number, brandName: p.brand_name, productName: p.product_name as string, secondaryInformation: joinParts([p.brake_type, p.compatible_code]), detailHref: null }]));
   const connectedTires = connect(tireMappings.map((m) => ({ id: m.id, position_type: m.position_type, productId: m.tire_product_id as number })), tireMap);
   const connectedBrakes = connect(brakeMappings.map((m) => ({ id: m.id, position_type: m.position_type, productId: m.brake_product_id as number })), brakeMap);
