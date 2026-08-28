@@ -1,6 +1,9 @@
 import { SITE_URL } from "@/lib/seo/site";
 import {
+  findActiveBatteryProductsForSitemap,
   findActiveModelYearsForSitemap,
+  findActiveTireModelsForSitemap,
+  findActiveTireProductsForSitemap,
   findPublishedContentsForSitemap,
 } from "@/repositories/seo.repository";
 
@@ -38,6 +41,10 @@ function serializeSitemap(entries: SitemapEntry[]) {
   ].join("\n");
 }
 
+function iso(value: string) {
+  return new Date(value).toISOString();
+}
+
 export async function GET() {
   const staticEntries: SitemapEntry[] = [
     { url: SITE_URL },
@@ -48,23 +55,38 @@ export async function GET() {
 
   let entries = staticEntries;
   try {
-    const [years, contents] = await Promise.all([
+    const [years, contents, tireProducts, tireModels, batteryProducts] = await Promise.all([
       findActiveModelYearsForSitemap(),
       findPublishedContentsForSitemap(),
+      findActiveTireProductsForSitemap(),
+      findActiveTireModelsForSitemap(),
+      findActiveBatteryProductsForSitemap(),
     ]);
     entries = [
       ...staticEntries,
       ...years.map((year) => ({
         url: `${SITE_URL}/model-detail/${year.bike_model_year_id}`,
-        lastModified: new Date(year.updated_at).toISOString(),
+        lastModified: iso(year.updated_at),
+      })),
+      ...tireModels.map((model) => ({
+        url: `${SITE_URL}/tire-detail/model/${encodeURIComponent(model.tire_model_key)}`,
+        lastModified: iso(model.updated_at),
+      })),
+      ...tireProducts.map((product) => ({
+        url: `${SITE_URL}/tire-detail/${product.tire_product_id}`,
+        lastModified: iso(product.updated_at),
+      })),
+      ...batteryProducts.map((product) => ({
+        url: `${SITE_URL}/battery-detail/${product.battery_product_id}`,
+        lastModified: iso(product.updated_at),
       })),
       ...contents.map((content) => ({
         url: `${SITE_URL}/contents/${content.content_key}`,
-        lastModified: new Date(content.updated_at).toISOString(),
+        lastModified: iso(content.updated_at),
       })),
     ];
   } catch {
-    // Keep the stable public routes available when a data source is temporarily unavailable.
+    // Keep stable public routes available when a data source is temporarily unavailable.
   }
 
   return new Response(serializeSitemap(entries), {
