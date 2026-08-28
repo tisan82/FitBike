@@ -61,7 +61,6 @@ export function BatteryProductSummary({ product }: Props) {
           </p>
 
           {price ? <p className="mt-5 text-2xl font-bold text-foreground">{price}</p> : null}
-          {product.sellerName ? <p className="mt-1 text-sm text-foreground-secondary">판매처 {product.sellerName}</p> : null}
 
           {product.productUrl ? (
             <a
