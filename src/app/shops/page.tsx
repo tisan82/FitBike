@@ -6,7 +6,7 @@ import { getPublishedServiceShops } from "@/services/service-shop.service";
 const title = "내 주변 오토바이 정비소 찾기";
 const description = "현재 위치를 기준으로 주변 오토바이 정비소를 찾고 주소, 전화, 정비 항목과 공개 이용후기 요약을 확인하세요.";
 
-export const revalidate = 3600;
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title,
@@ -29,7 +29,7 @@ export default async function ServiceShopsPage() {
           위치를 허용하면 가까운 정비소부터 보여드립니다. 정비 항목과 공개된 외부 이용후기 정보를 FitBike 기준으로 정리해 제공합니다.
         </p>
         <p className="mt-3 text-sm leading-6 text-foreground-secondary">
-          영업시간과 실제 작업 가능 여부는 변동될 수 있으므로 방문 전에 업체에 직접 확인하세요.
+          현재는 서울 지역 검증 정비소부터 제공합니다. 영업시간과 실제 작업 가능 여부는 방문 전에 업체에 직접 확인하세요.
         </p>
       </header>
       <ServiceShopMap naverMapClientId={clientId} shops={shops} />
