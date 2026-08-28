@@ -6,7 +6,7 @@ import { getPublishedServiceShops } from "@/services/service-shop.service";
 const title = "내 주변 오토바이 정비소 찾기";
 const description = "현재 위치를 기준으로 주변 오토바이 정비소를 찾고 주소, 전화, 정비 항목과 공개 이용후기 요약을 확인하세요.";
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title,
