@@ -122,8 +122,9 @@ export function ServiceShopMap({ shops, naverMapClientId }: Props) {
 
   useEffect(() => {
     if (!mapReady || !mapElementRef.current) return;
-    const naverApi = getNaver();
-    if (!naverApi) return;
+    const candidate = getNaver();
+    if (!candidate) return;
+    const naverApi: NaverNamespace = candidate;
 
     let cancelled = false;
     const markers: NaverMarker[] = [];
