@@ -30,6 +30,37 @@ export default async function ModelDetailPage({ params }: Props) {
   try { data = await getCachedModelDetail(id); }
   catch (error) { if (error instanceof ModelDetailNotFoundError) notFound(); throw error; }
   const name = identity(data); const url = `${SITE_URL}/model-detail/${id}`; const image = getStoragePublicUrl(data.imageUrl);
-  const motorcycle = { "@context": "https://schema.org", "@type": "Motorcycle", name, brand: { "@type": "Brand", name: data.brandNameKo ?? data.brandNameEn }, model: data.modelNameKo ?? data.modelNameEn, description: description(data), url, ...(image ? { image } : {}) };
-  return <><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(motorcycle).replace(/</g, "\\u003c") }} /><ModelDetail bikeModelYearId={id} initialData={data} /></>;
+  const additionalProperty = [
+    data.frontTire.fullSize && { "@type": "PropertyValue", name: "앞 타이어 규격", value: data.frontTire.fullSize },
+    data.rearTire.fullSize && { "@type": "PropertyValue", name: "뒤 타이어 규격", value: data.rearTire.fullSize },
+    data.batteryStandardCode && { "@type": "PropertyValue", name: "배터리 규격", value: data.batteryStandardCode },
+    data.batteryVoltage && { "@type": "PropertyValue", name: "배터리 전압", value: data.batteryVoltage },
+    data.frontBrakeSpec && { "@type": "PropertyValue", name: "앞 브레이크", value: data.frontBrakeSpec },
+    data.rearBrakeSpec && { "@type": "PropertyValue", name: "뒤 브레이크", value: data.rearBrakeSpec },
+  ].filter(Boolean);
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Motorcycle",
+        "@id": `${url}#motorcycle`,
+        name,
+        brand: { "@type": "Brand", name: data.brandNameKo ?? data.brandNameEn },
+        model: data.modelNameKo ?? data.modelNameEn,
+        description: description(data),
+        url,
+        ...(image ? { image: [image] } : {}),
+        additionalProperty,
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "FitBike", item: SITE_URL },
+          { "@type": "ListItem", position: 2, name: "내 바이크 찾기", item: `${SITE_URL}/bike-selector` },
+          { "@type": "ListItem", position: 3, name },
+        ],
+      },
+    ],
+  };
+  return <><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} /><ModelDetail bikeModelYearId={id} initialData={data} /></>;
 }
