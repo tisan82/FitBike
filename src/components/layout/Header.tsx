@@ -15,12 +15,14 @@ export function Header() {
             width={96}
           />
         </Link>
-        <Link
-          className="text-sm font-semibold text-foreground-secondary transition hover:text-primary"
-          href="/bike-selector"
-        >
-          내 바이크 선택
-        </Link>
+        <nav aria-label="주요 메뉴" className="flex items-center gap-4 text-sm font-semibold text-foreground-secondary">
+          <Link className="transition hover:text-primary" href="/shops">
+            정비소 찾기
+          </Link>
+          <Link className="transition hover:text-primary" href="/bike-selector">
+            내 바이크 선택
+          </Link>
+        </nav>
       </div>
     </header>
   );
