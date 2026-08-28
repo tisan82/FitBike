@@ -1,5 +1,8 @@
 import type { BatteryProductDetail } from "@/features/battery-detail/types/battery-detail.types";
-import { findActiveBatteryProductById } from "@/repositories/battery-detail.repository";
+import {
+  findActiveBatteryProductById,
+  findCompatibleModelsByBatteryProductId,
+} from "@/repositories/battery-detail.repository";
 
 export class BatteryProductNotFoundError extends Error {
   constructor() {
@@ -11,7 +14,10 @@ export class BatteryProductNotFoundError extends Error {
 export async function getBatteryProductDetail(
   batteryProductId: number,
 ): Promise<BatteryProductDetail> {
-  const product = await findActiveBatteryProductById(batteryProductId);
+  const [product, compatibleModels] = await Promise.all([
+    findActiveBatteryProductById(batteryProductId),
+    findCompatibleModelsByBatteryProductId(batteryProductId),
+  ]);
   if (!product) throw new BatteryProductNotFoundError();
 
   return {
@@ -36,5 +42,11 @@ export async function getBatteryProductDetail(
     productUrl: product.product_url,
     sellerName: product.seller_name,
     price: product.price,
+    compatibleModels: compatibleModels.map((item) => ({
+      bikeModelYearId: item.bike_model_year_id,
+      brandName: item.brand_ko ?? item.brand_en,
+      modelName: item.model_name_ko ?? item.model_name_en,
+      yearRangeLabel: item.year_range_label,
+    })),
   };
 }
