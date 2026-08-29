@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/internal/service-shops/discovery-hourly",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
