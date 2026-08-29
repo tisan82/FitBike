@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 
-import { MY_BIKE_STORAGE_KEY, type StoredBike } from "@/components/layout/MyBikeLink";
+import { storeSessionBike, type StoredBike } from "@/components/layout/MyBikeLink";
 import { BikeSelectorSubmit } from "@/features/bike-selector/components/BikeSelectorSubmit";
 import { BrandSelect } from "@/features/bike-selector/components/BrandSelect";
 import { ModelSelect } from "@/features/bike-selector/components/ModelSelect";
@@ -34,8 +34,7 @@ export function BikeSelector() {
         modelName: model.modelNameKo ?? model.modelNameEn,
         yearRangeLabel: year.yearRangeLabel,
       };
-      window.localStorage.setItem(MY_BIKE_STORAGE_KEY, JSON.stringify(stored));
-      window.dispatchEvent(new Event("fitbike:bike-changed"));
+      storeSessionBike(stored);
     }
     router.push(`/model-detail/${selector.selectedModelYearId}`);
   };
@@ -53,7 +52,7 @@ export function BikeSelector() {
     <main className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-surface px-3 py-4 sm:px-5 sm:py-5">
         <div className="mx-auto max-w-2xl">
-          <div className="mb-3 text-center"><p className="text-xl font-bold text-foreground">내 바이크 선택</p><p className="mt-1 text-sm text-foreground-secondary">한 번 선택하면 다른 화면에서도 바로 돌아올 수 있습니다.</p></div>
+          <div className="mb-3 text-center"><p className="text-xl font-bold text-foreground">내 바이크 선택</p><p className="mt-1 text-sm text-foreground-secondary">현재 브라우저 세션에서만 선택 정보가 유지됩니다.</p></div>
           <StepIndicator currentStep={currentStep} />
         </div>
       </header>
