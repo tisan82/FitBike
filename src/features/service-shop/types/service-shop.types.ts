@@ -25,5 +25,9 @@ export type ServiceShop = {
   reviewKeywords: string[];
   reviewSourceCount: number;
   reviewCheckedAt: string | null;
+  sidoName: string | null;
+  sigunguName: string | null;
+  subdistrictName: string | null;
+  dongName: string | null;
   services: ServiceType[];
 };
