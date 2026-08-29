@@ -19,6 +19,10 @@ type ShopRow = {
   review_keywords: string[] | null;
   review_source_count: number | null;
   review_checked_at: string | null;
+  sido_name: string | null;
+  sigungu_name: string | null;
+  subdistrict_name: string | null;
+  dong_name: string | null;
 };
 
 type ServiceRow = {
@@ -31,7 +35,7 @@ export async function getPublishedServiceShops(): Promise<ServiceShop[]> {
   const [{ data: shops, error: shopError }, { data: services, error: serviceError }] = await Promise.all([
     supabase
       .from("20_service_shop")
-      .select("service_shop_id,shop_name,address,road_address,latitude,longitude,phone,business_hours,description,naver_place_url,website_url,external_rating,external_review_count,review_summary,review_keywords,review_source_count,review_checked_at")
+      .select("service_shop_id,shop_name,address,road_address,latitude,longitude,phone,business_hours,description,naver_place_url,website_url,external_rating,external_review_count,review_summary,review_keywords,review_source_count,review_checked_at,sido_name,sigungu_name,subdistrict_name,dong_name")
       .eq("is_active", true)
       .eq("verification_status", "VERIFIED")
       .order("shop_name"),
@@ -69,6 +73,10 @@ export async function getPublishedServiceShops(): Promise<ServiceShop[]> {
     reviewKeywords: row.review_keywords ?? [],
     reviewSourceCount: row.review_source_count ?? 0,
     reviewCheckedAt: row.review_checked_at,
+    sidoName: row.sido_name,
+    sigunguName: row.sigungu_name,
+    subdistrictName: row.subdistrict_name,
+    dongName: row.dong_name,
     services: serviceMap.get(row.service_shop_id) ?? [],
   }));
 }
