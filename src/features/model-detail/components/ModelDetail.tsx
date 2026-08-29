@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 
+import { storeSessionBike } from "@/components/layout/MyBikeLink";
 import { ModelDescription } from "@/features/model-detail/components/ModelDescription";
 import { ModelDetailError } from "@/features/model-detail/components/ModelDetailError";
 import { ModelDetailHeader } from "@/features/model-detail/components/ModelDetailHeader";
@@ -18,6 +20,16 @@ type Props = { bikeModelYearId: number | null; initialData?: ModelDetailData };
 
 export function ModelDetail({ bikeModelYearId, initialData }: Props) {
   const query = useModelDetailQuery(bikeModelYearId, initialData);
+
+  useEffect(() => {
+    if (!query.data) return;
+    storeSessionBike({
+      bikeModelYearId: query.data.bikeModelYearId,
+      brandName: query.data.brandNameKo ?? query.data.brandNameEn,
+      modelName: query.data.modelNameKo ?? query.data.modelNameEn,
+      yearRangeLabel: query.data.yearRangeLabel,
+    });
+  }, [query.data]);
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-8 px-5 py-8 sm:py-14">
