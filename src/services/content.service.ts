@@ -13,6 +13,7 @@ import {
 import {
   CONTENT_TYPES,
   type ContentBlock,
+  type ContentImage,
   type ContentListItem,
   type ContentType,
   type PublishedContent,
@@ -30,6 +31,15 @@ function strings(value: unknown): string[] | null {
     : null;
 }
 
+function parseImage(value: unknown): ContentImage | null {
+  if (!isRecord(value) || typeof value.storagePath !== "string" || typeof value.alt !== "string") return null;
+  return {
+    storagePath: value.storagePath,
+    alt: value.alt,
+    ...(typeof value.caption === "string" ? { caption: value.caption } : {}),
+  };
+}
+
 function parseBlock(value: unknown): ContentBlock | null {
   if (!isRecord(value) || typeof value.type !== "string") return null;
   const text = typeof value.text === "string" ? value.text : null;
@@ -43,15 +53,16 @@ function parseBlock(value: unknown): ContentBlock | null {
         : null;
     case "paragraph":
       return text ? { type: "paragraph", text } : null;
-    case "image":
-      return typeof value.storagePath === "string" && typeof value.alt === "string"
-        ? {
-            type: "image",
-            storagePath: value.storagePath,
-            alt: value.alt,
-            ...(typeof value.caption === "string" ? { caption: value.caption } : {}),
-          }
-        : null;
+    case "image": {
+      const image = parseImage(value);
+      return image ? { type: "image", ...image } : null;
+    }
+    case "image_gallery": {
+      const images = Array.isArray(value.images) ? value.images.map(parseImage) : [];
+      if (images.length < 2 || images.some((image) => image === null)) return null;
+      const columns = value.columns === 3 ? 3 : 2;
+      return { type: "image_gallery", images: images as ContentImage[], columns };
+    }
     case "bullet_list":
     case "numbered_list": {
       const items = strings(value.items);
