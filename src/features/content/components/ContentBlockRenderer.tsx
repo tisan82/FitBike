@@ -3,18 +3,26 @@ import Image from "next/image";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
 import type { ContentBlock, ContentImage } from "@/features/content/types/content.types";
 
-function ContentVisual({ image, compact = false }: { image: ContentImage; compact?: boolean }) {
+function ContentVisual({
+  image,
+  compact = false,
+  contain = false,
+}: {
+  image: ContentImage;
+  compact?: boolean;
+  contain?: boolean;
+}) {
   const src = getStoragePublicUrl(image.storagePath, "content-assets");
   if (!src) return null;
   return (
     <figure className="space-y-2">
       <Image
         alt={image.alt}
-        className={`h-auto w-full rounded-2xl object-cover ${compact ? "aspect-[4/3]" : ""}`}
-        height={compact ? 900 : 900}
+        className={`h-auto w-full rounded-2xl ${compact ? "aspect-[4/3]" : ""} ${contain ? "bg-surface-secondary object-contain p-3" : "object-cover"}`}
+        height={900}
         src={src}
         unoptimized
-        width={compact ? 1200 : 1200}
+        width={1200}
       />
       {image.caption ? <figcaption className="text-sm leading-6 text-foreground-secondary">{image.caption}</figcaption> : null}
     </figure>
@@ -49,6 +57,17 @@ export function ContentBlockRenderer({ blocks }: { blocks: ContentBlock[] }) {
             ) : null;
           }
           case "image_gallery":
+            if (block.layout === "swipe") {
+              return (
+                <section aria-label="대표 차량 이미지" className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-3 pt-2 sm:mx-0 sm:px-0" key={key}>
+                  {block.images.map((image, imageIndex) => (
+                    <div className="w-[84%] min-w-[84%] snap-start sm:w-[46%] sm:min-w-[46%] lg:w-[32%] lg:min-w-[32%]" key={`${image.storagePath}-${imageIndex}`}>
+                      <ContentVisual compact contain image={image} />
+                    </div>
+                  ))}
+                </section>
+              );
+            }
             return (
               <section aria-label="관련 이미지" className={`grid grid-cols-1 gap-4 py-2 sm:gap-5 ${block.columns === 3 ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"}`} key={key}>
                 {block.images.map((image, imageIndex) => <ContentVisual compact image={image} key={`${image.storagePath}-${imageIndex}`} />)}
