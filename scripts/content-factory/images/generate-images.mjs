@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -101,6 +102,31 @@ async function convertCandidate(sourcePath, outputPath, standard) {
   return { checks, metadata: { width: metadata.width, height: metadata.height, format: metadata.format, colourspace: metadata.space, bytes: file.size } };
 }
 
+async function fileSha256(filePath) {
+  return createHash("sha256").update(await readFile(filePath)).digest("hex");
+}
+
+async function markDuplicateBodyImages(assetResults) {
+  const bodyAssets = assetResults.filter((asset) => asset.type === "body" && asset.absoluteFile && asset.status !== "FAIL");
+  const byHash = new Map();
+  for (const asset of bodyAssets) {
+    const hash = await fileSha256(asset.absoluteFile);
+    const matches = byHash.get(hash) ?? [];
+    matches.push(asset);
+    byHash.set(hash, matches);
+  }
+
+  const duplicateGroups = [...byHash.values()].filter((group) => group.length > 1);
+  for (const group of duplicateGroups) {
+    const ids = group.map((asset) => asset.id).join(", ");
+    for (const asset of group) {
+      asset.status = "REVIEW_REQUIRED";
+      asset.issues.push(`Duplicate body image output: ${ids}`);
+    }
+  }
+  return duplicateGroups.map((group) => group.map((asset) => asset.id));
+}
+
 async function createReviewSheet(assetResults, outputDirectory) {
   if (assetResults.length < 2) return null;
   const panelWidth = 800;
@@ -175,6 +201,7 @@ async function main() {
     });
   }
 
+  const duplicateBodyImages = await markDuplicateBodyImages(assets);
   const missingSource = assets.some((asset) => asset.status === "FAIL");
   const reviewRequired = assets.some((asset) => asset.status === "REVIEW_REQUIRED");
   const status = missingSource ? "FAILED" : reviewRequired ? "REVIEW_REQUIRED" : "READY_FOR_VISUAL_REVIEW";
@@ -186,12 +213,13 @@ async function main() {
     status,
     assets: serializableAssets,
     reviewSheet: sheetPath ? path.relative(contentDirectory, sheetPath).replaceAll("\\", "/") : null,
+    duplicateBodyImages,
     issues: serializableAssets.flatMap((asset) => asset.issues)
   };
   await writeFile(path.join(contentDirectory, "image-result.json"), `${JSON.stringify(imageResult, null, 2)}\n`, "utf8");
   const packageWithImages = { ...contentPackage, imageCandidates: imageResult };
   await writeFile(path.join(contentDirectory, "content-package-with-images.json"), `${JSON.stringify(packageWithImages, null, 2)}\n`, "utf8");
-  console.log(JSON.stringify({ status, contentDirectory, assets: serializableAssets.length, reviewSheet: imageResult.reviewSheet }, null, 2));
+  console.log(JSON.stringify({ status, contentDirectory, assets: serializableAssets.length, reviewSheet: imageResult.reviewSheet, duplicateBodyImages }, null, 2));
 }
 
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main().catch((error) => {
@@ -199,4 +227,4 @@ if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main
   process.exitCode = 1;
 });
 
-export { buildPrompt, prepareRequests, requestedAssets };
+export { buildPrompt, markDuplicateBodyImages, prepareRequests, requestedAssets };
