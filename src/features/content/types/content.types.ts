@@ -7,10 +7,17 @@ export const CONTENT_TYPES = [
 
 export type ContentType = (typeof CONTENT_TYPES)[number];
 
+export type ContentImage = {
+  storagePath: string;
+  alt: string;
+  caption?: string;
+};
+
 export type ContentBlock =
   | { type: "heading"; level: 2 | 3; text: string }
   | { type: "paragraph"; text: string }
-  | { type: "image"; storagePath: string; alt: string; caption?: string }
+  | ({ type: "image" } & ContentImage)
+  | { type: "image_gallery"; images: ContentImage[]; columns?: 2 | 3 }
   | { type: "bullet_list"; items: string[] }
   | { type: "numbered_list"; items: string[] }
   | { type: "step"; title: string; body: string; number?: number }
