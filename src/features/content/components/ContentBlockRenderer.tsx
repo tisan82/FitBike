@@ -3,6 +3,11 @@ import Image from "next/image";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
 import type { ContentBlock, ContentImage } from "@/features/content/types/content.types";
 
+function resolveContentImage(path: string) {
+  if (path.startsWith("/")) return path;
+  return getStoragePublicUrl(path, "content-assets");
+}
+
 function ContentVisual({
   image,
   compact = false,
@@ -12,7 +17,7 @@ function ContentVisual({
   compact?: boolean;
   contain?: boolean;
 }) {
-  const src = getStoragePublicUrl(image.storagePath, "content-assets");
+  const src = resolveContentImage(image.storagePath);
   if (!src) return null;
   return (
     <figure className="space-y-2">
@@ -48,7 +53,7 @@ export function ContentBlockRenderer({ blocks }: { blocks: ContentBlock[] }) {
           case "image": {
             const normalizedPath = block.storagePath.toLowerCase();
             const isMobileGuide = /\/body-(01|02)\.(svg|webp)$/.test(normalizedPath);
-            const src = getStoragePublicUrl(block.storagePath, "content-assets");
+            const src = resolveContentImage(block.storagePath);
             return src ? (
               <figure className="space-y-3 py-2" key={key}>
                 <Image alt={block.alt} className={isMobileGuide ? "mx-auto h-auto w-full max-w-md rounded-2xl" : "h-auto w-full rounded-2xl"} height={isMobileGuide ? 1000 : 900} src={src} unoptimized width={isMobileGuide ? 800 : 1200} />
