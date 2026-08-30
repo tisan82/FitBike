@@ -1,18 +1,48 @@
 {
   "MAINTENANCE": {
-    "intent": "점검, 관리, 교체 전 확인 정보를 설명한다.",
-    "images": { "thumbnail": true, "hero": false, "bodyVisualPreferred": false }
+    "intent": "점검, 관리, 교체 전 확인 정보를 실제 확인 위치와 상태 비교 중심으로 설명한다.",
+    "images": {
+      "thumbnail": true,
+      "hero": true,
+      "bodyVisualPreferred": true,
+      "minimumBodyImages": 3,
+      "targetBodyImages": 5,
+      "preferredScenes": ["actual inspection point", "normal vs worn condition", "tool in use", "before/after state"]
+    }
   },
   "DIY": {
-    "intent": "사용자가 직접 수행하는 교체 또는 작업 절차를 설명한다.",
-    "images": { "thumbnail": true, "hero": true, "bodyVisualPreferred": true }
+    "intent": "사용자가 직접 수행하는 교체 또는 작업 절차를 실제 작업 흐름 중심으로 설명한다.",
+    "images": {
+      "thumbnail": true,
+      "hero": true,
+      "bodyVisualPreferred": true,
+      "minimumBodyImages": 5,
+      "targetBodyImages": 7,
+      "preferredScenes": ["bike overview", "part location", "cover removed", "tool in use", "removal", "installation", "completed state"],
+      "vehicleExampleRequiredWhenLocationVaries": true
+    }
   },
   "PARTS_GUIDE": {
-    "intent": "부품, 규격, 구조를 이해할 수 있도록 설명한다.",
-    "images": { "thumbnail": true, "hero": false, "bodyVisualPreferred": true }
+    "intent": "부품, 규격, 구조를 실제 부품과 장착 위치를 보며 이해할 수 있도록 설명한다.",
+    "images": {
+      "thumbnail": true,
+      "hero": true,
+      "bodyVisualPreferred": true,
+      "minimumBodyImages": 3,
+      "targetBodyImages": 5,
+      "preferredScenes": ["actual part", "marking close-up", "installed position", "fitment comparison"]
+    }
   },
   "MODEL_GUIDE": {
-    "intent": "검증된 특정 바이크 모델 데이터를 기반으로 정보를 설명한다.",
-    "images": { "thumbnail": true, "hero": true, "bodyVisualPreferred": false }
+    "intent": "검증된 특정 바이크 모델 데이터를 기반으로 실제 모델에서 확인할 위치와 규격 정보를 설명한다.",
+    "images": {
+      "thumbnail": true,
+      "hero": true,
+      "bodyVisualPreferred": true,
+      "minimumBodyImages": 2,
+      "targetBodyImages": 4,
+      "preferredScenes": ["verified bike model", "front/rear part location", "manufacturer marking or label"],
+      "requireVerifiedModelAsset": true
+    }
   }
 }
