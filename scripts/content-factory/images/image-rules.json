@@ -1,30 +1,9 @@
 {
-  "version": 3,
+  "version": 4,
   "assets": {
-    "thumbnail": {
-      "width": 1200,
-      "height": 675,
-      "aspectRatio": "16:9",
-      "format": "webp",
-      "colourspace": "srgb",
-      "fileName": "thumbnail-candidate.webp"
-    },
-    "hero": {
-      "width": 1600,
-      "height": 900,
-      "aspectRatio": "16:9",
-      "format": "webp",
-      "colourspace": "srgb",
-      "fileName": "hero-candidate.webp"
-    },
-    "body": {
-      "width": 1200,
-      "height": 900,
-      "aspectRatio": "4:3",
-      "format": "webp",
-      "colourspace": "srgb",
-      "fileNamePattern": "body-{index}-candidate.webp"
-    }
+    "thumbnail": { "width": 1200, "height": 675, "aspectRatio": "16:9", "format": "webp", "colourspace": "srgb", "fileName": "thumbnail-candidate.webp" },
+    "hero": { "width": 1600, "height": 900, "aspectRatio": "16:9", "format": "webp", "colourspace": "srgb", "fileName": "hero-candidate.webp" },
+    "body": { "width": 1200, "height": 900, "aspectRatio": "4:3", "format": "webp", "colourspace": "srgb", "fileNamePattern": "body-{index}-candidate.webp" }
   },
   "textPolicy": {
     "default": "NONE",
@@ -32,33 +11,31 @@
     "prohibited": ["long headline", "body copy", "supporting copy", "feature chips"]
   },
   "generation": {
-    "sourcePriority": [
-      "APPROVED_BRAND_ASSET",
-      "GENERATED_EDUCATIONAL",
-      "GENERATED_GENERIC",
-      "IMAGE_REVIEW_REQUIRED"
-    ],
-    "sourceTypes": ["APPROVED_BRAND_ASSET", "GENERATED_EDUCATIONAL", "GENERATED_GENERIC", "NONE"],
-    "prohibited": ["brand logo", "watermark", "invented product number", "unsupported technical value", "advertising layout"],
+    "sourcePriority": ["VERIFIED_REAL_WORLD_ASSET", "APPROVED_BRAND_ASSET", "GENERATED_EDUCATIONAL", "GENERATED_GENERIC", "IMAGE_REVIEW_REQUIRED"],
+    "sourceTypes": ["VERIFIED_REAL_WORLD_ASSET", "APPROVED_BRAND_ASSET", "GENERATED_EDUCATIONAL", "GENERATED_GENERIC", "NONE"],
+    "practicalUseFirst": true,
+    "preferredComposition": ["hands and tool visible when procedural", "part location visible in vehicle context", "close-up plus wider context", "normal vs worn state comparison when relevant"],
+    "prohibited": ["brand logo", "watermark", "invented product number", "unsupported technical value", "advertising layout", "fake real-model replica presented as factual", "decorative infographic when a practical photo is required"],
     "modelGuide": {
       "preferExistingBikeAsset": true,
       "generatedRealModelReplica": false,
+      "requireVerifiedModelForLocationClaim": true,
       "fallback": ["GENERIC_CONTEXT_IMAGE", "IMAGE_REVIEW_REQUIRED"]
     },
     "product": {
       "preferApprovedProductAsset": true,
       "generatedProductReplica": false,
       "genericEducationalVisual": true,
-      "requiredApprovedBrandByPart": {
-        "BATTERY": "POWEROAD",
-        "TIRE": "MAXXIS"
-      }
+      "requiredApprovedBrandByPart": { "BATTERY": "POWEROAD", "TIRE": "MAXXIS" }
     }
   },
   "qa": {
-    "minimumBytes": 1,
+    "minimumBytes": 12000,
     "requireExactDimensions": true,
     "requireSrgb": true,
-    "requireVisualReview": true
+    "requireVisualReview": true,
+    "rejectDuplicateBodyHashes": true,
+    "rejectPlaceholderLikeVisual": true,
+    "requirePracticalSceneForMaintenanceAndDiy": true
   }
 }
