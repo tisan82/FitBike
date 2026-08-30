@@ -61,7 +61,8 @@ function parseBlock(value: unknown): ContentBlock | null {
       const images = Array.isArray(value.images) ? value.images.map(parseImage) : [];
       if (images.length < 2 || images.some((image) => image === null)) return null;
       const columns = value.columns === 3 ? 3 : 2;
-      return { type: "image_gallery", images: images as ContentImage[], columns };
+      const layout = value.layout === "swipe" ? "swipe" : "grid";
+      return { type: "image_gallery", images: images as ContentImage[], columns, layout };
     }
     case "bullet_list":
     case "numbered_list": {
