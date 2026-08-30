@@ -17,7 +17,12 @@ export type ContentBlock =
   | { type: "heading"; level: 2 | 3; text: string }
   | { type: "paragraph"; text: string }
   | ({ type: "image" } & ContentImage)
-  | { type: "image_gallery"; images: ContentImage[]; columns?: 2 | 3 }
+  | {
+      type: "image_gallery";
+      images: ContentImage[];
+      columns?: 2 | 3;
+      layout?: "grid" | "swipe";
+    }
   | { type: "bullet_list"; items: string[] }
   | { type: "numbered_list"; items: string[] }
   | { type: "step"; title: string; body: string; number?: number }
