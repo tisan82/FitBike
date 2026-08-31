@@ -7,7 +7,10 @@
     "requireNonEmptyCaption": true,
     "preferActualUseScene": true,
     "modelSpecificVisualsMustBeVerified": true,
-    "doNotReuseGenericBikeAsModelHero": true
+    "doNotReuseGenericBikeAsModelHero": true,
+    "requireVisualPurposeCaption": true,
+    "generatedVisualMustBeLabeledWhenNotActualPhoto": true,
+    "externalPhotoMustHaveSourceAndUsageBasis": true
   },
   "MAINTENANCE": {
     "intent": "점검, 관리, 교체 전 확인 정보를 실제 확인 위치와 상태 비교 중심으로 설명한다.",
@@ -17,7 +20,9 @@
       "bodyVisualPreferred": true,
       "minimumBodyImages": 3,
       "targetBodyImages": 5,
-      "preferredScenes": ["actual inspection point", "normal vs worn condition", "tool in use", "before/after state"]
+      "minimumActualPhotos": 2,
+      "preferredScenes": ["actual inspection point", "normal vs worn condition", "tool in use", "before/after state"],
+      "requireNormalAbnormalComparisonWhenApplicable": true
     }
   },
   "DIY": {
@@ -28,8 +33,10 @@
       "bodyVisualPreferred": true,
       "minimumBodyImages": 5,
       "targetBodyImages": 7,
+      "minimumActualPhotos": 3,
       "preferredScenes": ["bike overview", "part location", "cover removed", "tool in use", "removal", "installation", "completed state"],
-      "vehicleExampleRequiredWhenLocationVaries": true
+      "vehicleExampleRequiredWhenLocationVaries": true,
+      "requirePhotoBelowCaption": true
     }
   },
   "PARTS_GUIDE": {
@@ -40,7 +47,9 @@
       "bodyVisualPreferred": true,
       "minimumBodyImages": 3,
       "targetBodyImages": 5,
-      "preferredScenes": ["actual part", "marking close-up", "installed position", "fitment comparison"]
+      "minimumActualPhotos": 2,
+      "preferredScenes": ["actual part", "marking close-up", "installed position", "fitment comparison"],
+      "requireMarkingPhotoWhenSpecificationIsExplained": true
     }
   },
   "MODEL_GUIDE": {
@@ -51,9 +60,11 @@
       "bodyVisualPreferred": true,
       "minimumBodyImages": 2,
       "targetBodyImages": 4,
+      "minimumActualPhotos": 2,
       "preferredScenes": ["verified bike model", "front/rear part location", "manufacturer marking or label"],
       "requireVerifiedModelAsset": true,
-      "rejectSharedGenericModelHero": true
+      "rejectSharedGenericModelHero": true,
+      "allowGenericPhotoOnlyWhenExplicitlyLabeledAsVerificationExample": true
     }
   }
 }
