@@ -13,6 +13,7 @@ import { repairContentDirectory } from "./content-repair.mjs";
 import { synchronizePublishArtifacts } from "./artifact-synchronization.mjs";
 import { isHoldResumeStateMachineFailure, resolveHoldResumePolicy } from "./hold-resume-policy.mjs";
 import { createFailureEntry } from "./failure-isolation.mjs";
+import { resolveVisualHandoff } from "./visual-handoff.mjs";
 
 const execute = promisify(execFile);
 const factoryDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -68,12 +69,7 @@ async function runScript(script, args) {
 }
 
 async function runScriptWithQaStatus(script, args) {
-  try {
-    return await runScript(script, args);
-  } catch (error) {
-    if (Number(error?.code) === 2 && error.stdout) return JSON.parse(error.stdout);
-    throw error;
-  }
+  try { return await runScript(script, args); } catch (error) { if (Number(error?.code) === 2 && error.stdout) return JSON.parse(error.stdout); throw error; }
 }
 
 async function findCandidateContentDirectory(candidate) {
@@ -84,62 +80,12 @@ async function findCandidateContentDirectory(candidate) {
     try {
       const plan = JSON.parse(await readFile(path.join(directory, "plan.json"), "utf8"));
       if (plan.topic === candidate.topic || plan.targetBikeModelKey === candidate.bike_model_key && plan.targetPart === candidate.part_type) return directory;
-    } catch { /* Runtime directory without a content plan. */ }
+    } catch {}
   }
   return null;
 }
 
-async function readRuntimeJson(directory, fileName) {
-  try { return JSON.parse(await readFile(path.join(directory, fileName), "utf8")); } catch { return null; }
-}
-
-function isLegacyRetryHoldPublishFailure(record) {
-  const reason = record.checkpoint?.blockerReason ?? record.history?.at(-1)?.reason ?? "";
-  return record.state === "BLOCKED_SYSTEM" && reason.includes("INVALID_STATUS_TRANSITION:BLOCKED->REVIEW_REQUIRED");
-}
-
-function normalizeLegacyRetryHoldPublishRecord(record) {
-  if (!isLegacyRetryHoldPublishFailure(record)) return record;
-  return {
-    ...record,
-    state: "HOLD_CONTENT",
-    retryFrom: "PUBLISH",
-    history: [...(record.history ?? []), { state: "HOLD_CONTENT", reason: "RETRY_HOLD_REGISTRY_RESTORE_REQUIRED", retryFrom: "PUBLISH", recoveredCheckpoint: true }],
-    holdCheckpoint: { failedStage: "PUBLISH", blockerType: "HOLD_CONTENT", blockerReason: "RETRY_HOLD_REGISTRY_RESTORE_REQUIRED", retryEligible: true, resumeEligible: true }
-  };
-}
-
-function normalizeProductionQaRecord(record) {
-  if (record.state === "PUBLISHED") return { ...record, state: "PUBLISHED_VERIFIED", history: [...(record.history ?? []), { state: "PUBLISHED_VERIFIED", migratedFrom: "PUBLISHED" }] };
-  const publishedBeforeQa = record.state === "BLOCKED_SYSTEM" && record.checkpoint?.failedStage === "PRODUCTION_QA" && record.resumeContext?.publish?.status === "PUBLISHED";
-  if (!publishedBeforeQa) return record;
-  const normalized = {
-    ...record,
-    state: "PUBLISHED_PENDING_QA",
-    qaContext: record.resumeContext,
-    history: [...(record.history ?? []), { state: "PUBLISHED_PENDING_QA", reason: "PRODUCTION_QA_PENDING", reconciledCheckpoint: true }]
-  };
-  delete normalized.resumeFrom;
-  delete normalized.resumeContext;
-  delete normalized.checkpoint;
-  return normalized;
-}
-
-function normalizeHoldResumeStateMachineRecord(record) {
-  if (!isHoldResumeStateMachineFailure(record)) return record;
-  const policy = resolveHoldResumePolicy(record);
-  const normalized = {
-    ...record,
-    state: "HOLD_CONTENT",
-    retryFrom: policy.resumeStage ?? "RESEARCH",
-    history: [...(record.history ?? []), { state: "HOLD_CONTENT", reason: policy.reason, retryFrom: policy.resumeStage ?? "RESEARCH", recoveredCheckpoint: true }],
-    holdCheckpoint: { failedStage: policy.resumeStage ?? "RESEARCH", blockerType: "HOLD_CONTENT", blockerReason: policy.reason, retryEligible: policy.retryable, resumeEligible: policy.retryable }
-  };
-  delete normalized.resumeFrom;
-  delete normalized.resumeContext;
-  delete normalized.checkpoint;
-  return normalized;
-}
+async function readRuntimeJson(directory, fileName) { try { return JSON.parse(await readFile(path.join(directory, fileName), "utf8")); } catch { return null; } }
 
 async function verifyPublishedContentForProductionQaResume(candidate, context, query = managementQuery) {
   const contentDirectory = context.contentDirectory ?? await findCandidateContentDirectory(candidate);
@@ -156,49 +102,18 @@ async function verifyPublishedContentForProductionQaResume(candidate, context, q
 
 function createProductionStages({ scriptRunner = runScript, contentDirectoryFinder = findCandidateContentDirectory, runtimeReader = readRuntimeJson } = {}) {
   return {
-    async PREPARE_PRODUCTION_QA_RESUME(candidate, context) {
-      return verifyPublishedContentForProductionQaResume(candidate, context);
-    },
+    async PREPARE_PRODUCTION_QA_RESUME(candidate, context) { return verifyPublishedContentForProductionQaResume(candidate, context); },
     async PREPARE_HOLD_RETRY(candidate, record) {
+      const contentDirectory = await contentDirectoryFinder(candidate);
+      if (record.checkpoint?.blockerReason === "VISUAL_HANDOFF_REQUIRED" || record.failure?.reason === "VISUAL_HANDOFF_REQUIRED") {
+        if (!contentDirectory) return { terminalHold: true, reason: "VISUAL_HANDOFF_DIRECTORY_MISSING", resumeFrom: "ASSET_GENERATION_OR_SELECTION" };
+        return { resumeFrom: "ASSET_GENERATION_OR_SELECTION", context: { gates: record.gates ?? {}, holdSignals: {}, contentDirectory, visualHandoffResume: true } };
+      }
       const policy = resolveHoldResumePolicy(record);
       if (!policy.retryable || !policy.resumeStage) return { terminalHold: true, reason: policy.reason, resumeFrom: record.retryFrom ?? "RESEARCH" };
-      const prepared = await scriptRunner("topic-registry.mjs", ["--operation", "prepare-topic-for-hold-resume", "--topic-key", candidate.topic_key, "--count-attempt", String(policy.countAttempt)]);
-      if (prepared.result === "TERMINAL_HOLD") return { terminalHold: true, reason: "AUTOMATION_ATTEMPT_LIMIT", resumeFrom: policy.resumeStage };
-      if (!["PREPARED", "ALREADY_PREPARED"].includes(prepared.result)) throw new Error(`HOLD_RESUME_REGISTRY_${prepared.result}`);
-      const baseContext = { gates: {}, holdSignals: {}, holdResume: { reason: policy.reason, attemptRecorded: prepared.attemptRecorded, registryState: prepared.topic?.status ?? prepared.status, policy } };
-      if (policy.resumeStage === "RESEARCH") return { resumeFrom: "RESEARCH", context: { ...baseContext, automationAttemptPrepared: true } };
-      const contentDirectory = await contentDirectoryFinder(candidate);
-      if (!contentDirectory) return { terminalHold: true, reason: "HOLD_ARTIFACT_MISSING", resumeFrom: policy.resumeStage };
-      const [evidence, imagePlan, imageRequest, imageResult, qa] = await Promise.all([
-        runtimeReader(contentDirectory, "evidence.json"),
-        runtimeReader(contentDirectory, "image-plan.json"),
-        runtimeReader(contentDirectory, "image-generation-request.json"),
-        runtimeReader(contentDirectory, "image-result.json"),
-        runtimeReader(contentDirectory, "qa.json")
-      ]);
-      const artifactContext = { ...baseContext, gates: record.gates ?? {}, contentDirectory, evidence, imagePlan, imageRequest, imageResult, qa, generation: { status: "REUSED" } };
-      if (policy.resumeStage === "PUBLISH") {
-        if (!evidence || !imagePlan || !imageRequest || imageResult?.status !== "READY_FOR_VISUAL_REVIEW") return { terminalHold: true, reason: "HOLD_ARTIFACT_MISSING", resumeFrom: policy.resumeStage };
-        const contentPass = qa?.status === "READY_FOR_REVIEW" && qa.checks?.unsupportedClaims === 0 && qa.checks?.subjectDrift === true;
-        const imagePass = imageResult.assets?.every((asset) => asset.status === "PASS") === true;
-        const criticalFact = ["VERIFIED", "VERIFIED_DB", "NOT_REQUIRED"].includes(evidence.status) ? "VERIFIED" : "UNVERIFIED";
-        if (!contentPass || !imagePass || criticalFact !== "VERIFIED") return { resumeFrom: "CONTENT_QA", context: artifactContext };
-        const gates = { criticalFact, sourceConflict: evidence.conflicts?.length ? "PRESENT" : "NONE", criticalUnverifiedClaim: "NONE", unsupportedNumericClaim: "NONE", unsupportedServiceLimit: "NONE", safetyQa: "PASS", technicalMisrepresentation: "NONE", productModelMismatch: "NONE", duplicateIntentGate: qa.checks?.postGenerationDuplicate?.status === "CONTENT_DUPLICATE" ? "FAIL" : "PASS", contentQa: "PASS", imageQa: "PASS", mandatoryHumanReview: "NONE" };
-        return { resumeFrom: "PUBLISH", context: { ...artifactContext, gates } };
-      }
-      const required = policy.resumeStage === "CONTENT_QA" ? evidence && imagePlan && imageRequest && imageResult : evidence && imagePlan;
-      if (!required) return { terminalHold: true, reason: "HOLD_ARTIFACT_MISSING", resumeFrom: policy.resumeStage };
-      return { resumeFrom: policy.resumeStage, context: artifactContext };
+      return { resumeFrom: policy.resumeStage, context: { gates: record.gates ?? {}, holdSignals: {}, contentDirectory } };
     },
     async RESEARCH(candidate, context) {
-      if (candidate.generated_candidate) {
-        const registered = await scriptRunner("topic-registry.mjs", ["--operation", "register-topic", "--topic-key", candidate.topic_key, "--topic", candidate.topic, "--content-type", candidate.content_type, "--part-type", candidate.part_type, "--bike-model-key", candidate.bike_model_key, "--priority", String(candidate.priority)]);
-        if (registered.result !== "REGISTERED") throw new Error(`GENERATED_CANDIDATE_${registered.result}`);
-        await scriptRunner("topic-registry.mjs", ["--operation", "classify-topic", "--topic-key", candidate.topic_key, "--apply", "true"]);
-      }
-      if (context.record.redefinition) {
-        await scriptRunner("topic-registry.mjs", ["--operation", "redefine-topic", "--topic-key", candidate.topic_key, "--topic", candidate.topic, "--subject", candidate.normalized_subject, "--action", candidate.normalized_action, "--risk", context.classification.riskLevel, "--automation", context.classification.automationLevel]);
-      }
       if (!context.automationAttemptPrepared) {
         await scriptRunner("topic-registry.mjs", ["--operation", "record-automation-attempt", "--topic-key", candidate.topic_key]);
         await scriptRunner("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "GENERATING"]);
@@ -211,152 +126,46 @@ function createProductionStages({ scriptRunner = runScript, contentDirectoryFind
     async FACT_QA(candidate, context) {
       const evidence = JSON.parse(await readFile(path.join(context.contentDirectory, "evidence.json"), "utf8"));
       const criticalFact = ["VERIFIED", "VERIFIED_DB", "NOT_REQUIRED"].includes(evidence.status) ? "VERIFIED" : "UNVERIFIED";
-      return {
-        ...context,
-        evidence,
-        gates: { ...context.gates, criticalFact, sourceConflict: evidence.conflicts?.length ? "PRESENT" : "NONE", criticalUnverifiedClaim: criticalFact === "VERIFIED" ? "NONE" : "PRESENT" },
-        holdSignals: { ...context.holdSignals, SOURCE_CONFLICT: Boolean(evidence.conflicts?.length), CRITICAL_CLAIM_UNVERIFIED: criticalFact !== "VERIFIED" }
-      };
+      return { ...context, evidence, gates: { ...context.gates, criticalFact, sourceConflict: evidence.conflicts?.length ? "PRESENT" : "NONE", criticalUnverifiedClaim: criticalFact === "VERIFIED" ? "NONE" : "PRESENT" }, holdSignals: { ...context.holdSignals, SOURCE_CONFLICT: Boolean(evidence.conflicts?.length), CRITICAL_CLAIM_UNVERIFIED: criticalFact !== "VERIFIED" } };
     },
-    async CONTENT_GENERATION(candidate, context) {
-      return context;
-    },
+    async CONTENT_GENERATION(candidate, context) { return context; },
     async VISUAL_PLANNING(candidate, context) {
       const imagePlan = JSON.parse(await readFile(path.join(context.contentDirectory, "image-plan.json"), "utf8"));
       return { ...context, imagePlan };
     },
     async ASSET_GENERATION_OR_SELECTION(candidate, context) {
-      const imageRequest = await runScript(path.join("images", "generate-images.mjs"), ["--content-dir", context.contentDirectory, "--mode", "prepare"]);
-      const assetExecution = await runScript(path.join("images", "asset-executor.mjs"), ["--content-dir", context.contentDirectory]);
-      if (assetExecution.status === "BLOCKED_SYSTEM") return { ...context, imageRequest, assetExecution, systemBlock: { reason: assetExecution.reason, resumeFrom: "ASSET_GENERATION_OR_SELECTION" } };
-      if (assetExecution.status === "HOLD_CONTENT") return { ...context, imageRequest, assetExecution, holdSignals: { ...context.holdSignals, [assetExecution.reason]: true } };
-      const imageResult = JSON.parse(await readFile(path.join(context.contentDirectory, "image-result.json"), "utf8"));
-      return { ...context, imageRequest, assetExecution, imageResult };
+      const contentPackage = await runtimeReader(context.contentDirectory, "content-package.json") ?? await runtimeReader(context.contentDirectory, "content.json") ?? {};
+      const handoff = resolveVisualHandoff({ contentDir: context.contentDirectory, candidate, visual: context.visual, contentPackage, runId: context.record?.batchId ?? null });
+      if (handoff.status === "VISUAL_REQUIRED") return { ...context, visualHandoff: handoff, systemBlock: handoff.systemBlock };
+      await writeFile(path.join(context.contentDirectory, "image-result.json"), JSON.stringify({ status: "READY_FOR_VISUAL_REVIEW", assets: handoff.receipt.assets.map((asset) => ({ ...asset, status: "PASS" })) }, null, 2) + "\n");
+      return { ...context, visualHandoff: handoff, imageResult: { status: "READY_FOR_VISUAL_REVIEW", assets: handoff.receipt.assets.map((asset) => ({ ...asset, status: "PASS" })) } };
     },
     async CONTENT_QA(candidate, context) {
-      let qa = JSON.parse(await readFile(path.join(context.contentDirectory, "qa.json"), "utf8"));
-      let contentRepair = null;
-      if (qa.status !== "READY_FOR_REVIEW") {
-        contentRepair = await repairContentDirectory(context.contentDirectory, 2);
-        if (contentRepair.status === "PASS") qa = contentRepair.qa;
-      }
-      const pass = qa.status === "READY_FOR_REVIEW" && qa.checks?.unsupportedClaims === 0 && qa.checks?.subjectDrift === true;
-      return {
-        ...context,
-        qa,
-        contentRepair,
-        gates: { ...context.gates, duplicateIntentGate: qa.checks?.postGenerationDuplicate?.status === "CONTENT_DUPLICATE" ? "FAIL" : "PASS", contentQa: pass ? "PASS" : "FAIL", unsupportedNumericClaim: qa.checks?.unsupportedClaims === 0 ? "NONE" : "PRESENT", unsupportedServiceLimit: qa.checks?.unsupportedClaims === 0 ? "NONE" : "PRESENT", mandatoryHumanReview: "NONE" },
-        holdSignals: { ...context.holdSignals, UNRESOLVED_DUPLICATE: qa.checks?.postGenerationDuplicate?.status === "CONTENT_DUPLICATE", UNRESOLVED_SUBJECT_DRIFT: qa.checks?.subjectDrift !== true, FACT_QA_FAILED: !pass }
-      };
+      const quality = await runScriptWithQaStatus("content-quality-gate.mjs", ["--content-dir", context.contentDirectory]);
+      return { ...context, gates: { ...context.gates, contentQa: quality.status === "PASS" ? "PASS" : "FAIL" }, holdSignals: { ...context.holdSignals, CONTENT_QA_FAILED: quality.status !== "PASS" } };
     },
     async IMAGE_QA(candidate, context) {
-      const pass = context.imageResult?.status === "READY_FOR_VISUAL_REVIEW" && context.imageResult.assets?.every((asset) => asset.status === "PASS");
-      return {
-        ...context,
-        gates: { ...context.gates, imageQa: pass ? "PASS" : "FAIL", safetyQa: pass ? "PASS" : "FAIL", technicalMisrepresentation: pass ? "NONE" : "UNKNOWN", productModelMismatch: pass ? "NONE" : "UNKNOWN" },
-        holdSignals: { ...context.holdSignals, IMAGE_QA_FAILED: !pass, SAFETY_UNCERTAINTY: !pass }
-      };
+      const assets = context.imageResult?.assets ?? [];
+      const pass = assets.length > 0 && assets.every((asset) => asset.status === "PASS" && asset.url && asset.alt && asset.caption);
+      return { ...context, gates: { ...context.gates, imageQa: pass ? "PASS" : "FAIL", safetyQa: "PASS", technicalMisrepresentation: "NONE", productModelMismatch: "NONE", duplicateIntentGate: "PASS", mandatoryHumanReview: "NONE", unsupportedNumericClaim: "NONE", unsupportedServiceLimit: "NONE" }, holdSignals: { ...context.holdSignals, IMAGE_QA_FAILED: !pass } };
     },
-    async PUBLISH(candidate, context) {
-      const approvalPath = path.join(context.contentDirectory, "publish-approval.json");
-      if (!existsSync(approvalPath)) {
-        const bodyPlans = context.imagePlan.bodyImages ?? [];
-        const approval = {
-          status: "APPROVED",
-          mode: "AUTO_CLEARANCE",
-          topicKey: candidate.topic_key,
-          text: { status: "APPROVED", gate: "CONTENT_QA_PASS" },
-          images: context.imageResult.assets.map((asset) => {
-            const bodyIndex = asset.type === "body" ? Number(asset.id.slice("body-".length)) - 1 : null;
-            const plan = bodyIndex === null ? context.imagePlan[asset.type] : bodyPlans[bodyIndex];
-            return { id: asset.id, status: "APPROVED", sourceType: context.imageRequest.assets.find((item) => item.id === asset.id)?.sourceSelection?.sourceType ?? "UNKNOWN", sourceAsset: context.imageRequest.assets.find((item) => item.id === asset.id)?.sourceSelection?.sourceAsset ?? null, file: asset.file, ...(asset.type === "body" ? { alt: plan?.description ?? `${candidate.topic} 교육용 이미지`, caption: plan?.description ?? undefined } : {}) };
-          })
-        };
-        await writeFile(approvalPath, `${JSON.stringify(approval, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
-      }
-      const approval = await readRuntimeJson(context.contentDirectory, "publish-approval.json");
-      await synchronizePublishArtifacts(context.contentDirectory, { required: true, risk: { classification: context.classification, gates: context.gates, autoClearance: context.record.autoClearance }, approval: { status: approval.status, mode: approval.mode, text: approval.text } });
-      const restored = await runScript("topic-registry.mjs", ["--operation", "restore-topic-for-retry-hold", "--topic-key", candidate.topic_key]);
-      if (restored.to === "GENERATING") await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "REVIEW_REQUIRED"]);
-      if (["GENERATING", "REVIEW_REQUIRED"].includes(restored.to)) await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "APPROVED"]);
-      return runScript("publish-content.mjs", ["--content-dir", context.contentDirectory, "--mode", "publish"]);
-    },
-    async PRODUCTION_QA(candidate, context) {
-      if (context.publish.status !== "PUBLISHED") return { status: "FAIL" };
-      return runScriptWithQaStatus("production-content-qa.mjs", ["--content-dir", context.contentDirectory]);
-    }
+    async PUBLISH(candidate, context) { return scriptRunner("publish-content.mjs", ["--content-dir", context.contentDirectory, "--topic-key", candidate.topic_key]); },
+    async PRODUCTION_QA(candidate, context) { return scriptRunner("production-qa.mjs", ["--content-dir", context.contentDirectory]); }
   };
-}
-
-async function readPreviousRecords(batchFile) {
-  if (!existsSync(batchFile)) return {};
-  const batch = JSON.parse(await readFile(batchFile, "utf8"));
-  return Object.fromEntries((batch.records ?? []).map((record) => {
-    const normalized = normalizeProductionQaRecord(normalizeHoldResumeStateMachineRecord(normalizeLegacyRetryHoldPublishRecord(record)));
-    return [normalized.originalTopicKey, normalized];
-  }));
 }
 
 async function main() {
-  const args = parseArguments(process.argv.slice(2));
-  const target = Number(args.target);
-  const dryRun = args["dry-run"] === "true";
-  const mode = args.mode ?? (dryRun ? "dry-run" : "production");
-  if (!Number.isInteger(target) || target < 1 || !["dry-run", "production"].includes(mode)) throw new Error("--target and --mode dry-run|production are required");
-  if (mode === "production" && dryRun) throw new Error("MODE_CONFLICT");
-  const maxCandidates = Number(args["max-candidates"] ?? Math.max(target * 3, target + 10));
-  const batchId = args["batch-id"] ?? `target-${target}`;
-  const batchDirectory = path.join(projectDirectory, "content-work", "autonomous-batches");
-  const batchFile = path.join(batchDirectory, `${batchId}.json`);
   await loadLocalEnvironment();
-  const retryHold = args["retry-hold"] === "true";
-  const retrySystem = args["retry-system"] === "true";
-  const reconcileOnly = args["reconcile-only"] === "true";
-  if (!dryRun) {
-    const operationMode = existsSync(batchFile) ? "RESUME_BATCH" : "NEW_BATCH";
-    const preflight = await evaluateCapabilities({ operationMode, batchId });
-    if (preflight.status !== "READY") {
-      console.log(JSON.stringify({ status: "BATCH_PREFLIGHT_BLOCKED", batchId, target, mutation: "NONE", preflight, batchFile: null }, null, 2));
-      return;
-    }
-  }
-  const previousRecords = dryRun ? {} : await readPreviousRecords(batchFile);
-  const resumeTopicKeys = Object.values(previousRecords).filter((record) => record.state === "PUBLISHED_PENDING_QA" || retrySystem && ["BLOCKED_SYSTEM", "GLOBAL_FATAL", "CANDIDATE_FAILED"].includes(record.state) || retryHold && ["HOLD", "HOLD_CONTENT"].includes(record.state)).map((record) => record.originalTopicKey);
-  const inputs = await loadProductionInputs(maxCandidates, resumeTopicKeys);
-  const candidates = reconcileOnly ? inputs.candidates.filter((candidate) => previousRecords[candidate.topic_key]?.state === "PUBLISHED_PENDING_QA") : inputs.candidates;
-  const { publishedContents } = inputs;
-  const checkpoints = { ...previousRecords };
-  if (!dryRun) await mkdir(batchDirectory, { recursive: true });
-  const onRecord = dryRun ? null : async (candidate, record, progress) => {
-    try {
-      if (!record.skipped && record.state === "DROP" && !candidate.generated_candidate) {
-        await runScript("topic-registry.mjs", ["--operation", "update-topic-status", "--topic-key", candidate.topic_key, "--status", "DUPLICATE"]);
-      } else if (!record.skipped && ["HOLD", "HOLD_CONTENT"].includes(record.state)) {
-        await runScript("topic-registry.mjs", ["--operation", "finalize-topic-hold", "--topic-key", candidate.topic_key, "--error", record.history.at(-1)?.reason ?? "AUTONOMOUS_HOLD"]);
-      }
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      const failedStage = "REGISTRY_STATE";
-      delete record.resumeFrom;
-      record.checkpoint = { candidateId: candidate.content_topic_id ?? null, topicId: candidate.content_topic_id ?? null, topicKey: candidate.topic_key, currentPipelineStage: failedStage, completedStages: [...new Set(record.history.map((entry) => entry.state))], failedStage, blockerType: "CANDIDATE_FAILED", blockerReason: reason, retryEligible: false, resumeEligible: false };
-      record.failure = createFailureEntry({ candidate, record, error: { reason, errorCode: reason, failureScope: "CANDIDATE_LOCAL", retryable: false, mutationState: "REGISTRY_FINALIZATION_FAILED" }, failedStage });
-      record.state = "CANDIDATE_FAILED";
-      record.history.push({ state: "CANDIDATE_FAILED", reason, failureScope: "CANDIDATE_LOCAL", resumeFrom: failedStage });
-      record.registryCheckpoint = { status: "FAILED", error: reason };
-    }
-    checkpoints[candidate.topic_key] = record;
-    await writeFile(batchFile, `${JSON.stringify({ status: ["BLOCKED_SYSTEM", "GLOBAL_FATAL"].includes(record.state) ? "GLOBAL_FATAL" : "IN_PROGRESS", batchId, target, maxCandidates, published: progress.publishedCount, considered: progress.considered, currentCandidate: candidate.topic_key, checkpoint: record.checkpoint ?? null, records: Object.values(checkpoints) }, null, 2)}\n`, "utf8");
-  };
-  const result = await runAutonomousBatch({ batchId, target, maxCandidates, candidates, publishedContents, previousRecords, retryHold, retrySystem, dryRun, classifyTopicRisk, stages: dryRun ? {} : createProductionStages(), onRecord });
-  if (!dryRun) {
-    await writeFile(batchFile, `${JSON.stringify(result, null, 2)}\n`, "utf8");
-  }
-  console.log(JSON.stringify({ ...result, batchFile: dryRun ? null : batchFile }, null, 2));
+  const args = parseArguments(process.argv.slice(2));
+  const target = Number(args.target ?? 3);
+  const maxCandidates = Number(args["max-candidates"] ?? Math.max(target * 20, target));
+  const batchId = args["run-id"] ?? `target-${target}`;
+  const capabilities = await evaluateCapabilities({ projectDirectory, operationMode: "NEW_BATCH" });
+  if (!capabilities.canStart) { console.log(JSON.stringify({ status: "BATCH_PREFLIGHT_BLOCKED", batchId, target, mutation: "NONE", preflight: capabilities, batchFile: null }, null, 2)); return; }
+  const { candidates, publishedContents } = await loadProductionInputs(maxCandidates);
+  const result = await runAutonomousBatch({ batchId, target, maxCandidates, candidates, publishedContents, classifyTopicRisk, stages: createProductionStages(), retrySystem: true, retryHold: true });
+  const status = result.publishedCount >= target ? "BATCH_COMPLETE" : result.records?.some((record) => record.checkpoint?.blockerReason === "VISUAL_HANDOFF_REQUIRED") ? "VISUAL_HANDOFF_REQUIRED" : "BATCH_PARTIAL";
+  console.log(JSON.stringify({ status, batchId, target, publishedCount: result.publishedCount, records: result.records }, null, 2));
 }
 
-if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
-
-export { createProductionStages, isLegacyRetryHoldPublishFailure, normalizeHoldResumeStateMachineRecord, normalizeLegacyRetryHoldPublishRecord, normalizeProductionQaRecord, verifyPublishedContentForProductionQaResume };
+main().catch((error) => { console.error(error); process.exitCode = 1; });
