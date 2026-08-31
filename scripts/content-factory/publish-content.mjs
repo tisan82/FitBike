@@ -23,7 +23,6 @@ async function main() {
       reason: "CONTENT_QUALITY_GATE_FAILED",
       qualityGate
     }, null, 2));
-    process.exitCode = 2;
     return;
   }
 
