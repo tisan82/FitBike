@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+<title id="title">스파크 플러그 상태 점검 가이드</title><desc id="desc">정상, 카본 오염, 오일 젖음, 전극 마모를 비교하고 규격과 체결 토크를 확인하는 안내 이미지</desc>
+<rect width="1200" height="800" rx="36" fill="#F7F9FC"/>
+<text x="64" y="82" font-family="Arial,sans-serif" font-size="36" font-weight="700" fill="#101828">플러그는 전극과 절연체 상태를 함께 확인</text>
+<text x="64" y="132" font-family="Arial,sans-serif" font-size="22" fill="#667085">교체 주행거리 하나보다 실제 상태와 제조사 규격이 중요합니다.</text>
+<g transform="translate(80 210)">
+<rect width="230" height="390" rx="28" fill="#FFFFFF" stroke="#D0D5DD"/><circle cx="115" cy="76" r="50" fill="#D8C3A5"/><rect x="90" y="120" width="50" height="130" rx="20" fill="#F2F4F7" stroke="#98A2B3" stroke-width="5"/><rect x="78" y="242" width="74" height="62" rx="10" fill="#C7CDD4"/><path d="M100 304 v54 M140 304 v54" stroke="#6B7280" stroke-width="12"/><text x="52" y="345" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#101828">정상</text><text x="24" y="378" font-family="Arial,sans-serif" font-size="18" fill="#667085">연한 갈색 계열</text>
+</g>
+<g transform="translate(335 210)">
+<rect width="230" height="390" rx="28" fill="#FFFFFF" stroke="#D0D5DD"/><circle cx="115" cy="76" r="50" fill="#282828"/><rect x="90" y="120" width="50" height="130" rx="20" fill="#E5E7EB" stroke="#98A2B3" stroke-width="5"/><rect x="78" y="242" width="74" height="62" rx="10" fill="#8A8F98"/><path d="M100 304 v54 M140 304 v54" stroke="#3B3B3B" stroke-width="12"/><text x="48" y="345" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#101828">카본</text><text x="30" y="378" font-family="Arial,sans-serif" font-size="18" fill="#667085">검은 퇴적물</text>
+</g>
+<g transform="translate(590 210)">
+<rect width="230" height="390" rx="28" fill="#FFFFFF" stroke="#D0D5DD"/><circle cx="115" cy="76" r="50" fill="#4B5563"/><ellipse cx="115" cy="76" rx="36" ry="20" fill="#111827" opacity=".8"/><rect x="90" y="120" width="50" height="130" rx="20" fill="#E5E7EB" stroke="#98A2B3" stroke-width="5"/><rect x="78" y="242" width="74" height="62" rx="10" fill="#626A73"/><path d="M100 304 v54 M140 304 v54" stroke="#111827" stroke-width="12"/><text x="50" y="345" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#101828">오일</text><text x="31" y="378" font-family="Arial,sans-serif" font-size="18" fill="#667085">젖은 흔적</text>
+</g>
+<g transform="translate(845 210)">
+<rect width="230" height="390" rx="28" fill="#FFFFFF" stroke="#D0D5DD"/><circle cx="115" cy="76" r="50" fill="#B08968"/><rect x="90" y="120" width="50" height="130" rx="20" fill="#F2F4F7" stroke="#98A2B3" stroke-width="5"/><rect x="78" y="242" width="74" height="62" rx="10" fill="#BFC5CD"/><path d="M98 304 v42 M142 304 v32" stroke="#8A8F98" stroke-width="12"/><text x="50" y="345" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#101828">마모</text><text x="20" y="378" font-family="Arial,sans-serif" font-size="18" fill="#667085">전극 간극 변화</text>
+</g>
+<rect x="80" y="640" width="1040" height="92" rx="24" fill="#E8F1FF"/>
+<text x="112" y="680" font-family="Arial,sans-serif" font-size="23" font-weight="700" fill="#0564D8">규격 · 열가 · 체결 토크는 제조사 기준으로 확인</text>
+<text x="112" y="714" font-family="Arial,sans-serif" font-size="19" fill="#475467">증상이 반복되면 플러그만 교체하지 말고 연료·흡기·점화 계통 원인도 함께 점검합니다.</text>
+</svg>
