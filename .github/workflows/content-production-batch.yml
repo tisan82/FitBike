@@ -1,0 +1,78 @@
+name: Content Production Batch
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Number of PUBLISHED_VERIFIED contents to produce"
+        required: true
+        default: "3"
+        type: string
+      request:
+        description: "Natural-language content production request"
+        required: false
+        default: "Create new non-duplicate FitBike contents"
+        type: string
+      run_id:
+        description: "Optional batch run id"
+        required: false
+        type: string
+
+concurrency:
+  group: content-production-batch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  production-batch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      CONTENT_FACTORY_REQUEST: ${{ inputs.request }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate target
+        shell: bash
+        run: |
+          if ! [[ "${{ inputs.target }}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "target must be a positive integer"
+            exit 1
+          fi
+
+      - name: Run autonomous production batch
+        shell: bash
+        run: |
+          RUN_ID="${{ inputs.run_id }}"
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID="request-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          fi
+          node scripts/content-factory/autonomous-batch.mjs \
+            --target "${{ inputs.target }}" \
+            --run-id "$RUN_ID"
+
+      - name: Upload batch evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: content-production-batch-${{ github.run_id }}
+          if-no-files-found: ignore
+          path: |
+            .content-factory/**
+            artifacts/content-factory/**
+            tmp/content-factory/**
