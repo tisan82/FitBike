@@ -1,4 +1,14 @@
 {
+  "globalImageQuality": {
+    "rejectDuplicateBodyPaths": true,
+    "rejectDuplicateBodyHashes": true,
+    "rejectPlaceholderVisuals": true,
+    "minimumBodyImageBytes": 10000,
+    "requireNonEmptyCaption": true,
+    "preferActualUseScene": true,
+    "modelSpecificVisualsMustBeVerified": true,
+    "doNotReuseGenericBikeAsModelHero": true
+  },
   "MAINTENANCE": {
     "intent": "점검, 관리, 교체 전 확인 정보를 실제 확인 위치와 상태 비교 중심으로 설명한다.",
     "images": {
@@ -42,7 +52,8 @@
       "minimumBodyImages": 2,
       "targetBodyImages": 4,
       "preferredScenes": ["verified bike model", "front/rear part location", "manufacturer marking or label"],
-      "requireVerifiedModelAsset": true
+      "requireVerifiedModelAsset": true,
+      "rejectSharedGenericModelHero": true
     }
   }
 }
