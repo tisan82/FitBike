@@ -9,7 +9,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "content:qa": "node scripts/content-factory/content-quality-gate.mjs",
+    "test:content-qa": "node --test scripts/content-factory/content-quality-gate.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
