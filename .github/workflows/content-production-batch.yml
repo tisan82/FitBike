@@ -17,6 +17,8 @@ on:
         description: "Optional batch run id"
         required: false
         type: string
+  issues:
+    types: [opened, reopened]
 
 concurrency:
   group: content-production-batch
@@ -24,16 +26,19 @@ concurrency:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   production-batch:
+    if: github.event_name == 'workflow_dispatch' || (startsWith(github.event.issue.title, 'CONTENT_BATCH_REQUEST:') && contains(github.event.issue.body, '<!-- FITBIKE_CONTENT_BATCH_REQUEST -->'))
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      CONTENT_FACTORY_REQUEST: ${{ inputs.request }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,24 +52,79 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate target
+      - name: Resolve batch request
+        id: request
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TARGET: ${{ inputs.target }}
+          DISPATCH_REQUEST: ${{ inputs.request }}
+          DISPATCH_RUN_ID: ${{ inputs.run_id }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          if ! [[ "${{ inputs.target }}" =~ ^[1-9][0-9]*$ ]]; then
-            echo "target must be a positive integer"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TARGET="$DISPATCH_TARGET"
+            REQUEST="$DISPATCH_REQUEST"
+            RUN_ID="$DISPATCH_RUN_ID"
+          else
+            TARGET="$(printf '%s\n' "$ISSUE_BODY" | sed -n 's/^target:[[:space:]]*//p' | head -1 | tr -d '\r')"
+            REQUEST="$(printf '%s\n' "$ISSUE_BODY" | sed -n 's/^request:[[:space:]]*//p' | head -1 | tr -d '\r')"
+            RUN_ID="issue-${ISSUE_NUMBER}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          fi
+          if ! [[ "$TARGET" =~ ^[1-9][0-9]*$ ]]; then
+            echo "Invalid target: $TARGET"
             exit 1
           fi
-
-      - name: Run autonomous production batch
-        shell: bash
-        run: |
-          RUN_ID="${{ inputs.run_id }}"
           if [ -z "$RUN_ID" ]; then
             RUN_ID="request-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           fi
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          {
+            echo 'request<<EOF'
+            echo "$REQUEST"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run autonomous production batch
+        env:
+          CONTENT_FACTORY_REQUEST: ${{ steps.request.outputs.request }}
+        run: |
           node scripts/content-factory/autonomous-batch.mjs \
-            --target "${{ inputs.target }}" \
-            --run-id "$RUN_ID"
+            --target "${{ steps.request.outputs.target }}" \
+            --run-id "${{ steps.request.outputs.run_id }}"
+
+      - name: Close completed request issue
+        if: success() && github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Content Production Batch completed successfully. Run: ${context.runId}`
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+              state_reason: 'completed'
+            });
+
+      - name: Report failed request issue
+        if: failure() && github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Content Production Batch did not complete. Inspect workflow run ${context.runId}. The request remains open for recovery.`
+            });
 
       - name: Upload batch evidence
         if: always()
@@ -73,6 +133,7 @@ jobs:
           name: content-production-batch-${{ github.run_id }}
           if-no-files-found: ignore
           path: |
-            .content-factory/**
+            content-work/autonomous-batches/**
+            content-work/**/publish-result.json
+            content-work/**/production-qa.json
             artifacts/content-factory/**
-            tmp/content-factory/**
