@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+<title id="title">오토바이 브레이크액 점검 가이드</title><desc id="desc">브레이크 리저버의 레벨, 색상 변화, 누유 흔적과 지정 DOT 규격을 확인하는 안내 이미지</desc>
+<rect width="1200" height="800" rx="36" fill="#F7F9FC"/>
+<text x="64" y="82" font-family="Arial,sans-serif" font-size="36" font-weight="700" fill="#101828">브레이크액은 레벨 · 누유 · 규격을 함께 확인</text>
+<text x="64" y="132" font-family="Arial,sans-serif" font-size="22" fill="#667085">갑자기 줄었거나 제동감이 달라졌다면 단순 보충으로 끝내지 않습니다.</text>
+<rect x="80" y="200" width="470" height="465" rx="32" fill="#111827"/>
+<path d="M145 520 C220 440 265 345 350 320 C425 298 485 335 515 408 L515 585 L145 585 Z" fill="#27364A"/>
+<rect x="225" y="278" width="210" height="170" rx="35" fill="#FFF7E6" stroke="#98A2B3" stroke-width="6"/>
+<rect x="250" y="350" width="160" height="72" rx="16" fill="#B7791F" opacity=".72"/>
+<rect x="260" y="238" width="140" height="58" rx="18" fill="#0F172A"/>
+<line x1="250" y1="335" x2="410" y2="335" stroke="#0564D8" stroke-width="7"/>
+<line x1="250" y1="405" x2="410" y2="405" stroke="#0564D8" stroke-width="7"/>
+<text x="430" y="342" font-family="Arial,sans-serif" font-size="21" font-weight="700" fill="#7CC4FF">MAX</text>
+<text x="430" y="412" font-family="Arial,sans-serif" font-size="21" font-weight="700" fill="#7CC4FF">MIN</text>
+<g transform="translate(635 205)">
+<circle cx="42" cy="42" r="36" fill="#E8F1FF"/><text x="30" y="53" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#0564D8">1</text>
+<text x="100" y="38" font-family="Arial,sans-serif" font-size="28" font-weight="700" fill="#101828">리저버 레벨 확인</text>
+<text x="100" y="74" font-family="Arial,sans-serif" font-size="20" fill="#667085">차량이 지정한 자세에서 MIN · MAX 사이인지 봅니다.</text>
+</g>
+<g transform="translate(635 335)">
+<circle cx="42" cy="42" r="36" fill="#E8F1FF"/><text x="30" y="53" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#0564D8">2</text>
+<text x="100" y="38" font-family="Arial,sans-serif" font-size="28" font-weight="700" fill="#101828">누유 흔적 확인</text>
+<text x="100" y="74" font-family="Arial,sans-serif" font-size="20" fill="#667085">마스터 실린더, 호스 연결부, 캘리퍼 주변을 확인합니다.</text>
+</g>
+<g transform="translate(635 465)">
+<circle cx="42" cy="42" r="36" fill="#E8F1FF"/><text x="30" y="53" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#0564D8">3</text>
+<text x="100" y="38" font-family="Arial,sans-serif" font-size="28" font-weight="700" fill="#101828">지정 DOT 규격 확인</text>
+<text x="100" y="74" font-family="Arial,sans-serif" font-size="20" fill="#667085">색만으로 호환성을 판단하지 말고 제조사 지침을 따릅니다.</text>
+</g>
+<rect x="635" y="615" width="485" height="105" rx="24" fill="#FFF1F3" stroke="#FDA4AF"/>
+<text x="670" y="656" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#9F1239">제동감 변화 · 급격한 레벨 감소는 운행 전 점검</text>
+<text x="670" y="691" font-family="Arial,sans-serif" font-size="19" fill="#9F1239">에어빼기와 교환 작업이 익숙하지 않다면 전문 정비를 권장합니다.</text>
+</svg>
