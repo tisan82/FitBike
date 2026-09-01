@@ -29,13 +29,14 @@ export function TireHeroImage({ alt, sources, preload = false }: Props) {
   return (
     <div className="relative aspect-square overflow-hidden rounded-2xl bg-surface-secondary">
       <Image
-        alt={fallback ? `${alt} 준비 중` : alt}
-        className="object-contain"
+        alt={fallback ? `${alt} 이미지 준비중` : alt}
+        className={fallback ? "object-cover" : "object-contain"}
         fill
-        onError={() => setFailedIndex((index) => Math.min(index + 1, candidates.length - 1))}
+        onError={fallback ? undefined : () => setFailedIndex((index) => Math.min(index + 1, candidates.length - 1))}
         preload={preload}
         sizes="(max-width: 767px) calc(100vw - 40px), 480px"
         src={source}
+        unoptimized={fallback}
       />
     </div>
   );
