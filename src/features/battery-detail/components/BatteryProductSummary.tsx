@@ -1,7 +1,12 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 
 import type { BatteryProductDetail } from "@/features/battery-detail/types/battery-detail.types";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
+
+const BATTERY_IMAGE_FALLBACK_SRC = "/images/common/no-image-battery.svg";
 
 type Props = {
   product: BatteryProductDetail;
@@ -20,29 +25,27 @@ function batteryTypeLabel(value: string | null) {
 }
 
 export function BatteryProductSummary({ product }: Props) {
+  const [imageFailed, setImageFailed] = useState(false);
   const price = formatPrice(product.price);
-  const imageUrl = getStoragePublicUrl(product.productImageUrl, "battery-assets");
+  const productImageUrl = getStoragePublicUrl(product.productImageUrl, "battery-assets");
+  const useFallback = imageFailed || !productImageUrl;
+  const imageUrl = useFallback ? BATTERY_IMAGE_FALLBACK_SRC : productImageUrl;
   const batteryType = batteryTypeLabel(product.batteryType);
 
   return (
     <section className="overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
       <div className="grid md:grid-cols-2">
         <div className="flex min-h-72 items-center justify-center bg-surface-secondary p-5 sm:p-8">
-          {imageUrl ? (
-            <Image
-              alt={`${product.brandName} ${product.specCode} 배터리`}
-              className="h-auto max-h-[420px] w-full object-contain"
-              height={720}
-              priority
-              src={imageUrl}
-              unoptimized
-              width={720}
-            />
-          ) : (
-            <div className="flex min-h-64 w-full items-center justify-center rounded-2xl border border-dashed border-border bg-surface text-sm text-foreground-secondary">
-              상품 이미지 준비 중
-            </div>
-          )}
+          <Image
+            alt={useFallback ? `${product.brandName} ${product.specCode} 이미지 준비중` : `${product.brandName} ${product.specCode} 배터리`}
+            className={useFallback ? "min-h-64 w-full rounded-2xl object-cover" : "h-auto max-h-[420px] w-full object-contain"}
+            height={720}
+            onError={useFallback ? undefined : () => setImageFailed(true)}
+            priority
+            src={imageUrl}
+            unoptimized
+            width={720}
+          />
         </div>
         <div className="flex flex-col justify-center p-5 sm:p-8">
           <p className="text-sm font-bold text-primary">{product.brandName}</p>
