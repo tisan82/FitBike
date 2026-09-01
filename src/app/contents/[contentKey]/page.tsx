@@ -21,6 +21,15 @@ function validContentKey(value: string) {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) ? value : null;
 }
 
+function shouldOptimizeHero(src: string) {
+  try {
+    const hostname = new URL(src).hostname;
+    return hostname === "upload.wikimedia.org" || hostname === "commons.wikimedia.org";
+  } catch {
+    return false;
+  }
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const contentKey = validContentKey((await params).contentKey);
   if (!contentKey) notFound();
@@ -120,8 +129,9 @@ export default async function ContentDetailPage({ params }: Props) {
               className="aspect-video w-full rounded-2xl object-cover"
               height={675}
               priority
+              sizes="(max-width: 768px) 100vw, 768px"
               src={hero}
-              unoptimized
+              unoptimized={!shouldOptimizeHero(hero)}
               width={1200}
             />
           </figure>
