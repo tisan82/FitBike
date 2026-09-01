@@ -1,3 +1,5 @@
+export type { ApiErrorResponse, ApiResponse, ApiSuccessResponse } from "@/lib/api/types";
+
 export type TireSpecification = {
   fullSize: string | null;
   width: number | null;
@@ -75,18 +77,3 @@ export type ModelDetailData = {
   majorChanges: string | null;
   relatedGuides: RelatedGuide[];
 };
-
-export type ApiSuccessResponse<T> = {
-  success: true;
-  data: T;
-};
-
-export type ApiErrorResponse = {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-  };
-};
-
-export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
