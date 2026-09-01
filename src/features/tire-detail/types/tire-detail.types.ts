@@ -1,3 +1,5 @@
+export type { ApiErrorResponse, ApiResponse, ApiSuccessResponse } from "@/lib/api/types";
+
 export type TirePositionType = "FRONT" | "REAR" | "BOTH" | "COMMON";
 
 export type TireProductDetail = {
@@ -106,18 +108,3 @@ export type TireModelCompatibleBike = {
   variantName: string | null;
   fitments: TireModelCompatibleFitment[];
 };
-
-export type ApiSuccessResponse<T> = {
-  success: true;
-  data: T;
-};
-
-export type ApiErrorResponse = {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-  };
-};
-
-export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
