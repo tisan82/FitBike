@@ -6,6 +6,8 @@ import { useState } from "react";
 import type { ModelDetailData } from "@/features/model-detail/types/model-detail.types";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
 
+const BIKE_IMAGE_FALLBACK_SRC = "/images/common/no-image-bike.svg";
+
 function Item({
   label,
   value,
@@ -27,26 +29,23 @@ export function ModelSummary({ model }: { model: ModelDetailData }) {
   const [failed, setFailed] = useState(false);
   const brand = model.brandNameKo ?? model.brandNameEn;
   const name = model.modelNameKo ?? model.modelNameEn;
-  const src = failed ? null : getStoragePublicUrl(model.imageUrl);
+  const modelImageUrl = getStoragePublicUrl(model.imageUrl);
+  const useFallback = failed || !modelImageUrl;
+  const src = useFallback ? BIKE_IMAGE_FALLBACK_SRC : modelImageUrl;
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
       <div className="relative flex aspect-[16/9] items-center justify-center bg-surface-secondary">
-        {src ? (
-          <Image
-            alt={`${brand} ${name} ${model.yearRangeLabel} 대표 이미지`}
-            className="object-contain"
-            fill
-            onError={() => setFailed(true)}
-            preload
-            sizes="(max-width: 1024px) calc(100vw - 40px), 984px"
-            src={src}
-          />
-        ) : (
-          <p className="text-sm text-foreground-secondary">
-            바이크 이미지 준비중
-          </p>
-        )}
+        <Image
+          alt={useFallback ? `${brand} ${name} 이미지 준비중` : `${brand} ${name} ${model.yearRangeLabel} 대표 이미지`}
+          className={useFallback ? "object-cover" : "object-contain"}
+          fill
+          onError={useFallback ? undefined : () => setFailed(true)}
+          preload
+          sizes="(max-width: 1024px) calc(100vw - 40px), 984px"
+          src={src}
+          unoptimized={useFallback}
+        />
       </div>
       <div className="space-y-5 p-5 sm:p-7">
         <p className="text-2xl font-bold">{model.yearRangeLabel}</p>

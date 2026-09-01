@@ -1,3 +1,5 @@
+export type { ApiErrorResponse, ApiResponse, ApiSuccessResponse } from "@/lib/api/types";
+
 export type BrandOption = {
   brandId: number;
   brandKey: string;
@@ -31,18 +33,3 @@ export type BikeSelectorState = {
   selectedModelId: number | null;
   selectedModelYearId: number | null;
 };
-
-export type ApiSuccessResponse<T> = {
-  success: true;
-  data: T;
-};
-
-export type ApiErrorResponse = {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-  };
-};
-
-export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
