@@ -9,12 +9,29 @@ function resolveContentImage(path: string) {
   return getStoragePublicUrl(path, "content-assets");
 }
 
+function shouldOptimizeContentImage(src: string) {
+  try {
+    const hostname = new URL(src).hostname;
+    return hostname === "upload.wikimedia.org" || hostname === "commons.wikimedia.org";
+  } catch {
+    return false;
+  }
+}
+
 function ContentVisual({ image, compact = false, contain = false }: { image: ContentImage; compact?: boolean; contain?: boolean }) {
   const src = resolveContentImage(image.storagePath);
   if (!src) return null;
   return (
     <figure className="space-y-2">
-      <Image alt={image.alt} className={`h-auto w-full rounded-2xl ${compact ? "aspect-[4/3]" : ""} ${contain ? "bg-surface-secondary object-contain p-3" : "object-cover"}`} height={900} src={src} unoptimized width={1200} />
+      <Image
+        alt={image.alt}
+        className={`w-full rounded-2xl ${compact ? "aspect-[4/3]" : "h-auto"} ${contain ? "bg-surface-secondary object-cover" : "object-cover"}`}
+        height={900}
+        sizes={compact ? "(max-width: 640px) 84vw, (max-width: 1024px) 46vw, 32vw" : "(max-width: 768px) 100vw, 768px"}
+        src={src}
+        unoptimized={!shouldOptimizeContentImage(src)}
+        width={1200}
+      />
       {image.caption?.trim() ? <figcaption className="text-sm leading-6 text-foreground-secondary">{image.caption}</figcaption> : null}
     </figure>
   );
@@ -36,11 +53,11 @@ export function ContentBlockRenderer({ blocks }: { blocks: ContentBlock[] }) {
             if (!block.storagePath?.trim() || seenImagePaths.has(block.storagePath)) return null;
             seenImagePaths.add(block.storagePath);
             const src = resolveContentImage(block.storagePath);
-            return src ? <figure className="space-y-3 py-2" key={key}><Image alt={block.alt} className="h-auto w-full rounded-2xl" height={900} src={src} unoptimized width={1200} />{block.caption?.trim() ? <figcaption className="text-sm leading-6 text-foreground-secondary">{block.caption}</figcaption> : null}</figure> : null;
+            return src ? <figure className="space-y-3 py-2" key={key}><Image alt={block.alt} className="h-auto w-full rounded-2xl object-cover" height={900} sizes="(max-width: 768px) 100vw, 768px" src={src} unoptimized={!shouldOptimizeContentImage(src)} width={1200} />{block.caption?.trim() ? <figcaption className="text-sm leading-6 text-foreground-secondary">{block.caption}</figcaption> : null}</figure> : null;
           }
           case "image_gallery": {
             const uniqueImages = block.images.filter((image) => { if (!image.storagePath?.trim() || seenImagePaths.has(image.storagePath)) return false; seenImagePaths.add(image.storagePath); return true; });
-            if (uniqueImages.length === 0) return null;
+            if (uniqueImages.length < 2) return uniqueImages.length === 1 ? <div className="py-2" key={key}><ContentVisual image={uniqueImages[0]} /></div> : null;
             if (block.layout === "swipe") return <section aria-label="작업 및 확인 이미지" className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-3 pt-2 sm:mx-0 sm:px-0" key={key}>{uniqueImages.map((image, imageIndex) => <div className="w-[84%] min-w-[84%] snap-start sm:w-[46%] sm:min-w-[46%] lg:w-[32%] lg:min-w-[32%]" key={`${image.storagePath}-${imageIndex}`}><ContentVisual compact contain image={image} /></div>)}</section>;
             return <section aria-label="관련 이미지" className={`grid grid-cols-1 gap-4 py-2 sm:gap-5 ${block.columns === 3 ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"}`} key={key}>{uniqueImages.map((image, imageIndex) => <ContentVisual compact image={image} key={`${image.storagePath}-${imageIndex}`} />)}</section>;
           }
