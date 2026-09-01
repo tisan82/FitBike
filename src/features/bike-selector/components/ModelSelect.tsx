@@ -6,6 +6,8 @@ import { useState } from "react";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
 import type { ModelOption } from "@/features/bike-selector/types/bike-selector.types";
 
+const BIKE_IMAGE_FALLBACK_SRC = "/images/common/no-image-bike.svg";
+
 type ModelSelectProps = {
   models: ModelOption[];
   value: number | null;
@@ -23,39 +25,21 @@ type ModelImageProps = {
 function ModelImage({ imagePath, modelName }: ModelImageProps) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const publicUrl = getStoragePublicUrl(imagePath);
-
-  if (publicUrl && failedUrl !== publicUrl) {
-    return (
-      <div className="flex h-16 w-28 flex-shrink-0 items-center justify-center overflow-hidden">
-        <Image
-          src={publicUrl}
-          alt={modelName}
-          className="h-full w-full origin-center scale-[1.35] object-contain"
-          height={64}
-          onError={() => setFailedUrl(publicUrl)}
-          sizes="112px"
-          width={112}
-        />
-      </div>
-    );
-  }
+  const useFallback = !publicUrl || failedUrl === publicUrl;
+  const src = useFallback ? BIKE_IMAGE_FALLBACK_SRC : publicUrl;
 
   return (
     <div className="flex h-16 w-28 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-secondary">
-      <svg
-        aria-hidden="true"
-        className="h-6 w-6 text-foreground-secondary"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
+      <Image
+        src={src}
+        alt={useFallback ? `${modelName} 이미지 준비중` : modelName}
+        className={useFallback ? "h-full w-full object-cover" : "h-full w-full origin-center scale-[1.35] object-contain"}
+        height={64}
+        onError={useFallback ? undefined : () => setFailedUrl(publicUrl)}
+        sizes="112px"
+        unoptimized={useFallback}
+        width={112}
+      />
     </div>
   );
 }
@@ -71,7 +55,6 @@ export function ModelSelect({
   const [searchQuery, setSearchQuery] = useState("");
   const selectedModel = models.find((m) => m.bikeModelId === value);
 
-  // Show selected model only if selectedOnly mode
   if (selectedOnly) {
     if (!selectedModel) return null;
     return (
@@ -127,7 +110,6 @@ export function ModelSelect({
     <div className="space-y-3">
       <p className="text-base font-semibold text-foreground">모델을 선택하세요</p>
 
-      {/* Search Input */}
       <div className="relative">
         <svg
           aria-hidden="true"
@@ -154,7 +136,6 @@ export function ModelSelect({
         />
       </div>
 
-      {/* Models List */}
       {loading ? (
         <div className="space-y-2">
           {[...Array(3)].map((_, i) => (
