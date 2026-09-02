@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "assets": {
     "thumbnail": { "width": 1200, "height": 675, "aspectRatio": "16:9", "format": "webp", "colourspace": "srgb", "fileName": "thumbnail-candidate.webp" },
     "hero": { "width": 1600, "height": 900, "aspectRatio": "16:9", "format": "webp", "colourspace": "srgb", "fileName": "hero-candidate.webp" },
@@ -11,8 +11,16 @@
     "prohibited": ["long headline", "body copy", "supporting copy", "feature chips"]
   },
   "generation": {
-    "sourcePriority": ["VERIFIED_REAL_WORLD_ASSET", "APPROVED_BRAND_ASSET", "GENERATED_EDUCATIONAL", "GENERATED_GENERIC", "IMAGE_REVIEW_REQUIRED"],
-    "sourceTypes": ["VERIFIED_REAL_WORLD_ASSET", "APPROVED_BRAND_ASSET", "GENERATED_EDUCATIONAL", "GENERATED_GENERIC", "NONE"],
+    "sourcePriority": ["DIRECT_PHOTO_APPROVED", "LICENSED_WEB_REAL_ASSET_EDIT", "OFFICIAL_APPROVED_ASSET", "APPROVED_BRAND_ASSET", "GENERATED_EDUCATIONAL", "GENERATED_GENERIC", "IMAGE_REVIEW_REQUIRED"],
+    "sourceTypes": ["DIRECT_PHOTO_APPROVED", "LICENSED_WEB_REAL_ASSET_EDIT", "OFFICIAL_APPROVED_ASSET", "APPROVED_BRAND_ASSET", "GENERATED_EDUCATIONAL", "GENERATED_GENERIC", "NONE"],
+    "webRealAsset": {
+      "requiredMetadata": ["sourceUrl", "creator", "rightsStatus", "rightsEvidence", "editPlan"],
+      "acceptedRights": ["PUBLIC_DOMAIN", "CC0", "CC_BY", "CC_BY_SA", "OWNER_APPROVED", "OFFICIAL_APPROVED"],
+      "allowedEdits": ["crop for mobile focus", "rotation and perspective correction", "exposure and white balance correction", "background cleanup without changing the part", "non-obscuring arrow, outline, or short label", "privacy masking"],
+      "prohibitedEdits": ["changing motorcycle model identity", "changing product code or terminal direction", "inventing a removed cover or exposed part", "removing damage that affects the explanation", "presenting a composite as one unedited factual photo"],
+      "attributionRequired": true,
+      "storeOriginalAndEditedSeparately": true
+    },
     "practicalUseFirst": true,
     "preferredComposition": ["hands and tool visible when procedural", "part location visible in vehicle context", "close-up plus wider context", "normal vs worn state comparison when relevant"],
     "prohibited": ["brand logo", "watermark", "invented product number", "unsupported technical value", "advertising layout", "fake real-model replica presented as factual", "decorative infographic when a practical photo is required"],
