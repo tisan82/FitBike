@@ -44,6 +44,26 @@ Database mutations are delivered through reviewed migrations; the application do
 - `PARTS_GUIDE`: 부품 구조, 규격 표기, 차이와 선택 전에 이해해야 할 정보
 - `MODEL_GUIDE`: 특정 모델 자체에 대해 공식 근거로 설명할 가치가 있는 정보. FitBike fitment DB를 콘텐츠화하는 유형이 아님
 
+## Purpose Templates
+
+Topic은 제목만 선정하지 않고 사용자가 콘텐츠를 보는 목적까지 함께 정의한다. 기존 DB의 `content_type`은 유지하며 Factory Artifact의 `contentTemplate`으로 실행 구조를 선택한다.
+
+| Template | 사용자 목적 | 필수 결과 |
+|---|---|---|
+| `CHECK` | 상태·교체 필요 판단 | 정상/주의/점검 필요와 다음 행동 |
+| `HOW_TO` | 실제 작업 수행 | 준비, 단계, 완료 확인, 중단 조건 |
+| `TROUBLESHOOT` | 증상 원인 확인 | 원인 분기와 결과별 행동 |
+| `SPEC` | 규격·표기 확인 | 코드 의미, 실차 비교, 구매 전 확인 |
+| `MODEL_DATA` | 모델·연식 데이터 확인 | 공식 근거 기반의 짧은 규격표 |
+| `EXPLAIN` | 원리 이해 | 한 문장 정의, 실제 맥락, 오해 방지 |
+| `COMPARE` | 차이 이해 | 비교표와 적용 조건. 추천·랭킹 금지 |
+| `PREVENT` | 사전 예방·관리 | 해야 할 것, 피할 것, 이상 시 행동 |
+| `CHECKLIST` | 상황별 빠른 확인 | 확인 목록과 최종 GO/STOP |
+
+Topic 선정 순서는 `User Need → Purpose/Intent → Topic → Content Type → Template → Evidence → Content Plan`이다. 모든 Template을 같은 길이로 만들지 않으며 `MODEL_DATA`와 `CHECKLIST`는 짧게, `HOW_TO`는 실제 절차에 필요한 만큼만 작성한다. 공통 보강 문단을 반복 삽입해 길이를 맞추지 않는다.
+
+이미지는 개수가 아니라 역할로 계획한다. `CHECK`는 위치·정상/이상·다음 행동, `HOW_TO`는 위치·절차·완료 상태, `SPEC`은 라벨/각인·비교, `MODEL_DATA`는 검증된 실제 모델·표기 이미지를 우선한다.
+
 ## Detail UX
 
 콘텐츠 상세는 읽기 경험을 우선한다.

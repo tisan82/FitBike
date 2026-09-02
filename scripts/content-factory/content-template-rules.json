@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "templates": {
+    "CHECK": { "purpose": "현재 상태를 정상·주의·점검 필요로 판단한다.", "minBlocks": 7, "maxBlocks": 18, "requiredBlockTypes": ["table"], "imageRoles": ["LOCATION", "NORMAL_ABNORMAL", "ACTION"] },
+    "HOW_TO": { "purpose": "안전하게 실제 작업을 완료한다.", "minBlocks": 9, "maxBlocks": 28, "requiredBlockTypes": ["step", "warning"], "imageRoles": ["LOCATION", "PROCEDURE", "COMPLETION"] },
+    "TROUBLESHOOT": { "purpose": "증상과 확인 결과에 따라 다음 행동을 결정한다.", "minBlocks": 8, "maxBlocks": 22, "requiredBlockTypes": ["table", "warning"], "imageRoles": ["SYMPTOM", "LOCATION", "DECISION"] },
+    "SPEC": { "purpose": "표기와 규격을 읽고 실차·공식 기준과 비교한다.", "minBlocks": 6, "maxBlocks": 16, "requiredBlockTypes": ["table"], "imageRoles": ["MARKING", "COMPARISON"] },
+    "MODEL_DATA": { "purpose": "특정 모델·연식의 공식 확인 데이터를 짧고 정확하게 제공한다.", "minBlocks": 4, "maxBlocks": 12, "requiredBlockTypes": ["table"], "imageRoles": ["VERIFIED_MODEL", "MARKING"] },
+    "EXPLAIN": { "purpose": "원리와 의미를 실제 바이크 맥락에서 이해한다.", "minBlocks": 6, "maxBlocks": 18, "requiredBlockTypes": [], "imageRoles": ["CONCEPT", "REAL_CONTEXT"] },
+    "COMPARE": { "purpose": "두 대상의 차이와 적용 조건을 이해한다.", "minBlocks": 6, "maxBlocks": 16, "requiredBlockTypes": ["table"], "imageRoles": ["A", "B", "COMPARISON"] },
+    "PREVENT": { "purpose": "문제가 생기기 전에 필요한 관리 행동을 수행한다.", "minBlocks": 6, "maxBlocks": 18, "requiredBlockTypes": ["bullet_list"], "imageRoles": ["SITUATION", "ACTION"] },
+    "CHECKLIST": { "purpose": "짧은 시간 안에 항목을 확인하고 GO/STOP을 판단한다.", "minBlocks": 4, "maxBlocks": 12, "requiredBlockTypes": ["bullet_list", "table"], "imageRoles": ["CHECK_POINT"] }
+  }
+}

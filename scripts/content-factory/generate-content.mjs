@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { createClient } from "@supabase/supabase-js";
 import { resolveFitBikeEvidence } from "./verified-evidence.mjs";
+import { selectContentTemplate, validateTemplateContent } from "./content-templates.mjs";
 
 const factoryDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectDirectory = path.resolve(factoryDirectory, "../..");
@@ -675,7 +676,7 @@ async function writeDuplicateReport(contentKey, requestIntent, duplicate) {
 }
 
 async function main() {
-  const [rules, typeRules, blockSchema] = await Promise.all([readJson("content-rules.json"), readJson("content-type-rules.json"), readJson("content-block-schema.json")]);
+  const [rules, typeRules, blockSchema, templateRules] = await Promise.all([readJson("content-rules.json"), readJson("content-type-rules.json"), readJson("content-block-schema.json"), readJson("content-template-rules.json")]);
   if (blockSchema.title !== "FitBike Content Blocks") throw new Error("Content block schema is invalid");
   const args = parseArguments(process.argv.slice(2));
   const topic = args.topic;
@@ -690,6 +691,7 @@ async function main() {
   await loadLocalEnvironment();
   const contentKey = createContentKey(topic, rules.slugTerms);
   const requestIntent = normalizeIntent({ title: topic, contentType, targetPart, targetBikeModelKey });
+  const contentTemplate = selectContentTemplate({ topic, contentType, explicitTemplate: args.template });
   const readEvidence = await createEvidenceReader();
   const indexQuery = process.env.SUPABASE_ACCESS_TOKEN ? `
     select c.content_id,c.content_key,c.title,c.summary,c.content_type,c.body_blocks,
@@ -754,6 +756,7 @@ async function main() {
     targetPart,
     targetBikeModelKey,
     normalizedIntent: requestIntent,
+    contentTemplate,
     strategy: contentType,
     intent: typeRules[contentType].intent,
     sections: draft.blocks.filter((block) => block.type === "heading").map((block) => block.text),
@@ -770,6 +773,7 @@ async function main() {
   };
 
   const blockIssues = validateBlocks(draft.blocks, rules.validBlockTypes);
+  const templateIssues = validateTemplateContent({ template: contentTemplate, blocks: draft.blocks, rule: templateRules.templates[contentTemplate] });
   const semanticDuplication = checkSemanticDuplication(draft.blocks);
   const proceduralRequired = requiresProcedure(contentType, requestIntent.action);
   const proceduralCompleteness = checkProceduralCompleteness(draft.blocks, proceduralRequired);
@@ -787,6 +791,7 @@ async function main() {
   const qaIssues = [
     ...(postGenerationDuplicate.status === "CONTENT_DUPLICATE" ? [`Post-generation duplicate detected: ${postGenerationDuplicate.duplicateWith}`] : []),
     ...blockIssues,
+    ...templateIssues,
     ...claimIssues,
     ...(semanticDuplication.pass ? [] : [`Semantic duplication detected (${semanticDuplication.duplicatePairs})`]),
     ...(proceduralCompleteness.pass ? [] : ["Procedural flow is incomplete"]),
@@ -808,6 +813,8 @@ async function main() {
     summary: draft.summary.length > 0,
     validContentType: rules.validContentTypes.includes(contentType),
     validBlocks: blockIssues.length === 0,
+    contentTemplate,
+    templateValid: templateIssues.length === 0,
     duplicateStatus: duplicate.status,
     duplicateWith: duplicate.duplicateWith,
     duplicateReason: duplicate.reason,
@@ -832,7 +839,7 @@ async function main() {
     imagePlanValidity
   };
   const qa = { status, checks, issues: qaIssues };
-  const contentPackage = { content: { contentKey, title: draft.title, summary: draft.summary, contentType, bodyBlocks: draft.blocks }, relations, images: imagePlan, qa };
+  const contentPackage = { content: { contentKey, title: draft.title, summary: draft.summary, contentType, contentTemplate, bodyBlocks: draft.blocks }, relations, images: imagePlan, qa };
   const outputDirectory = nextOutputDirectory(contentKey);
   await mkdir(outputDirectory, { recursive: true });
   const outputs = {
