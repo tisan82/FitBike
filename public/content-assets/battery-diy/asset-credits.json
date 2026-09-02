@@ -1,0 +1,32 @@
+{
+  "contentKey": "motorcycle-battery-diy-replacement",
+  "assets": [
+    {
+      "path": "/content-assets/battery-diy/ytx7a-bs-real-cc-by-sa.webp",
+      "role": "REAL_PRODUCT_REFERENCE",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Taiwan_Yuasa_Battery_YTX7A-BS_20150717.jpg",
+      "creator": "Solomon203",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "changes": "Resized, metadata removed, and converted to WebP; photographic content unchanged."
+    },
+    {
+      "path": "/content-assets/battery-diy/lead-acid-real-cc-by-sa.webp",
+      "role": "REAL_PRODUCT_REFERENCE",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lead-acid_battery_for_motorcycle.jpg",
+      "creator": "Cjp24",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "changes": "Resized, metadata removed, and converted to WebP; photographic content unchanged."
+    },
+    {
+      "path": "/content-assets/battery-diy/scooter-access-reconstruction.webp",
+      "role": "GENERATED_ACCESS_EXPLANATION",
+      "sourceUrl": null,
+      "creator": "FitBike / OpenAI image generation",
+      "license": "FitBike editorial asset",
+      "licenseUrl": null,
+      "changes": "Generated as a brand-neutral explanatory reconstruction; not a photograph of a specific model."
+    }
+  ]
+}
