@@ -323,14 +323,21 @@ function diyDraft(topic, targetPart) {
       { type: "paragraph", text: `작업 대상 ${part}와 바이크 모델·연식을 먼저 확인합니다. 작업 절차와 안전 조건을 공식 정비 안내에서 확인할 수 없다면 작업을 시작하지 않습니다.` },
       { type: "heading", level: 2, text: "도구와 부품 준비" },
       { type: "bullet_list", items: ["공식 절차에 명시된 도구", "검증된 적용 부품", "분리한 부품을 구분할 공간"] },
+      { type: "heading", level: 2, text: "실차 접근 범위를 먼저 판단하세요" },
+      { type: "table", headers: ["확인 결과", "진행 판단"], rows: [
+        ["시트나 단일 커버만 분리하면 작업 위치와 연결부가 보임", "공식 절차와 공구가 준비되면 다음 단계 진행"],
+        ["외장·수납부·여러 커버 또는 주변 배선을 움직여야 함", "분리 순서와 복구 방법을 확인한 뒤 진행"],
+        ["작업 공간이 좁아 공구가 비스듬히 들어가거나 배선·부품과 간섭함", "억지로 진행하지 말고 안전한 접근 방법 재확인"],
+        ["차종·연식의 구조나 체결 기준을 확인할 수 없음", "작업을 중단하고 제조사 안내 또는 전문 점검 확인"]
+      ] },
       { type: "heading", level: 2, text: "작업 순서" },
       { type: "step", number: 1, title: "작업 위치를 확인합니다", body: `${part}와 주변 연결부의 원래 상태를 확인합니다.` },
       { type: "step", number: 2, title: "공식 절차에 따라 작업합니다", body: "확인한 순서와 체결 조건을 벗어나지 않도록 한 단계씩 진행합니다." },
       { type: "step", number: 3, title: "연결 상태를 복원합니다", body: "분리하거나 이동한 연결부를 공식 절차에 따라 원래 위치에 정리합니다." },
-      { type: "heading", level: 2, text: "결과 확인" },
-      { type: "paragraph", text: "작업한 위치와 주변에 남은 부품이나 도구가 없는지 확인하고, 작업 전 상태와 비교해 연결 누락이 없는지 점검합니다." },
+      { type: "heading", level: 2, text: "완료 확인" },
+      { type: "paragraph", text: "분리한 커버와 고정부를 원래 위치로 복구하고, 작업 공간에 남은 부품이나 도구가 없는지 확인합니다. 연결부가 흔들리지 않고 배선이 눌리거나 당겨지지 않는지 작업 전 사진과 비교한 뒤 허용된 범위에서 작동을 확인합니다." },
       { type: "heading", level: 2, text: "주의 사항" },
-      { type: "warning", body: "필요한 규격, 체결 조건 또는 안전 절차가 Evidence에 없으면 임의로 추정해 작업하지 마세요." }
+      { type: "warning", title: "확인할 수 없으면 작업을 중단하세요", body: "필요한 규격, 체결 조건, 차종별 분리 순서 또는 안전 절차가 Evidence에 없으면 임의로 추정해 작업하지 말고 전문 점검을 확인하세요." }
     ]
   };
 }
@@ -765,7 +772,13 @@ async function main() {
     relationRequirements: [targetPart ? `${targetPart}:CATEGORY` : null, targetBikeModelKey ? `BIKE_MODEL:${targetBikeModelKey}` : null].filter(Boolean)
   };
   const imageDefaults = typeRules[contentType].images;
-  const bodyImages = imageDefaults.bodyVisualPreferred ? [{ type: "diagram", imageRole: "EDUCATIONAL_DIAGRAM", description: `${partLabel(targetPart)}의 주요 표기 또는 확인 위치를 텍스트보다 빠르게 이해할 수 있는 단순 도식. 수치나 긴 문장 없음.` }] : [];
+  const templateImageRoles = templateRules.templates[contentTemplate].imageRoles ?? [];
+  const bodyImages = imageDefaults.bodyVisualPreferred ? templateImageRoles.map((imageRole) => ({
+    required: true,
+    type: ["VEHICLE_CONTEXT", "ACCESS_POINT", "OPENED_STATE", "PROCEDURE", "COMPLETION", "LOCATION", "NORMAL_ABNORMAL"].includes(imageRole) ? "verified real-world image" : "educational visual",
+    imageRole,
+    description: `${topic}에서 ${imageRole} 역할을 수행하는 이미지. 실제 차종 구조를 주장하는 경우 모델·연식과 출처가 검증되어야 하며, 긴 설명문이나 지원되지 않는 수치를 넣지 않는다.`
+  })) : [];
   const imagePlan = {
     thumbnail: { required: imageDefaults.thumbnail, type: "editorial context image", imageRole: contentType === "PARTS_GUIDE" ? "PRODUCT_REPRESENTATION" : "USAGE_ACTION", description: `${topic} 주제를 한눈에 식별할 수 있는 단순한 장면. 긴 설명문이나 수치 텍스트를 넣지 않는다.` },
     hero: { required: imageDefaults.hero, type: "context image", description: imageDefaults.hero ? `${topic}의 실제 맥락을 보여주는 이미지` : "필수 아님" },

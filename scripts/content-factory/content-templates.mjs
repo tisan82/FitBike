@@ -30,6 +30,18 @@ export function validateTemplateContent({ template, blocks, rule }) {
   for (const type of rule.requiredBlockTypes) {
     if (!blocks.some((block) => block.type === type)) failures.push(`TEMPLATE_REQUIRED_BLOCK:${type}`);
   }
+  const text = JSON.stringify(blocks).normalize("NFKC");
+  const realityPatterns = {
+    ACCESS_SCOPE: /시트|커버|외장|수납|접근 범위|분리 범위/,
+    VISIBLE_SCOPE: /직접 확인|눈으로 확인|확인 가능한 범위|보이는 범위/,
+    MODEL_VARIANCE: /차종|모델|연식|세대|구조.*다|위치.*다/,
+    WORKSPACE_CONSTRAINT: /작업 공간|공구.*들어|손이.*들어|배선|간섭|좁/,
+    STOP_CONDITION: /작업.*중단|진행하지|전문 점검|정비소|확인할 수 없/,
+    COMPLETION_CHECK: /완료 확인|작업 결과|복구|흔들리지|누락|시동|작동 확인/
+  };
+  for (const signal of rule.requiredRealitySignals ?? []) {
+    if (!realityPatterns[signal]?.test(text)) failures.push(`TEMPLATE_REALITY_SIGNAL:${signal}`);
+  }
   return failures;
 }
 

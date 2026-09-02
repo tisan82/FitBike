@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { validateTemplateContent } from "./content-templates.mjs";
 
 const factoryDirectory = path.dirname(fileURLToPath(import.meta.url));
 
@@ -72,7 +73,7 @@ async function validateAssetUniqueness(contentDirectory, assets, failures) {
   }
 }
 
-export async function evaluateContentQuality({ contentDirectory, rules, packageWithImages, imageResult, imageRequest = null }) {
+export async function evaluateContentQuality({ contentDirectory, rules, templateRules = null, packageWithImages, imageResult, imageRequest = null }) {
   const failures = [];
   const warnings = [];
   const content = packageWithImages?.content ?? {};
@@ -86,6 +87,13 @@ export async function evaluateContentQuality({ contentDirectory, rules, packageW
   if (!nonEmpty(content.summary)) failures.push("SUMMARY_MISSING");
   if (!Array.isArray(content.bodyBlocks) || bodyBlocks.length === 0) failures.push("BODY_BLOCKS_EMPTY");
   bodyBlocks.forEach((block, index) => validateTextBlock(block, index, failures));
+  if (nonEmpty(content.contentTemplate)) {
+    failures.push(...validateTemplateContent({
+      template: content.contentTemplate,
+      blocks: bodyBlocks,
+      rule: templateRules?.templates?.[content.contentTemplate]
+    }));
+  } else if (templateRules) failures.push("CONTENT_TEMPLATE_MISSING");
 
   const galleryPaths = [];
   for (const block of bodyBlocks) {
@@ -139,13 +147,14 @@ export async function evaluateContentQuality({ contentDirectory, rules, packageW
 }
 
 export async function runContentQualityGate(contentDirectory) {
-  const [rules, packageWithImages, imageResult, imageRequest] = await Promise.all([
+  const [rules, templateRules, packageWithImages, imageResult, imageRequest] = await Promise.all([
     readJson(path.join(factoryDirectory, "content-type-rules.json")),
+    readJson(path.join(factoryDirectory, "content-template-rules.json")),
     readJson(path.join(contentDirectory, "content-package-with-images.json")),
     readJson(path.join(contentDirectory, "image-result.json")),
     existsSync(path.join(contentDirectory, "image-generation-request.json")) ? readJson(path.join(contentDirectory, "image-generation-request.json")) : Promise.resolve(null)
   ]);
-  const result = await evaluateContentQuality({ contentDirectory, rules, packageWithImages, imageResult, imageRequest });
+  const result = await evaluateContentQuality({ contentDirectory, rules, templateRules, packageWithImages, imageResult, imageRequest });
   await writeFile(path.join(contentDirectory, "content-qa-gate.json"), `${JSON.stringify(result, null, 2)}\n`, "utf8");
   return result;
 }

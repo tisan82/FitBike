@@ -56,3 +56,13 @@ test("blocks missing image caption metadata", async () => {
   assert.equal(result.status, "FAIL");
   assert.ok(result.checks.failures.some((item) => item.includes("IMAGE_META_MISSING")));
 });
+
+test("blocks template packages that omit real-world access context", async () => {
+  const data = await fixture();
+  data.packageWithImages.content.contentTemplate = "HOW_TO";
+  const templateRules = { templates: { HOW_TO: { minBlocks: 1, maxBlocks: 20, requiredBlockTypes: [], requiredRealitySignals: ["ACCESS_SCOPE", "STOP_CONDITION"] } } };
+  const result = await evaluateContentQuality({ contentDirectory: data.dir, rules, templateRules, packageWithImages: data.packageWithImages, imageResult: data.imageResult });
+  assert.equal(result.status, "FAIL");
+  assert.ok(result.checks.failures.includes("TEMPLATE_REALITY_SIGNAL:ACCESS_SCOPE"));
+  assert.ok(result.checks.failures.includes("TEMPLATE_REALITY_SIGNAL:STOP_CONDITION"));
+});

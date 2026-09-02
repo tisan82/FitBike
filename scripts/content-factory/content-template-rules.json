@@ -1,8 +1,8 @@
 {
   "version": 1,
   "templates": {
-    "CHECK": { "purpose": "현재 상태를 정상·주의·점검 필요로 판단한다.", "minBlocks": 7, "maxBlocks": 18, "requiredBlockTypes": ["table"], "imageRoles": ["LOCATION", "NORMAL_ABNORMAL", "ACTION"] },
-    "HOW_TO": { "purpose": "안전하게 실제 작업을 완료한다.", "minBlocks": 9, "maxBlocks": 28, "requiredBlockTypes": ["step", "warning"], "imageRoles": ["LOCATION", "PROCEDURE", "COMPLETION"] },
+    "CHECK": { "purpose": "현재 상태를 정상·주의·점검 필요로 판단한다.", "minBlocks": 7, "maxBlocks": 18, "requiredBlockTypes": ["table"], "requiredRealitySignals": ["VISIBLE_SCOPE", "MODEL_VARIANCE", "STOP_CONDITION"], "imageRoles": ["VEHICLE_CONTEXT", "LOCATION", "NORMAL_ABNORMAL", "ACTION"] },
+    "HOW_TO": { "purpose": "안전하게 실제 작업을 완료한다.", "minBlocks": 12, "maxBlocks": 28, "requiredBlockTypes": ["step", "table", "warning"], "requiredRealitySignals": ["ACCESS_SCOPE", "MODEL_VARIANCE", "WORKSPACE_CONSTRAINT", "STOP_CONDITION", "COMPLETION_CHECK"], "imageRoles": ["VEHICLE_CONTEXT", "ACCESS_POINT", "OPENED_STATE", "PROCEDURE", "COMPLETION"] },
     "TROUBLESHOOT": { "purpose": "증상과 확인 결과에 따라 다음 행동을 결정한다.", "minBlocks": 8, "maxBlocks": 22, "requiredBlockTypes": ["table", "warning"], "imageRoles": ["SYMPTOM", "LOCATION", "DECISION"] },
     "SPEC": { "purpose": "표기와 규격을 읽고 실차·공식 기준과 비교한다.", "minBlocks": 6, "maxBlocks": 16, "requiredBlockTypes": ["table"], "imageRoles": ["MARKING", "COMPARISON"] },
     "MODEL_DATA": { "purpose": "특정 모델·연식의 공식 확인 데이터를 짧고 정확하게 제공한다.", "minBlocks": 4, "maxBlocks": 12, "requiredBlockTypes": ["table"], "imageRoles": ["VERIFIED_MODEL", "MARKING"] },
