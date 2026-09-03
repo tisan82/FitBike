@@ -1,0 +1,96 @@
+name: Content Image Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      content_ids:
+        description: "Optional comma-separated content ids. Empty = all active content"
+        required: false
+        default: ""
+        type: string
+  issues:
+    types: [opened, reopened]
+
+concurrency:
+  group: content-image-migration
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  migrate:
+    if: github.event_name == 'workflow_dispatch' || (startsWith(github.event.issue.title, 'CONTENT_IMAGE_MIGRATION:') && contains(github.event.issue.body, '<!-- FITBIKE_CONTENT_IMAGE_MIGRATION -->'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      FITBIKE_SITE_URL: https://fitbike.co.kr
+      CONTENT_IMAGE_MIGRATION_IDS: ${{ inputs.content_ids }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate production credentials
+        shell: bash
+        run: |
+          missing=0
+          for name in NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not configured in GitHub Actions secrets"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Migrate external images to content-assets
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/content-factory/migrate-external-content-images.mjs | tee "$RUNNER_TEMP/content-image-migration.json"
+          grep -q '"status": "PUBLISHED_VERIFIED"' "$RUNNER_TEMP/content-image-migration.json"
+          grep -q '"remainingExternalHotlinks": 0' "$RUNNER_TEMP/content-image-migration.json"
+
+      - name: Close completed migration issue
+        if: success() && github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Production content image migration completed and verified. Workflow run: ${context.runId}`
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+              state_reason: 'completed'
+            });
+
+      - name: Report migration failure
+        if: failure() && github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Production content image migration failed. Inspect workflow run ${context.runId}. Issue remains open for recovery.`
+            });
