@@ -5,6 +5,7 @@ import path from "node:path";
 
 const functionUrl = process.env.CONTENT_IMAGE_MIGRATION_FUNCTION_URL;
 const anonJwt = process.env.SUPABASE_ANON_JWT;
+const storageBaseUrl = "https://farjyjcvduthawpdjuqe.supabase.co/storage/v1/object/public/content-assets";
 
 if (!functionUrl || !anonJwt) {
   throw new Error("CONTENT_IMAGE_MIGRATION_FUNCTION_URL and SUPABASE_ANON_JWT are required");
@@ -210,6 +211,17 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 300));
 
   for (const asset of discovered.assets) {
+    const managedUrl = `${storageBaseUrl}/${asset.storage_path}`;
+    const existing = await fetch(managedUrl, { method: "HEAD" });
+    if (existing.ok) {
+      console.log(JSON.stringify({
+        stage: "ASSET_REUSED",
+        source_url: asset.source_url,
+        storage_path: asset.storage_path,
+      }));
+      continue;
+    }
+
     const converted = await imageToWebpBase64(cdp, asset.fetch_url);
     if (converted.size > 4 * 1024 * 1024) {
       throw new Error(`converted WebP exceeds 4MB: ${asset.source_url}`);
@@ -243,7 +255,12 @@ try {
   }
 } finally {
   chrome.kill("SIGTERM");
-  fs.rmSync(userDataDir, { recursive: true, force: true });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  try {
+    fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  } catch (error) {
+    console.warn(`Chrome temp cleanup warning: ${error instanceof Error ? error.message : String(error)}`);
+  }
   if (chrome.exitCode && chrome.exitCode !== 0) {
     console.error(stderr.slice(-4000));
   }
