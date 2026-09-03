@@ -19,23 +19,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Migrate external images to FitBike content-assets
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Internalize and optimize Production content images
         shell: bash
         env:
-          FUNCTION_URL: https://farjyjcvduthawpdjuqe.supabase.co/functions/v1/content-image-migrate
+          CONTENT_IMAGE_MIGRATION_FUNCTION_URL: https://farjyjcvduthawpdjuqe.supabase.co/functions/v1/content-image-migrate
           SUPABASE_ANON_JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmp5amN2ZHV0aGF3cGRqdXFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTU4OTMsImV4cCI6MjA5MjkzMTg5M30.EX3GclxMzkXuZE1n5EN-9BVFbTIRsSUuM1sHha9mI8Q
         run: |
           set -o pipefail
           output="$RUNNER_TEMP/content-image-migration.json"
-          curl --fail-with-body --silent --show-error \
-            --request POST \
-            --header "Authorization: Bearer $SUPABASE_ANON_JWT" \
-            --header "apikey: $SUPABASE_ANON_JWT" \
-            --header "Content-Type: application/json" \
-            --data '{}' \
-            "$FUNCTION_URL" | tee "$output"
-          grep -q '"status":"PUBLISHED_VERIFIED"' "$output"
-          grep -q '"remaining_external_hotlinks":0' "$output"
+          node scripts/content-factory/migrate-external-content-images-browser.mjs | tee "$output"
+          grep -q '"status": "PUBLISHED_VERIFIED"' "$output"
+          grep -q '"remaining_external_hotlinks": 0' "$output"
 
       - name: Close completed migration issue
         if: success() && github.event_name == 'issues'
