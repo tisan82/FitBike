@@ -51,6 +51,16 @@ When changing a global customer-facing UI policy, update both the code and `SCRE
 
 Before changing a customer-facing public page, review `SEO_GEO.md`. Update it with the code when a global SEO/GEO policy changes.
 
+## Production deployment policy
+
+-   GitHub `main` is the FitBike Production source branch.
+-   Vercel Git integration is the default Production delivery path: merge/push to `main` → Vercel Production build → `fitbike.co.kr`.
+-   Feature branches and pull requests must remain Preview deployments and must not become the normal Production source.
+-   Do not add a duplicate GitHub Actions Vercel deploy pipeline while the native Vercel Git integration is healthy; duplicate pipelines can create redundant Production builds and unclear release ownership.
+-   A change is not reported as Production complete until the Vercel deployment for the same `main` commit is `READY` and the affected Production URL is verified.
+-   If GitHub `main` and the active Vercel Production commit differ, report `PRODUCTION DRIFT` and reconcile before starting the next release.
+-   Manual Vercel promotion/direct deployment is reserved for recovery or an explicitly requested exceptional release; the resulting commit must still be reconciled back to `main`.
+
 ## Product guardrails
 
 -   Fitment accuracy is the highest priority.
@@ -98,7 +108,8 @@ Classify decisions before documenting them:
 
 -   Global rules used across services belong in the relevant Product or Framework document.
 -   Rules limited to one feature belong in its Service Module.
--   Implementation details such as local pixel values, debugging history, build output, and temporary fixes remain in code or the Task result.
+-   Implementation details such as local pixel values, debugging history,
+    build output, and temporary fixes remain in code or the Task result.
 
 Do not duplicate the same policy across Global and Service Module documents. If no persistent rule was established, report `Documentation Update: NONE`. When a major service gains durable Product/UX/Data contracts and has no Service Module, propose one; do not create it merely because a screen exists.
 
@@ -129,6 +140,9 @@ These instructions do not override IDE/OS permission prompts.
 
 ## Completion report
 
-Report: goal/root cause, changed files, changes made, validation, remaining issues, and policy/schema conflicts.
+Report: goal/root cause, changed files, changes made, validation,
+remaining issues, and policy/schema conflicts.
 
-For Feature Tasks, also report a Persistent Knowledge Review with New Global Rules, New Service-specific Rules, Documentation Updated, and Policy Conflict; use `NONE` where applicable.
+For Feature Tasks, also report a Persistent Knowledge Review with New Global
+Rules, New Service-specific Rules, Documentation Updated, and Policy Conflict;
+use `NONE` where applicable.
