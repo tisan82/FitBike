@@ -28,7 +28,7 @@ project from scratch.
 4.  `docs/01_product/SERVICE.md`
 5.  Relevant files under `docs/02_framework/`
 6.  Relevant Service Module under `docs/03_service_modules/`
-7.  For Content Factory/content production tasks, read `docs/03_service_modules/CONTENT.md` and then `docs/00_ai/CONTENT_FACTORY.md`
+7.  For Content Factory/content production tasks, read `docs/03_service_modules/CONTENT.md`, then `docs/00_ai/CONTENT_FACTORY.md`, then `docs/00_ai/CONTENT_QUEUE.md`
 8.  Current Task/result/changelog when relevant
 9.  Existing implementation code
 10. For DB work, `docs/04_database_schema/` is mandatory
@@ -38,33 +38,25 @@ repository for small changes.
 
 ## Source of Truth
 
--   Product/Business: `SERVICE.md` > Service Module > Task >
-    implementation
--   Content production execution: `CONTENT.md` (product/editorial policy) > `CONTENT_FACTORY.md` (AI production procedure) > Task > implementation
--   Database: current Supabase export in `docs/04_database_schema/` >
-    `DATABASE.md` > Service Module > implementation
--   Architecture/API: `ARCHITECTURE.md` + `API.md` > Service Module >
-    Task > implementation
+-   Product/Business: `SERVICE.md` > Service Module > Task > implementation
+-   Content production execution: `CONTENT.md` (product/editorial policy) > `CONTENT_FACTORY.md` (AI production procedure) > `CONTENT_QUEUE.md` (queue reconciliation/execution) > Task > implementation
+-   Database: current Supabase export in `docs/04_database_schema/` > `DATABASE.md` > Service Module > implementation
+-   Architecture/API: `ARCHITECTURE.md` + `API.md` > Service Module > Task > implementation
 -   UI/UX: `SCREEN.md` > Service Module > Task > implementation
 -   Public SEO/GEO: `SEO_GEO.md` > Service Module > Task > implementation
 
-Existing code is evidence of current behavior but does not override an
-explicit higher-level policy. If sources conflict, do not guess; report
-the conflict before a policy/schema-breaking change.
+Existing code is evidence of current behavior but does not override an explicit higher-level policy. If sources conflict, do not guess; report the conflict before a policy/schema-breaking change.
 
-When changing a global customer-facing UI policy, update both the code and
-`SCREEN.md` in the same Task.
+When changing a global customer-facing UI policy, update both the code and `SCREEN.md` in the same Task.
 
-Before changing a customer-facing public page, review `SEO_GEO.md`. Update it
-with the code when a global SEO/GEO policy changes.
+Before changing a customer-facing public page, review `SEO_GEO.md`. Update it with the code when a global SEO/GEO policy changes.
 
 ## Product guardrails
 
 -   Fitment accuracy is the highest priority.
 -   Model + Model Year is the core service axis.
 -   Never invent fitment data. Unknown/unverified values remain `NULL`.
--   Information first; do not introduce ranking/recommendation unless
-    explicitly requested.
+-   Information first; do not introduce ranking/recommendation unless explicitly requested.
 -   Mobile First, Minimal Input, Progressive Disclosure.
 -   Preserve Brand → Model → Model Year selection flow.
 
@@ -76,8 +68,7 @@ with the code when a global SEO/GEO policy changes.
 -   Documentation examples are not schema truth.
 -   Avoid `SELECT *` when required fields are known.
 -   Preserve constraints and active-data policies.
--   Storage DB values may be object paths; do not hard-code
-    environment-specific public URLs into DB data.
+-   Storage DB values may be object paths; do not hard-code environment-specific public URLs into DB data.
 
 ## API guardrails
 
@@ -101,31 +92,17 @@ with the code when a global SEO/GEO policy changes.
 
 ## Persistent development knowledge
 
-After implementation and validation, determine whether the Task established a
-Product, UX/UI, Architecture, Data, or API rule that future Tasks must follow.
-Do not leave such policy only in code, conversation, or a Task result. Update
-the smallest appropriate existing Source of Truth document instead of creating
-a duplicate document.
+After implementation and validation, determine whether the Task established a Product, UX/UI, Architecture, Data, or API rule that future Tasks must follow. Do not leave such policy only in code, conversation, or a Task result. Update the smallest appropriate existing Source of Truth document instead of creating a duplicate document.
 
 Classify decisions before documenting them:
 
--   Global rules used across services belong in the relevant Product or
-    Framework document.
+-   Global rules used across services belong in the relevant Product or Framework document.
 -   Rules limited to one feature belong in its Service Module.
--   Implementation details such as local pixel values, debugging history,
-    build output, and temporary fixes remain in code or the Task result.
+-   Implementation details such as local pixel values, debugging history, build output, and temporary fixes remain in code or the Task result.
 
-Do not duplicate the same policy across Global and Service Module documents.
-If no persistent rule was established, report `Documentation Update: NONE`.
-When a major service gains durable Product/UX/Data contracts and has no Service
-Module, propose one; do not create it merely because a screen exists.
+Do not duplicate the same policy across Global and Service Module documents. If no persistent rule was established, report `Documentation Update: NONE`. When a major service gains durable Product/UX/Data contracts and has no Service Module, propose one; do not create it merely because a screen exists.
 
-If a Task conflicts with an existing Source of Truth, report `POLICY CONFLICT`
-with the existing rule, requested rule, and impact, then wait for a decision.
-Do not override a Global policy with a Feature requirement without explicit
-approval. If code and documentation materially differ, report
-`DOCUMENTATION DRIFT` and follow the Source of Truth precedence above rather
-than guessing which is correct.
+If a Task conflicts with an existing Source of Truth, report `POLICY CONFLICT` with the existing rule, requested rule, and impact, then wait for a decision. Do not override a Global policy with a Feature requirement without explicit approval. If code and documentation materially differ, report `DOCUMENTATION DRIFT` and follow the Source of Truth precedence above rather than guessing which is correct.
 
 ## Normal local validation
 
@@ -152,9 +129,6 @@ These instructions do not override IDE/OS permission prompts.
 
 ## Completion report
 
-Report: goal/root cause, changed files, changes made, validation,
-remaining issues, and policy/schema conflicts.
+Report: goal/root cause, changed files, changes made, validation, remaining issues, and policy/schema conflicts.
 
-For Feature Tasks, also report a Persistent Knowledge Review with New Global
-Rules, New Service-specific Rules, Documentation Updated, and Policy Conflict;
-use `NONE` where applicable.
+For Feature Tasks, also report a Persistent Knowledge Review with New Global Rules, New Service-specific Rules, Documentation Updated, and Policy Conflict; use `NONE` where applicable.
