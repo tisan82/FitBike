@@ -19,7 +19,7 @@ jobs:
           set -o pipefail
           curl --fail-with-body --silent --show-error \
             --request POST \
-            'https://farjyjcvduthawpdjuqe.supabase.co/functions/v1/seed-editorial-reference?token=fitbike-ref-20260904-v2' \
+            'https://farjyjcvduthawpdjuqe.supabase.co/functions/v1/seed-editorial-reference?token=fitbike-ref-20260904-v3' \
             | tee /tmp/seed.json
           grep -q '"REFERENCE_UPLOADED"' /tmp/seed.json
       - name: Close issue
