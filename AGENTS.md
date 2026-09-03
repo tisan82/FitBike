@@ -28,9 +28,10 @@ project from scratch.
 4.  `docs/01_product/SERVICE.md`
 5.  Relevant files under `docs/02_framework/`
 6.  Relevant Service Module under `docs/03_service_modules/`
-7.  Current Task/result/changelog when relevant
-8.  Existing implementation code
-9.  For DB work, `docs/04_database_schema/` is mandatory
+7.  For Content Factory/content production tasks, read `docs/03_service_modules/CONTENT.md` and then `docs/00_ai/CONTENT_FACTORY.md`
+8.  Current Task/result/changelog when relevant
+9.  Existing implementation code
+10. For DB work, `docs/04_database_schema/` is mandatory
 
 Read only what is relevant to the Task. Do not repeatedly scan the whole
 repository for small changes.
@@ -39,6 +40,7 @@ repository for small changes.
 
 -   Product/Business: `SERVICE.md` > Service Module > Task >
     implementation
+-   Content production execution: `CONTENT.md` (product/editorial policy) > `CONTENT_FACTORY.md` (AI production procedure) > Task > implementation
 -   Database: current Supabase export in `docs/04_database_schema/` >
     `DATABASE.md` > Service Module > implementation
 -   Architecture/API: `ARCHITECTURE.md` + `API.md` > Service Module >
