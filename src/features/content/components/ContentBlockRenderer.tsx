@@ -26,7 +26,9 @@ function ContentVisual({ image, compact = false, contain = false }: { image: Con
       <Image
         alt={image.alt}
         className={`w-full rounded-2xl ${compact ? "aspect-[4/3]" : "h-auto"} ${contain ? "bg-surface-secondary object-cover" : "object-cover"}`}
+        decoding="async"
         height={900}
+        loading="lazy"
         sizes={compact ? "(max-width: 640px) 84vw, (max-width: 1024px) 46vw, 32vw" : "(max-width: 768px) 100vw, 768px"}
         src={src}
         unoptimized={!shouldOptimizeContentImage(src)}
@@ -53,7 +55,7 @@ export function ContentBlockRenderer({ blocks }: { blocks: ContentBlock[] }) {
             if (!block.storagePath?.trim() || seenImagePaths.has(block.storagePath)) return null;
             seenImagePaths.add(block.storagePath);
             const src = resolveContentImage(block.storagePath);
-            return src ? <figure className="space-y-3 py-2" key={key}><Image alt={block.alt} className="h-auto w-full rounded-2xl object-cover" height={900} sizes="(max-width: 768px) 100vw, 768px" src={src} unoptimized={!shouldOptimizeContentImage(src)} width={1200} />{block.caption?.trim() ? <figcaption className="text-sm leading-6 text-foreground-secondary">{block.caption}</figcaption> : null}</figure> : null;
+            return src ? <figure className="space-y-3 py-2" key={key}><Image alt={block.alt} className="h-auto w-full rounded-2xl object-cover" decoding="async" height={900} loading="lazy" sizes="(max-width: 768px) 100vw, 768px" src={src} unoptimized={!shouldOptimizeContentImage(src)} width={1200} />{block.caption?.trim() ? <figcaption className="text-sm leading-6 text-foreground-secondary">{block.caption}</figcaption> : null}</figure> : null;
           }
           case "image_gallery": {
             const uniqueImages = block.images.filter((image) => { if (!image.storagePath?.trim() || seenImagePaths.has(image.storagePath)) return false; seenImagePaths.add(image.storagePath); return true; });
