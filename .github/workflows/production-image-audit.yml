@@ -1,0 +1,122 @@
+name: Production Image Audit
+
+on:
+  workflow_dispatch:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.issue.title, 'PRODUCTION_IMAGE_AUDIT:')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check all active content pages and local image routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://fitbike.co.kr'
+
+          content_keys=(
+            tire-size-guide
+            pcx125-tire-guide
+            battery-check-before-replace
+            tire-replacement-check-guide
+            pcx125-battery-guide
+            motorcycle-battery-inspection
+            motorcycle-tire-check
+            motorcycle-tire
+            motorcycle-battery-maintenance-check
+            motorcycle-brake-check
+            brake-specification-check
+            cbr650r-tire-specification
+            350-tire-specification
+            cb650r-tire-specification
+            mt-07-tire-specification
+            ninja-400-tire-specification
+            tire
+            battery
+            brake
+            rs-660-tire-specification
+            750-tire-specification
+            900-tire-specification
+            125-tire-specification
+            300-tire-specification
+            sr-125-tire-specification
+            899-tire-specification
+            502-tire-specification
+            c-400-gt-tire-specification
+            c-400-x-tire-specification
+            c-600-tire-specification
+            motorcycle-battery-fitment-check
+            motorcycle-battery-diy-replacement
+            motorcycle-engine-oil-guide
+            motorcycle-chain-maintenance
+            motorcycle-coolant-maintenance
+            motorcycle-spark-plug-check
+            motorcycle-brake-fluid-change
+            motorcycle-engine-oil-check-change
+            motorcycle-air-filter-inspection-replacement
+            motorcycle-five-minute-pre-ride-check
+            motorcycle-return-from-storage-check
+          )
+
+          local_assets=(
+            /content-assets/battery-diy/lead-acid-real-cc-by-sa.webp
+            /content-assets/battery-diy/scooter-access-reconstruction.webp
+            /content-assets/battery-diy/ytx7a-bs-real-cc-by-sa.webp
+            /content-guides/inspection-flow.svg
+            /content-guides/model-fitment-check.svg
+            /content-guides/spec-check.svg
+            /images/contents/battery-fitment-check/fitment-check-guide.svg
+            /images/contents/model-guides/srmax-sportcity-reference.webp
+          )
+
+          failures=0
+          checked_pages=0
+          checked_assets=0
+
+          check_url() {
+            local url="$1"
+            local code
+            code=$(curl -L -sS -o /dev/null -w '%{http_code}' --max-time 20 "$url" || true)
+            if [[ "$code" =~ ^2|^3 ]]; then
+              echo "PASS $code $url"
+            else
+              echo "FAIL $code $url"
+              failures=$((failures+1))
+            fi
+          }
+
+          check_url "$base/contents"
+          for key in "${content_keys[@]}"; do
+            check_url "$base/contents/$key"
+            checked_pages=$((checked_pages+1))
+          done
+
+          for path in "${local_assets[@]}"; do
+            check_url "$base$path"
+            checked_assets=$((checked_assets+1))
+          done
+
+          echo "AUDIT_SUMMARY pages=$checked_pages local_assets=$checked_assets failures=$failures"
+          test "$failures" -eq 0
+
+      - name: Close completed audit issue
+        if: success() && github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body: `Production image audit passed: all active content pages and local image routes responded successfully. Run: ${context.runId}` });
+            await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, state: 'closed', state_reason: 'completed' });
+
+      - name: Report audit failure
+        if: failure() && github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body: `Production image audit failed. Inspect workflow run ${context.runId}.` });
