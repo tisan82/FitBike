@@ -63,6 +63,10 @@ jobs:
             motorcycle-air-filter-inspection-replacement
             motorcycle-five-minute-pre-ride-check
             motorcycle-return-from-storage-check
+            motorcycle-post-tipover-safety-check
+            motorcycle-fluid-leak-troubleshooting
+            motorcycle-tire-foreign-object-check
+            motorcycle-front-fork-leak-check
           )
 
           local_assets=(
