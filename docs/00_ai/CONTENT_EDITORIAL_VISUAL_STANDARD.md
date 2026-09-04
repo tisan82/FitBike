@@ -4,164 +4,120 @@
 **Scope:** Content Factory의 Writing / Visual Planning / Image QA
 
 ## 1. Core Rule
-
-콘텐츠는 사용자가 **무엇을 점검하고, 어디를 확인하고, 어떤 상태면 중단해야 하는지** 빠르게 이해하도록 만든다. 설명 분량을 늘리기 위해 같은 정보를 문장·표·이미지로 반복하지 않는다.
+콘텐츠는 사용자가 **무엇을 점검하고, 어디를 확인하고, 어떤 상태면 중단해야 하는지** 빠르게 이해하도록 만든다. 같은 정보를 문장·표·이미지로 반복하지 않는다.
 
 ## 2. Heading Naming
-
-H2/H3는 행동을 길게 지시하는 문장보다 사용자가 스캔하기 쉬운 **대상 + 목적** 명칭을 우선한다.
-
-- 권장: `타이어 / 휠 점검`, `브레이크 / 조작계 점검`, `등화 / 전기장치 점검`, `유체 / 누유 점검`, `차체 / 스탠드 점검`
-- 지양: `타이어와 휠부터 보세요`, `브레이크와 조작계는 직접 움직여 확인하세요`
-
-`합니다`, `봅니다`, `살펴봅니다` 같은 서술형 문구를 반복하지 않는다. 정보 라벨은 `점검`, `확인`, `정상`, `이상`, `STOP`처럼 명시적으로 표현한다.
+H2/H3는 행동형 장문보다 **대상 + 목적**을 우선한다. 예: `타이어 / 휠 점검`, `브레이크 / 조작계 점검`, `유체 / 누유 점검`. `합니다/봅니다` 반복보다 `점검/확인/정상/이상/STOP`을 사용한다.
 
 ## 3. No Repetition
+- Hero와 동일 이미지를 본문에 재사용하지 않는다.
+- 동일 콘텐츠 안에서 같은 Production Asset을 두 번 사용하지 않는다.
+- 다른 콘텐츠의 이미지는 정보 목적과 inspection target이 정확히 일치할 때만 재사용한다. 단순히 Storage에 있다는 이유로 재사용하지 않는다.
+- 이미지가 정보를 전달하면 본문은 확인 위치·항목·정상/이상·다음 행동만 보완한다.
 
-- Hero와 동일 이미지를 본문 첫 이미지로 다시 노출하지 않는다.
-- 같은 체크리스트를 인포그래픽 → 본문 목록 → 별도 요약 이미지로 반복하지 않는다.
-- 이미지가 확인 위치와 상태를 충분히 전달하면 본문은 `확인 위치 / 확인 항목 / 정상·이상 기준 / 다음 행동`만 보완한다.
-- 하나의 섹션은 하나의 사용자 질문을 해결한다.
+## 4. Real Image First
+실제 부품의 위치·형태·마모·누유·조작부를 알아야 하는 콘텐츠는 실사를 우선한다. 타이어 손상, 브레이크, 스로틀, 등화장치, 누유 위치, 포크 씰, 체인/벨트, 스탠드 등은 실제 구조가 식별되어야 한다. 적합한 실사가 없으면 무관한 기존 사진으로 채우지 않는다.
 
-## 4. Real Image First for Physical Inspection
+## 5. Image Must Teach
+각 이미지는 다음 중 최소 하나를 명확하게 가르쳐야 한다: `어디를 볼 것인가`, `무엇을 확인할 것인가`, `어떤 상태가 문제인가`. 모바일 390px에서 핵심 대상이 식별되지 않거나 사진만 보고 확인 목적을 설명할 수 없으면 `IMAGE_INFORMATION_VALUE_FAIL`이다.
 
-실제 부품의 위치·형태·마모·누유·조작부를 알아야 하는 점검 콘텐츠는 **실사 우선**이다.
+## 6. Image Brief — Mandatory Before Generation
+모든 Production 이미지에는 생성/확보 전에 독립 Image Brief가 있어야 한다.
 
-실사 우선 대상:
+- `asset_role`: HERO | BODY
+- `inspection_target`
+- `inspection_point`
+- `information_goal`
+- `normal_abnormal`
+- `real_photo_required`
+- `term_explanation`
+- `duplicate_check`
+- `reference_assets`: 참고만 할 Reference Asset 목록
+- `production_output`: 최종 한 장이 전달해야 하는 장면
 
-- 타이어 표면, 마모한계선, 이물질, 휠
-- 브레이크 디스크·캘리퍼·레버·페달
-- 스로틀 그립과 실제 조작 위치
-- 전조등·방향지시등·제동등·계기판
-- 엔진·호스·리저버·주차면의 누유 확인 위치
-- 차체 고정물·체인/벨트·사이드/센터 스탠드
+**절대 규칙: `1 Image Brief = 1 Generation/Acquisition = 1 Production Asset`.**
 
-실사를 확보할 수 없으면 생성 이미지를 실제 사진처럼 대체하지 않는다. 생성 이미지는 원리·판단 흐름·개념 비교에만 사용한다.
+여러 콘텐츠, 여러 섹션, 여러 판단 단계를 한 번의 Production 이미지 생성 요청에 합치지 않는다.
 
-## 5. Image Must Teach the Inspection Point
+## 7. Reference Asset vs Production Asset
+`editorial-reference/**`의 대시보드, 콜라주, ChatGPT 생성안, UI mockup은 **Visual Knowledge Base**다. 생성형 AI가 구도·점검 위치·정보 구조를 참고할 수 있지만 서비스에 직접 노출하지 않는다.
 
-실사 이미지는 단순히 부품을 보여주는 것으로 끝내지 않는다. Caption 또는 허용된 편집으로 다음 중 필요한 정보를 제공한다.
+Reference Asset을 활용할 때는:
+`Reference 분석 → 현재 섹션의 단일 Image Brief → 새 독립 이미지 생성/실사 확보 → Production QA → contents/<content-key>/** 저장`
 
-1. **어디를 볼 것인가** — 실제 확인 위치
-2. **무엇을 확인할 것인가** — 마모, 균열, 이물질, 작동, 누유 등
-3. **어떤 상태가 문제인가** — 정상/이상 또는 STOP 기준
+다음은 금지한다.
+- Reference 대시보드 전체를 Hero/본문에 연결
+- 대시보드의 작은 패널을 crop하여 실사처럼 사용
+- 3개 콘텐츠용 이미지를 한 장으로 생성
+- 한 장에 여러 섹션을 축소 배치해 모바일 가독성을 희생
+- Reference Asset path를 Production DB에 저장
 
-모바일 390px에서 핵심 부품이 식별되지 않는 원거리 사진은 사용하지 않는다. 긴 텍스트를 이미지 내부에 넣지 않는다.
+## 8. Dashboard / Composite Detection Gate
+이미지 생성 직후 **Production Storage 업로드 전에** 결과를 판정한다.
 
-## 6. Term Explanation
+다음 중 하나라도 해당하면 `REFERENCE_ONLY`로 강등하고 Production 진입을 차단한다.
+- 둘 이상의 콘텐츠 제목/번호가 한 이미지에 존재
+- 독립 카드/패널이 3개 이상인 대시보드·콜라주 구조
+- 한 이미지가 여러 Image Brief를 동시에 해결하려 함
+- 모바일에서 각 패널의 핵심 대상이 작아 식별 불가
+- 웹페이지/대시보드/프레젠테이션 화면처럼 생성됨
+- Production output과 다른 장면이 포함됨
 
-초보자가 모를 수 있는 용어는 실제 이미지 바로 옆에서 짧게 정의한다.
+실패 코드: `DASHBOARD_COMPOSITE_OUTPUT`, `MULTI_BRIEF_IMAGE`, `REFERENCE_ASSET_DIRECTLY_SERVED`.
 
-예: `스로틀 = 오른쪽 핸들의 회전식 그립. 회전해 가속하고 손을 놓으면 정상적으로 원위치로 복귀해야 한다.`
+실패 시 자동 행동:
+1. 해당 결과를 `editorial-reference/generated/**`에 Reference Asset으로 저장 가능
+2. `used_in_service=false`
+3. Production DB 연결 금지
+4. Image Brief를 변경하지 말고 **한 장씩 다시 생성**
+5. 새 결과가 Gate를 통과할 때까지 게시 이미지로 승인하지 않음
 
-용어 설명을 별도 장문 문단으로 반복하지 않는다.
+## 9. Production Asset Uniqueness Gate
+게시 직전 Hero/Body asset 목록을 비교한다.
+- Hero == Body path → FAIL
+- 동일 Body path 2회 이상 → FAIL
+- 같은 콘텐츠의 perceptually same image/동일 원본 변형 반복 → FAIL
+- 다른 콘텐츠에서 가져온 범용 이미지가 현재 inspection target을 직접 보여주지 않음 → FAIL
 
-## 7. Checklist Content Structure
+실패 코드: `DUPLICATE_IMAGE`, `HERO_BODY_DUPLICATE`, `GENERIC_ASSET_REUSE`, `INSPECTION_TARGET_MISMATCH`.
 
-출발 전 점검과 같은 CHECKLIST 콘텐츠는 다음 구조를 기본으로 한다.
+## 10. Production Image Delivery
+웹 이미지는 Research Source이지 Production Delivery URL이 아니다.
 
-`짧은 목적 설명 → 영역별 점검(H2) → 해당 영역 실사 → 확인 항목 → STOP 기준 → 최종 GO/STOP`
+`External/Official/Blog Source → provenance → 편집 → Resize → WebP → FitBike Storage → DB Storage path → Lazy Loading → Production QA`
 
-별도의 `실제로 볼 것` 섹션을 만들어 앞의 내용을 다시 요약하지 않는다. 각 영역 안에서 바로 실사와 확인 포인트를 결합한다.
+- 외부 Hotlink 금지
+- `/public` 로컬 콘텐츠 이미지 직접 호출 금지
+- Production은 FitBike Storage Asset 사용
+- 사진형 본문 장변 약 1200px, WebP 우선
+- 본문은 대체로 100–300KB 목표(정보 손실 시 예외)
+- Hero/LCP 후보만 필요 시 우선 로딩, 나머지 본문은 lazy loading
+- responsive sizes를 제공해 모바일 과다운로드 방지
 
-## 8. Image Brief Additions
+## 11. Mobile Text Inside Images
+390px 화면에서 일반 설명 약 16px CSS-equivalent, 보조 정보 약 14px 이상을 목표로 한다. 1200px 원본 기준 일반 설명 약 49px+, 핵심 라벨 55px+, 제목 68px+를 기본 시작점으로 한다. 글이 많으면 글자를 줄이지 말고 이미지를 분리하거나 HTML로 이동한다.
 
-Physical Inspection용 Image Brief에는 기존 필드에 더해 다음을 반드시 명시한다.
+## 12. Production Image QA Gate
+### Editorial / Information
+- 이미지마다 단일 Image Brief가 존재하는가?
+- Dashboard/Composite Gate를 통과했는가?
+- Hero와 Body가 중복되지 않는가?
+- 동일 콘텐츠 내 중복 이미지가 없는가?
+- 현재 주제의 실제 inspection target을 직접 보여주는가?
+- 이미지 하나만 봐도 확인 목적이 설명 가능한가?
+- 실사가 필요한 물리적 점검은 실제 구조가 식별 가능한가?
+- 모바일에서 핵심 대상과 텍스트가 인지 가능한가?
 
-- `inspection_target`: 사용자가 실제로 찾을 부품/영역
-- `inspection_point`: 이미지에서 집중해서 볼 위치
-- `normal_abnormal`: 정상/이상 구분이 필요한지
-- `term_explanation`: 스로틀 등 초보자 용어 설명 필요 여부
-- `real_photo_required`: 실제 구조 확인이 목적이면 `true`
-- `duplicate_check`: Hero 또는 다른 본문 이미지와 정보가 겹치는지
+### Delivery
+- 외부 hotlink 0인가?
+- `/public` 직접 이미지 0인가?
+- `editorial-reference/**` 직접 서비스 0인가?
+- 모든 Production 이미지가 FitBike Storage에 존재하는가?
+- WebP/Resize가 적용됐는가?
+- Hero 외 본문은 기본 lazy loading인가?
+- 깨진 asset/layout shift가 없는가?
 
-## 9. Production Image Delivery — Mandatory
+### Blocking Fail Codes
+`DASHBOARD_COMPOSITE_OUTPUT`, `MULTI_BRIEF_IMAGE`, `REFERENCE_ASSET_DIRECTLY_SERVED`, `DUPLICATE_IMAGE`, `HERO_BODY_DUPLICATE`, `GENERIC_ASSET_REUSE`, `INSPECTION_TARGET_MISMATCH`, `IMAGE_INFORMATION_VALUE_FAIL`, `EXTERNAL_HOTLINK`, `LOCAL_PUBLIC_IMAGE_REF`, `UNOPTIMIZED_ORIGINAL`, `MOBILE_TEXT_UNREADABLE`, `BROKEN_ASSET`, `EAGER_LOAD_OVERUSE`.
 
-웹에서 발견한 이미지는 **Research Source**이지 Production Delivery URL이 아니다. FitBike Production 콘텐츠는 외부 이미지 원본을 직접 hotlink하지 않는다.
-
-필수 흐름:
-
-`External/Official/Blog Source → provenance 기록 → 필요한 편집/Crop → Resize → WebP 최적화 → FitBike Storage 업로드 → Content DB에는 FitBike Storage path/URL 사용 → Lazy Loading → Production QA`
-
-### 9.1 No External Hotlink in Production
-
-- `commons.wikimedia.org`, 제조사 사이트, 블로그, 기타 외부 CDN URL을 `hero_image_storage_path`, `thumbnail_image_storage_path`, `body_blocks[].storagePath`의 최종 Production 값으로 직접 저장하지 않는다.
-- 원본 URL은 `17_content_asset_source` 등 provenance/source record에 보존한다.
-- 이미 게시된 콘텐츠에 외부 hotlink가 발견되면 Asset Migration 대상으로 분류한다.
-- 외부 URL이 일시적으로 표시된다는 이유로 QA PASS 처리하지 않는다.
-
-### 9.2 FitBike Storage Asset
-
-Production에서 표시하는 이미지는 FitBike가 관리하는 Storage Asset을 기본으로 한다.
-
-- 동일 원본/동일 편집본은 중복 업로드하지 않고 기존 Asset을 재사용한다.
-- Storage object path는 콘텐츠/역할을 식별할 수 있도록 일관된 naming을 사용한다.
-- DB가 object path를 저장하는 구조라면 환경별 public URL을 DB에 하드코딩하지 않는다. 현재 schema/renderer 계약을 우선한다.
-
-### 9.3 Resize / Format / File Weight
-
-서비스에 필요한 표시 크기보다 과도하게 큰 원본을 그대로 저장하지 않는다.
-
-기본 목표:
-
-- 본문 실사: 장변 약 `1200px` 기준. 확대 정보가 실제로 필요한 경우에만 더 큰 Variant 허용.
-- Hero: 서비스 Hero 비율에 맞춘 별도 Variant 사용을 우선한다.
-- Thumbnail: Hero 원본을 그대로 내려받게 하지 말고 목록 노출에 적합한 소형 Variant를 우선한다.
-- 사진형 Asset: `WebP` 우선.
-- 투명도/그래픽 특성상 다른 포맷이 더 적합한 경우에만 예외 허용.
-- 본문 사진은 품질을 훼손하지 않는 범위에서 대체로 `100–300KB` 수준을 목표로 한다. 정보 식별에 더 큰 용량이 필요한 경우 Quality Judge가 예외 사유를 남긴다.
-- 원본 파일 크기/해상도를 그대로 Production에 전달하지 않는다.
-
-파일 크기 목표는 절대적인 PASS 기준이 아니라 Delivery Budget이다. 핵심 부품 식별이 손상되면 더 높은 품질을 사용하되 이유를 기록한다.
-
-### 9.4 Loading Priority / Lazy Loading
-
-첫 화면에 필요하지 않은 본문 이미지를 초기 페이지 로드와 동시에 모두 요청하지 않는다.
-
-- Hero/LCP 후보: 의도적으로 우선 로딩할 수 있다.
-- Above-the-fold의 첫 핵심 Visual: 실제 UX상 필요한 경우에만 우선순위를 부여한다.
-- 나머지 본문 이미지: 기본 `lazy loading`.
-- 여러 이미지에 무분별하게 `priority`/eager loading을 적용하지 않는다.
-- 이미지 컴포넌트는 가능한 경우 명확한 display size / responsive `sizes` 정보를 제공해 모바일에서 불필요하게 큰 Variant를 받지 않도록 한다.
-
-### 9.5 Mobile Text Inside Images
-
-이미지 안 텍스트는 원본 canvas의 px가 아니라 **실제 모바일 표시 크기**를 기준으로 판정한다.
-
-- 390px 화면에서 일반 설명 텍스트는 최소 약 `16px CSS-equivalent`를 목표로 한다.
-- 보조 정보도 약 `14px CSS-equivalent` 아래로 내려가지 않도록 한다.
-- 원본 1200px 이미지를 약 390px 폭으로 표시한다면 일반 설명 텍스트는 대략 `49px` 이상, 핵심 라벨은 약 `55px` 이상, 이미지 제목은 약 `68px` 이상을 기본 시작점으로 한다.
-- 원본 1600px 이미지를 약 390px 폭으로 표시한다면 일반 설명 텍스트는 대략 `66px` 이상, 핵심 라벨은 약 `74px` 이상, 이미지 제목은 약 `90px` 이상을 기본 시작점으로 한다.
-- 텍스트가 많아 최소 크기를 지킬 수 없으면 글자를 줄이지 말고 이미지를 여러 Visual로 분리하거나 HTML 본문으로 이동한다.
-
-## 10. Production Image QA Gate
-
-게시 전 다음을 모두 확인한다.
-
-### Editorial / Information QA
-
-- 동일 이미지가 Hero와 본문에 중복 노출되지 않는가?
-- 같은 내용을 문장/목록/이미지에서 반복하지 않는가?
-- Heading만 읽어도 섹션 목적이 즉시 이해되는가?
-- 물리적 점검 대상은 실사로 식별 가능한가?
-- 스로틀·스탠드 등 초보자가 모를 수 있는 대상을 이미지로 이해할 수 있는가?
-- 이미지마다 확인 위치와 확인 항목이 연결되어 있는가?
-- 모바일에서 이미지의 핵심 대상이 충분히 크게 보이는가?
-- 문체가 `합니다/봅니다`의 반복보다 `점검/확인/STOP` 중심으로 정보화되어 있는가?
-
-### Delivery QA
-
-- Production Content DB에 외부 hotlink가 남아 있지 않은가?
-- 모든 Production 이미지가 FitBike Storage에서 정상 응답하는가?
-- 원본 대비 필요한 Resize/최적화가 수행됐는가?
-- 사진형 이미지는 WebP Variant가 사용되는가?
-- Hero/Thumbnail/본문의 역할에 맞는 크기 Variant가 사용되는가?
-- Hero 외의 본문 이미지가 기본 lazy loading 되는가?
-- 여러 이미지가 불필요하게 eager/priority 처리되지 않았는가?
-- 모바일에서 과도하게 큰 원본을 다운로드하지 않는가?
-- 이미지 내부 텍스트가 모바일 최소 가독성 기준을 충족하는가?
-- 이미지 깨짐, layout shift, 잘못된 aspect ratio가 없는가?
-
-`EXTERNAL_HOTLINK`, `UNOPTIMIZED_ORIGINAL`, `MOBILE_TEXT_UNREADABLE`, `BROKEN_ASSET`, `EAGER_LOAD_OVERUSE`가 발견되면 Production Image QA는 FAIL이다.
-
-하나라도 실패하면 Image/Content QA를 PASS하지 않는다.
+**Blocking Fail Code가 하나라도 있으면 Content를 새로 PUBLISHED 상태로 전환하지 않는다.** 이미 게시된 콘텐츠에서 발견되면 게시를 삭제하는 대신 `IMAGE_QA_REOPEN` 대상으로 잡아 Visual Layer를 교체한다.
