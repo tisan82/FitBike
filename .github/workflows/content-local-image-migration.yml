@@ -1,0 +1,32 @@
+name: Content Local Image Migration
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  migrate:
+    if: startsWith(github.event.issue.title, 'CONTENT_LOCAL_IMAGE_MIGRATION:')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Migrate local public content images to Supabase Storage
+        shell: bash
+        run: |
+          set -o pipefail
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            'https://farjyjcvduthawpdjuqe.supabase.co/functions/v1/content-local-image-migrate?token=fitbike-local-image-migrate-20260904-v1' \
+            | tee /tmp/local-image-migration.json
+          grep -q '"LOCAL_IMAGE_MIGRATION_VERIFIED"' /tmp/local-image-migration.json
+          grep -q '"remaining_local_refs":\[\]' /tmp/local-image-migration.json
+      - name: Close issue
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body: `Local content image migration completed and verified. Run: ${context.runId}` });
+            await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, state: 'closed', state_reason: 'completed' });
