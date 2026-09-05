@@ -26,10 +26,16 @@ FitBike Content는 사람들이 실제로 검색하고 궁금해하는 오토바
 - `13_content_bike_model`: optional content-to-bike-model relation
 - `14_content_bike_model_year`: optional content-to-model-year relation
 - `15_content_part_link`: optional content-to-part relation
+- `16_content_topic`: Content Factory queue and publication state
+- `17_content_asset_source`: image/source provenance and reuse-rights ledger
 
 Relations are metadata for relevance and contextual discovery. They do not mean that every article must render a bike or part CTA.
 
-Database mutations are delivered through reviewed migrations; the application does not mutate content or Storage data.
+일반 사용자 애플리케이션은 Content 또는 Storage를 변경하지 않는다. 유일한 예외는
+Bearer 인증과 서버 전용 Supabase 자격정보 뒤에 격리된 Internal Content Factory API다.
+이 API는 신규 게시에 필요한 Content, Queue, `content-assets` 이미지, Source ledger만
+다루며 회원·인증·Fitment 원본 데이터 API를 제공하지 않는다. DB 게시는 검토된 제한
+RPC로 원자 처리하고 임의 수정·삭제는 허용하지 않는다.
 
 ## Routes
 
