@@ -1,4 +1,4 @@
-begin;
+begin; -- Applied to production as migration 20260905121603.
 
 create or replace function public.content_factory_next_topic_v1()
 returns jsonb

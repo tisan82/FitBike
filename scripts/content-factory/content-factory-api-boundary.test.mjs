@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const repository = await readFile(new URL("../../src/repositories/content-factory.repository.ts", import.meta.url), "utf8");
-const migration = await readFile(new URL("../../supabase/migrations/202609050001_content_factory_publish_api.sql", import.meta.url), "utf8");
+const migration = await readFile(new URL("../../supabase/migrations/20260905121603_content_factory_publish_api.sql", import.meta.url), "utf8");
 const routes = await Promise.all([
   "../../src/app/api/internal/content-factory/queue/next/route.ts",
   "../../src/app/api/internal/content-factory/queue/[topicKey]/route.ts",
