@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Providers } from "@/app/providers";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { DEFAULT_DESCRIPTION, DEFAULT_OG_IMAGE, DEFAULT_TITLE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo/site";
+import { DEFAULT_DESCRIPTION, DEFAULT_OG_IMAGE, DEFAULT_TITLE, SITE_ALTERNATE_NAME, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo/site";
 import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: DEFAULT_TITLE, template: "%s | FitBike" },
+  title: { default: DEFAULT_TITLE, template: "%s | 핏바이크" },
   description: DEFAULT_DESCRIPTION,
   applicationName: SITE_NAME,
   openGraph: {
@@ -36,6 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         "@type": "Organization",
         "@id": `${SITE_URL}/#organization`,
         name: SITE_NAME,
+        alternateName: SITE_ALTERNATE_NAME,
         url: SITE_URL,
         logo: absoluteUrl(DEFAULT_OG_IMAGE),
       },
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         "@type": "WebSite",
         "@id": `${SITE_URL}/#website`,
         name: SITE_NAME,
+        alternateName: SITE_ALTERNATE_NAME,
         url: SITE_URL,
         description: DEFAULT_DESCRIPTION,
         inLanguage: "ko-KR",

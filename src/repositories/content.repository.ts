@@ -41,6 +41,22 @@ export async function findPublishedContents(): Promise<ContentListRow[]> {
   return (data ?? []) as ContentListRow[];
 }
 
+export async function findLatestPublishedContentDetails(limit = 50): Promise<ContentDetailRow[]> {
+  const now = new Date().toISOString();
+  const { data, error } = await createServerSupabaseClient()
+    .from("12_content")
+    .select(CONTENT_DETAIL_COLUMNS)
+    .eq("is_active", true)
+    .not("published_at", "is", null)
+    .lte("published_at", now)
+    .order("published_at", { ascending: false })
+    .order("content_id", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(`Failed to load published content feed: ${error.message}`);
+  return (data ?? []) as ContentDetailRow[];
+}
+
 export async function findPublishedContentByKey(
   contentKey: string,
 ): Promise<ContentDetailRow | null> {

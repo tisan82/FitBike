@@ -30,6 +30,15 @@ function shouldOptimizeHero(src: string) {
   }
 }
 
+function metadataDescription(summary: string) {
+  const normalized = summary.replace(/\s+/g, " ").trim();
+  return normalized.length <= 80 ? normalized : `${normalized.slice(0, 77).trimEnd()}…`;
+}
+
+function formatKoreanDate(value: string) {
+  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "long", timeZone: "Asia/Seoul" }).format(new Date(value));
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const contentKey = validContentKey((await params).contentKey);
   if (!contentKey) notFound();
@@ -38,24 +47,30 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const path = `/contents/${encodeURIComponent(content.contentKey)}`;
   const hero = getStoragePublicUrl(content.heroImageStoragePath, "content-assets");
   const image = hero ?? absoluteUrl(DEFAULT_OG_IMAGE);
+  const description = metadataDescription(content.summary);
   return {
     title: content.title,
-    description: content.summary,
-    alternates: { canonical: path },
+    description,
+    alternates: {
+      canonical: path,
+      types: { "application/rss+xml": [{ title: "FitBike 바이크 가이드", url: "/rss.xml" }] },
+    },
     robots: { index: true, follow: true },
     openGraph: {
       type: "article",
       siteName: SITE_NAME,
       locale: "ko_KR",
       title: `${content.title} | FitBike`,
-      description: content.summary,
+      description,
       url: path,
       images: [{ url: image, alt: content.title }],
+      publishedTime: content.publishedAt,
+      modifiedTime: content.updatedAt,
     },
     twitter: {
       card: "summary_large_image",
       title: `${content.title} | FitBike`,
-      description: content.summary,
+      description,
       images: [image],
     },
   };
@@ -106,10 +121,16 @@ export default async function ContentDetailPage({ params }: Props) {
         type="application/ld+json"
       />
 
-      <nav aria-label="콘텐츠 탐색" className="mb-7">
-        <Link className="inline-flex min-h-11 items-center text-sm font-bold text-primary hover:text-primary-hover" href="/contents">
-          ← 바이크 가이드
+      <nav aria-label="현재 위치" className="mb-7 flex flex-wrap items-center gap-2 text-sm text-foreground-secondary">
+        <Link className="inline-flex min-h-11 items-center font-bold text-primary hover:text-primary-hover" href="/">
+          홈
         </Link>
+        <span aria-hidden="true">/</span>
+        <Link className="inline-flex min-h-11 items-center font-bold text-primary hover:text-primary-hover" href="/contents">
+          바이크 가이드
+        </Link>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page" className="line-clamp-1">{content.title}</span>
       </nav>
 
       <article className="mx-auto max-w-3xl">
@@ -117,6 +138,10 @@ export default async function ContentDetailPage({ params }: Props) {
           <p className="text-sm font-bold text-primary">{labels[content.contentType]}</p>
           <h1 className="mt-3 text-2xl font-bold leading-9 sm:text-3xl sm:leading-10">{content.title}</h1>
           <p className="mt-5 text-base leading-7 text-foreground-secondary sm:text-lg sm:leading-8">{content.summary}</p>
+          <p className="mt-4 text-sm leading-6 text-foreground-secondary">
+            게시 {formatKoreanDate(content.publishedAt)}
+            {content.updatedAt !== content.publishedAt ? ` · 수정 ${formatKoreanDate(content.updatedAt)}` : ""}
+          </p>
           <p className="mt-5 text-sm leading-6 text-foreground-secondary">
             이 글은 정비·관리 판단에 필요한 정보를 이해하기 쉽게 정리한 가이드입니다. 모델별 실제 제원이나 정비 기준은 제조사 공식 자료를 우선 확인하세요.
           </p>

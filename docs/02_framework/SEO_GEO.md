@@ -16,6 +16,8 @@ Production origin은 `https://fitbike.co.kr`이며 공통 site config에서 관�
 
 공개 페이지는 visible content와 일치하는 고유 title과 description을 제공한다. Root는 `metadataBase`, title template, application name, Open Graph, Twitter, robots 기본값을 제공한다. 숨은 keyword, doorway copy, 존재하지 않는 규격이나 설명은 만들지 않는다.
 
+검색엔진이 한글 서비스명과 영문 표기를 같은 entity로 이해할 수 있도록 공개 site name은 `핏바이크`, alternate name은 `FitBike`로 정의한다. Home의 title, description, H1 주변 visible copy는 `핏바이크`와 서비스 핵심 주제인 `오토바이 부품 규격·정비 관리`를 자연스럽게 함께 제공한다. 개별 페이지는 검색어 반복보다 실제 사용자 질문과 답을 고유하게 표현한다.
+
 ## Dynamic Metadata and Model-Year SEO
 
 각 활성 `bike_model_year_id`는 crawlable URL과 고유 metadata를 가진다. Title과 H1은 실제 Brand, Model, Year Range를 포함한다. Description은 실제로 존재하는 spec만 선택적으로 포함한다. 모델·연식·특징·변경·기본 부품 규격은 초기 server-rendered HTML에 포함하고 Product/Gallery만 deferred 처리한다. 연식 navigation은 실제 anchor URL을 사용한다.
@@ -24,6 +26,8 @@ Production origin은 `https://fitbike.co.kr`이며 공통 site config에서 관�
 
 Sitemap은 `/`, `/bike-selector`, `/tire-models/maxxis`, `/contents`, 활성 Model-Year URL과 공개 Content Detail URL을 포함한다. Model-Year와 Content는 실제 `updated_at`을 `lastModified`로 사용하며 요청 시각을 임의로 사용하지 않는다. 현재 규모에서는 단일 sitemap을 사용하고 존재하지 않거나 비활성인 ID를 생성하지 않는다. `/sitemap.xml`은 Runtime DB 결과를 300초 CDN response cache로 제공한다.
 
+신규 Content 발견을 돕기 위해 `/rss.xml`은 최신 공개 콘텐츠의 제목, canonical URL, 발행일과 본문 텍스트를 제공한다. `/contents`와 Content Detail metadata는 이 Feed를 `application/rss+xml` alternate로 연결한다. Sitemap과 RSS는 네이버 서치어드바이저에 별도로 제출해야 하며, 구현만으로 색인이나 상위 노출을 보장하지 않는다.
+
 ## Robots Policy
 
 Admin과 API는 robots에서 제외하되 robots를 보안 수단으로 간주하지 않는다. Googlebot, Yeti 및 일반 crawler가 공개 페이지와 static asset에 접근할 수 있어야 하며 production sitemap URL을 제공한다.
@@ -31,6 +35,8 @@ Admin과 API는 robots에서 제외하되 robots를 보안 수단으로 간주�
 ## Structured Data Policy
 
 JSON-LD와 화면에 표시되는 실제 데이터만 사용한다. DB 문자열은 `<`를 Unicode escape해 serialize한다. Root는 Organization과 WebSite를 사용하고 Model-Year는 Motorcycle을 사용한다. BreadcrumbList는 실제 visible breadcrumb navigation이 구현된 경우에만 사용한다. Offer, price, availability, review, rating, sameAs는 검증된 visible data가 없으면 생성하지 않는다.
+
+Content Detail은 Article의 발행일·수정일을 metadata와 JSON-LD에 제공하고 동일한 날짜를 화면에도 표시한다. BreadcrumbList의 단계와 이름은 화면의 breadcrumb navigation과 일치해야 한다. 네이버 검색 결과 가독성을 위해 Content description은 의미를 유지하는 범위에서 공백을 정규화하고 80자 이내로 제한한다.
 
 ## Image SEO and Internal Linking
 

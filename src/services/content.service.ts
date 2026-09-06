@@ -1,6 +1,7 @@
 import {
   findPublishedContentByKey,
   findPublishedContents,
+  findLatestPublishedContentDetails,
   findPublishedContentsByIds,
   findContentBikeModelRelationsByBikeModelId,
   findContentBikeModelRelationsByContentId,
@@ -123,6 +124,10 @@ function mapDetailRow(row: ContentDetailRow): PublishedContent {
 
 export async function getPublishedContents(): Promise<ContentListItem[]> {
   return (await findPublishedContents()).map(mapListRow);
+}
+
+export async function getLatestPublishedContentsForFeed(limit = 50): Promise<PublishedContent[]> {
+  return (await findLatestPublishedContentDetails(limit)).map(mapDetailRow);
 }
 
 export async function getPublishedContentByKey(

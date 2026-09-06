@@ -10,19 +10,19 @@ import { getPublishedContents } from "@/services/content.service";
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "오토바이 모델 정보·관리 가이드·정비소 찾기",
-  description: "내 오토바이의 모델·연식별 타이어, 배터리, 브레이크 규격을 확인하고 관리·DIY 가이드와 주변 정비소 정보를 찾아보세요.",
+  title: { absolute: "핏바이크 | 오토바이 부품 규격·정비 관리 가이드" },
+  description: "핏바이크에서 오토바이 모델·연식별 타이어, 배터리, 브레이크 규격과 점검·교체·DIY 관리 방법, 주변 정비소 정보를 확인하세요.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "오토바이 모델 정보·관리 가이드·정비소 찾기 | FitBike",
-    description: "내 바이크를 알고 관리하는 데 필요한 모델별 규격, 관리 가이드와 정비소 정보를 확인하세요.",
+    title: "핏바이크 | 오토바이 부품 규격·정비 관리 가이드",
+    description: "오토바이 모델·연식별 부품 규격과 점검·교체·DIY 관리 방법, 주변 정비소 정보를 확인하세요.",
     url: "/",
     images: [DEFAULT_OG_IMAGE],
   },
   twitter: {
     card: "summary",
-    title: "오토바이 모델 정보·관리 가이드·정비소 찾기 | FitBike",
-    description: "내 바이크를 알고 관리하는 데 필요한 정보를 한곳에서 확인하세요.",
+    title: "핏바이크 | 오토바이 부품 규격·정비 관리 가이드",
+    description: "오토바이 모델·연식별 부품 규격과 정비·관리 정보를 한곳에서 확인하세요.",
     images: [DEFAULT_OG_IMAGE],
   },
 };
@@ -65,9 +65,9 @@ export default async function HomePage() {
     <main className="min-h-screen bg-background text-foreground">
       <section className="px-5 pb-10 pt-10 sm:pb-14 sm:pt-16">
         <div className="mx-auto max-w-5xl">
-          <p className="mb-3 text-sm font-semibold text-primary">내 바이크를 알고, 관리하는 방법</p>
+          <p className="mb-3 text-sm font-semibold text-primary">핏바이크(FitBike) 오토바이 정보 서비스</p>
           <h1 className="max-w-3xl text-3xl font-bold leading-tight tracking-tight sm:text-5xl">
-            내 바이크에 필요한 정보를 한곳에서 확인하세요.
+            내 오토바이의 부품 규격과 관리 정보를 확인하세요.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-foreground-secondary sm:text-lg sm:leading-8">
             모델·연식별 부품 규격부터 점검·DIY 가이드, 주변 오토바이 정비소까지 필요한 순간에 맞춰 찾아볼 수 있습니다.
