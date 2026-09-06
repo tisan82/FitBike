@@ -93,3 +93,16 @@ Topic 상태와 콘텐츠 유형, 이미지 경로, 출처 권리 상태를 재�
 `16_content_topic` editorial 컬럼이 `docs/04_database_schema` export 및 저장소 migration
 history보다 앞서 있는 Documentation Drift를 확인했다. 운영 적용 전 schema snapshot을
 별도로 동기화해야 한다.
+
+## Internal Admin API
+
+`/api/internal/admin/**`는 Supabase access token을 서버에서 `getUser()`로 검증하고,
+서버 전용 `ADMIN_EMAILS` allowlist에 포함된 계정만 허용한다. 전환 기간에는 기존
+`NEXT_PUBLIC_ADMIN_EMAILS`를 fallback으로 읽지만 신규 환경은 server-only 변수를 사용한다.
+
+- `GET /api/internal/admin/session`: 로그인 세션과 관리자 권한 검증
+- `GET /api/internal/admin/operations`: Content/Queue/Source 운영 요약 및 최근 Topic
+- `PATCH /api/internal/admin/topics/{topicKey}`: Content Factory가 허용한 Queue 상태 전환
+
+운영 Admin API는 회원 목록이나 Fitment 원본을 반환하지 않는다. 브라우저는 service-role
+또는 Content Factory token을 보유하지 않으며 모든 운영 요청은 서버 인증을 다시 거친다.

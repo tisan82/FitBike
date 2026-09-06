@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { isAllowedAdmin, signInAdmin } from "@/features/admin/services/admin.service";
+import { signInAdmin, signOutAdmin, verifyAdminSession } from "@/features/admin/services/admin.service";
 
 export function AdminLogin() {
   const router = useRouter();
@@ -15,21 +15,24 @@ export function AdminLogin() {
     event.preventDefault();
     setLoading(true); setError(null);
     try {
-      const session = await signInAdmin(email, password);
-      if (!isAllowedAdmin(session?.user.email)) throw new Error("관리자 권한이 없습니다.");
+      await signInAdmin(email, password);
+      if (!await verifyAdminSession()) {
+        await signOutAdmin();
+        throw new Error("관리자 권한이 없습니다.");
+      }
       router.replace("/admin");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "로그인에 실패했습니다.");
     } finally { setLoading(false); }
   }
 
-  return <main className="mx-auto max-w-md px-5 py-16">
-    <h1 className="text-3xl font-bold">FitBike Admin</h1>
-    <form onSubmit={submit} className="mt-8 space-y-4 rounded-2xl border p-6">
+  return <main className="mx-auto max-w-md px-5 py-16 sm:py-24">
+    <p className="text-sm font-semibold text-primary">FitBike Operations</p><h1 className="mt-2 text-3xl font-bold">관리자 로그인</h1><p className="mt-3 text-base leading-7 text-foreground-secondary">승인된 운영 계정만 접속할 수 있습니다.</p>
+    <form onSubmit={submit} className="mt-8 space-y-5 rounded-2xl border border-border bg-surface p-6">
       <label className="block text-sm font-medium">이메일<input className="mt-2 w-full rounded-lg border px-3 py-2" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required /></label>
       <label className="block text-sm font-medium">비밀번호<input className="mt-2 w-full rounded-lg border px-3 py-2" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required /></label>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <button className="w-full rounded-lg bg-black px-4 py-3 text-white disabled:opacity-50" disabled={loading}>{loading ? "로그인 중" : "로그인"}</button>
+      <button className="min-h-12 w-full rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground disabled:opacity-50" disabled={loading}>{loading ? "인증 확인 중" : "로그인"}</button>
     </form>
   </main>;
 }

@@ -37,6 +37,10 @@ Bearer 인증과 서버 전용 Supabase 자격정보 뒤에 격리된 Internal C
 다루며 회원·인증·Fitment 원본 데이터 API를 제공하지 않는다. DB 게시는 검토된 제한
 RPC로 원자 처리하고 임의 수정·삭제는 허용하지 않는다.
 
+Admin의 `운영 어드민`은 Content Factory Queue, 게시 현황, 보류·오류, Source 권리 검토
+상태를 보여주는 관제 화면이다. 운영자가 Queue 상태를 바꿀 수 있지만 실제 Content 게시는
+동일한 Factory Gate와 원자 게시 RPC를 우회하지 않는다.
+
 ## Routes
 
 - `/contents`: published content discovery hub with search and content-type filtering

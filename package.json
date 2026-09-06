@@ -12,7 +12,8 @@
     "lint": "eslint",
     "content:qa": "node scripts/content-factory/content-quality-gate.mjs",
     "test:content-qa": "node --test scripts/content-factory/content-quality-gate.test.mjs",
-    "test:content-api-boundary": "node --test scripts/content-factory/content-factory-api-boundary.test.mjs"
+    "test:content-api-boundary": "node --test scripts/content-factory/content-factory-api-boundary.test.mjs",
+    "test:admin-boundary": "node --test scripts/content-factory/admin-operations-boundary.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
