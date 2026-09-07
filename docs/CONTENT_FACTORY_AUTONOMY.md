@@ -27,3 +27,5 @@ Autonomous operation is complete only when candidate failure isolation, duplicat
 ## Implementation helpers
 
 `src/lib/content-factory/failure-policy.ts` is the canonical application-level failure classifier. `src/lib/content-factory/duplicate-guard.ts` is the canonical topic-key duplicate guard. Workers/orchestrators must import these helpers instead of defining divergent failure or duplicate rules.
+
+The current repository exposes queue/publish primitives and operational controls. Until a worker imports these helpers and loops over `content_factory_next_topic_v1`, the system must be reported as **operator-assisted**, not fully autonomous.
