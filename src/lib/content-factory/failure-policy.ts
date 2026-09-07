@@ -15,9 +15,11 @@ export const GLOBAL_FATAL_CODES = new Set([
   "SCHEMA_MISMATCH",
 ]);
 
-export function classifyFactoryFailure(code?: string | null) {
-  if (code && GLOBAL_FATAL_CODES.has(code)) return "GLOBAL_FATAL" as const;
-  return "CANDIDATE_FAILED" as const;
+export type FactoryFailureClass = "CANDIDATE_FAILED" | "GLOBAL_FATAL";
+
+export function classifyFactoryFailure(code?: string | null): FactoryFailureClass {
+  if (code && GLOBAL_FATAL_CODES.has(code)) return "GLOBAL_FATAL";
+  return "CANDIDATE_FAILED";
 }
 
 export function shouldContinueFactory(code?: string | null) {
