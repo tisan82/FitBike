@@ -1,56 +1,12 @@
 import type { AdminResourceConfig } from "@/features/admin/types/admin.types";
 
+/**
+ * Operational admin allow-list.
+ *
+ * Do not add member tables, bike/model/year master tables, or fitment mapping tables here.
+ * The operations console must stay separated from member and raw fitment data.
+ */
 export const ADMIN_RESOURCES: AdminResourceConfig[] = [
-  {
-    key: "brands", label: "브랜드", table: "01_brand", primaryKey: "brand_id",
-    searchColumns: ["brand_key", "brand_en", "brand_ko"],
-    fields: [
-      { key: "brand_id", label: "ID", type: "number", readonly: true },
-      { key: "brand_key", label: "브랜드 키", type: "text", required: true },
-      { key: "brand_en", label: "영문명", type: "text", required: true },
-      { key: "brand_ko", label: "한글명", type: "text" },
-      { key: "brand_summary", label: "브랜드 설명", type: "textarea" },
-      { key: "logo_image_url", label: "로고 URL", type: "text" },
-      { key: "country_code", label: "국가 코드", type: "text" },
-      { key: "slug", label: "Slug", type: "text", required: true },
-      { key: "is_active", label: "활성", type: "boolean" },
-    ],
-  },
-  {
-    key: "bikeModels", label: "바이크 모델", table: "02_bike_model", primaryKey: "bike_model_id",
-    searchColumns: ["model_key", "model_name_en", "model_name_ko"],
-    fields: [
-      { key: "bike_model_id", label: "ID", type: "number", readonly: true },
-      { key: "brand_id", label: "브랜드 ID", type: "number", required: true },
-      { key: "model_key", label: "모델 키", type: "text", required: true },
-      { key: "model_name_en", label: "영문명", type: "text", required: true },
-      { key: "model_name_ko", label: "한글명", type: "text" },
-      { key: "default_category", label: "카테고리", type: "text" },
-      { key: "engine_cc", label: "배기량", type: "number" },
-      { key: "model_summary", label: "모델 설명", type: "textarea" },
-      { key: "model_image_url", label: "이미지 URL", type: "text" },
-      { key: "slug", label: "Slug", type: "text", required: true },
-      { key: "is_active", label: "활성", type: "boolean" },
-    ],
-  },
-  {
-    key: "bikeModelYears", label: "모델·연식", table: "03_bike_model_year", primaryKey: "bike_model_year_id",
-    searchColumns: ["model_year_key", "model_key", "year_range_label"],
-    fields: [
-      { key: "bike_model_year_id", label: "ID", type: "number", readonly: true },
-      { key: "bike_model_id", label: "모델 ID", type: "number", required: true },
-      { key: "model_year_key", label: "연식 키", type: "text", required: true },
-      { key: "model_key", label: "모델 키", type: "text", required: true },
-      { key: "year_range_label", label: "연식 범위", type: "text", required: true },
-      { key: "start_year", label: "시작 연도", type: "number", required: true },
-      { key: "end_year", label: "종료 연도", type: "number" },
-      { key: "generation_name", label: "세대", type: "text" },
-      { key: "front_tire_full_size", label: "앞 타이어", type: "text" },
-      { key: "rear_tire_full_size", label: "뒤 타이어", type: "text" },
-      { key: "battery_standard_code", label: "배터리 규격", type: "text" },
-      { key: "is_active", label: "활성", type: "boolean" },
-    ],
-  },
   {
     key: "tireProducts", label: "타이어 상품", table: "04_tire_product", primaryKey: "tire_product_id",
     searchColumns: ["tire_product_key", "brand_name", "product_name"],
@@ -60,17 +16,12 @@ export const ADMIN_RESOURCES: AdminResourceConfig[] = [
       { key: "brand_name", label: "브랜드", type: "text", required: true },
       { key: "product_name", label: "상품명", type: "text", required: true },
       { key: "tire_size_full", label: "규격", type: "text" },
-      {
-        key: "position_type",
-        label: "위치",
-        type: "select",
-        options: [
-          { value: "FRONT", label: "FRONT — 앞 타이어" },
-          { value: "REAR", label: "REAR — 뒤 타이어" },
-          { value: "BOTH", label: "BOTH — 앞·뒤 사용 가능" },
-          { value: "COMMON", label: "COMMON — 미검증" },
-        ],
-      },
+      { key: "position_type", label: "위치", type: "select", options: [
+        { value: "FRONT", label: "FRONT — 앞 타이어" },
+        { value: "REAR", label: "REAR — 뒤 타이어" },
+        { value: "BOTH", label: "BOTH — 앞·뒤 사용 가능" },
+        { value: "COMMON", label: "COMMON — 미검증" },
+      ] },
       { key: "tube_type", label: "튜브 타입", type: "text" },
       { key: "product_url", label: "상품 URL", type: "text" },
       { key: "seller_name", label: "판매처", type: "text" },
@@ -92,18 +43,6 @@ export const ADMIN_RESOURCES: AdminResourceConfig[] = [
       { key: "product_url", label: "상품 URL", type: "text" },
       { key: "seller_name", label: "판매처", type: "text" },
       { key: "price", label: "가격", type: "number" },
-      { key: "is_active", label: "활성", type: "boolean" },
-    ],
-  },
-  {
-    key: "tireFitments", label: "타이어 Fitment", table: "07_bike_model_year_tire_product", primaryKey: "id",
-    searchColumns: ["position_type", "match_type"],
-    fields: [
-      { key: "id", label: "ID", type: "number", readonly: true },
-      { key: "bike_model_year_id", label: "모델·연식 ID", type: "number", required: true },
-      { key: "tire_product_id", label: "타이어 상품 ID", type: "number", required: true },
-      { key: "position_type", label: "위치(FRONT/REAR)", type: "text", required: true },
-      { key: "match_type", label: "매칭 타입", type: "text", required: true },
       { key: "is_active", label: "활성", type: "boolean" },
     ],
   },
