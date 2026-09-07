@@ -35,10 +35,21 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       {
         "@type": "Organization",
         "@id": `${SITE_URL}/#organization`,
-        name: SITE_NAME,
-        alternateName: SITE_ALTERNATE_NAME,
+        name: "에스와이아이",
+        alternateName: [SITE_NAME, SITE_ALTERNATE_NAME],
         url: SITE_URL,
         logo: absoluteUrl(DEFAULT_OG_IMAGE),
+        description: "오토바이 모델·연식 기준 부품 규격 및 바이크 관리 정보 서비스 핏바이크(FitBike) 운영 사업자",
+        email: "mailto:changsoo_j@naver.com",
+        telephone: "+82-10-2640-0761",
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: "영중로 96 2층 1호",
+          addressLocality: "영등포구",
+          addressRegion: "서울특별시",
+          postalCode: "07246",
+          addressCountry: "KR",
+        },
       },
       {
         "@type": "WebSite",
