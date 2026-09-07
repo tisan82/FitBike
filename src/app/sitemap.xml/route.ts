@@ -45,9 +45,14 @@ function iso(value: string) {
   return new Date(value).toISOString();
 }
 
+function dedupeEntries(entries: SitemapEntry[]) {
+  return Array.from(new Map(entries.map((entry) => [entry.url, entry])).values());
+}
+
 export async function GET() {
   const staticEntries: SitemapEntry[] = [
     { url: SITE_URL },
+    { url: `${SITE_URL}/about` },
     { url: `${SITE_URL}/bike-selector` },
     { url: `${SITE_URL}/tire-models/maxxis` },
     { url: `${SITE_URL}/contents` },
@@ -63,7 +68,8 @@ export async function GET() {
       findActiveTireModelsForSitemap(),
       findActiveBatteryProductsForSitemap(),
     ]);
-    entries = [
+
+    entries = dedupeEntries([
       ...staticEntries,
       ...years.map((year) => ({
         url: `${SITE_URL}/model-detail/${year.bike_model_year_id}`,
@@ -82,12 +88,12 @@ export async function GET() {
         lastModified: iso(product.updated_at),
       })),
       ...contents.map((content) => ({
-        url: `${SITE_URL}/contents/${content.content_key}`,
+        url: `${SITE_URL}/contents/${encodeURIComponent(content.content_key)}`,
         lastModified: iso(content.updated_at),
       })),
-    ];
+    ]);
   } catch {
-    // Keep stable public routes available when a data source is temporarily unavailable.
+    // Keep stable public routes discoverable if a data source is temporarily unavailable.
   }
 
   return new Response(serializeSitemap(entries), {
