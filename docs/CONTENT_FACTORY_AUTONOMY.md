@@ -23,3 +23,7 @@ Operations Admin may access content/queue/image/source operational data only. Me
 ## Completion criteria
 
 Autonomous operation is complete only when candidate failure isolation, duplicate prevention, publish, Production QA, sitemap/RSS discovery, and next-candidate continuation are verified in Production. The Admin dashboard is observability/control; it is not itself the worker runtime.
+
+## Implementation helpers
+
+`src/lib/content-factory/failure-policy.ts` is the canonical application-level failure classifier. `src/lib/content-factory/duplicate-guard.ts` is the canonical topic-key duplicate guard. Workers/orchestrators must import these helpers instead of defining divergent failure or duplicate rules.
