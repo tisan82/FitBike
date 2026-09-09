@@ -22,6 +22,14 @@ export async function updateContentFactoryTopic(topicKey: string, update: QueueU
   return data;
 }
 
+export async function storeBlockedContentFactoryPackage(payload: PublishRequest) {
+  const { data, error } = await createContentFactorySupabaseClient().rpc("content_factory_store_blocked_v1", {
+    p_payload: payload,
+  });
+  if (error) throw new Error(`CONTENT_FACTORY_DRAFT_STORE_FAILED:${error.message}`);
+  return data;
+}
+
 export async function publishContentFactoryPackage(payload: PublishRequest) {
   const { data, error } = await createContentFactorySupabaseClient().rpc("content_factory_publish_v1", {
     p_payload: payload,

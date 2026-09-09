@@ -3,19 +3,23 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const repository = await readFile(new URL("../../src/repositories/content-factory.repository.ts", import.meta.url), "utf8");
-const migration = await readFile(new URL("../../supabase/migrations/20260905121603_content_factory_publish_api.sql", import.meta.url), "utf8");
+const migration = [
+  await readFile(new URL("../../supabase/migrations/20260905121603_content_factory_publish_api.sql", import.meta.url), "utf8"),
+  await readFile(new URL("../../supabase/migrations/202609100001_store_blocked_content_drafts.sql", import.meta.url), "utf8"),
+].join("\n");
 const routes = await Promise.all([
   "../../src/app/api/internal/content-factory/queue/next/route.ts",
   "../../src/app/api/internal/content-factory/queue/[topicKey]/route.ts",
   "../../src/app/api/internal/content-factory/assets/route.ts",
   "../../src/app/api/internal/content-factory/publish/route.ts",
+  "../../src/app/api/internal/content-factory/draft/route.ts",
 ].map(async (path) => readFile(new URL(path, import.meta.url), "utf8")));
 
 test("repository is limited to fixed content RPCs and content-assets", () => {
   assert.match(repository, /const BUCKET = "content-assets"/);
   assert.deepEqual(
     [...repository.matchAll(/\.rpc\("([^"]+)"/g)].map((match) => match[1]).sort(),
-    ["content_factory_next_topic_v1", "content_factory_publish_v1", "content_factory_update_topic_v1"],
+    ["content_factory_next_topic_v1", "content_factory_publish_v1", "content_factory_store_blocked_v1", "content_factory_update_topic_v1"],
   );
   assert.doesNotMatch(repository, /\.from\("(?:auth\.|profiles|0[1-9]_bike|1[01]_bike|0[4-9]_.*fitment)/i);
 });
@@ -27,6 +31,8 @@ test("every Content Factory route fails closed behind shared bearer auth", () =>
 test("RPC execution is denied to public roles and only granted to service_role", () => {
   assert.match(migration, /revoke all on function public\.content_factory_publish_v1\(jsonb\) from public, anon, authenticated/);
   assert.match(migration, /grant execute on function public\.content_factory_publish_v1\(jsonb\) to service_role/);
+  assert.match(migration, /revoke all on function public\.content_factory_store_blocked_v1\(jsonb\) from public, anon, authenticated/);
+  assert.match(migration, /grant execute on function public\.content_factory_store_blocked_v1\(jsonb\) to service_role/);
   assert.doesNotMatch(migration, /grant\s+(?:select|insert|update|delete).*"(?:0[1-9]|1[01])_/i);
 });
 

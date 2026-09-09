@@ -1,6 +1,7 @@
 import {
   findNextContentFactoryTopic,
   publishContentFactoryPackage,
+  storeBlockedContentFactoryPackage,
   updateContentFactoryTopic,
   uploadContentFactoryAsset,
 } from "@/repositories/content-factory.repository";
@@ -17,6 +18,10 @@ export async function getNextContentFactoryTopic() {
 
 export async function transitionContentFactoryTopic(topicKey: string, update: QueueUpdate) {
   return updateContentFactoryTopic(topicKey, update);
+}
+
+export async function storeBlockedContentFactory(payload: PublishRequest) {
+  return storeBlockedContentFactoryPackage(payload);
 }
 
 export async function publishContentFactory(payload: PublishRequest) {
