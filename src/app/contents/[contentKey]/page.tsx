@@ -3,11 +3,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ContentBlockRenderer } from "@/features/content";
+import { ContentBlockRenderer, RelatedContentGuides } from "@/features/content";
 import type { ContentBlock } from "@/features/content/types/content.types";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo/site";
-import { getPublishedContentByKey } from "@/services/content.service";
+import { getPublishedContentByKey, getPublishedContents, selectRelatedPublishedContents } from "@/services/content.service";
 
 type Props = { params: Promise<{ contentKey: string }> };
 
@@ -112,8 +112,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ContentDetailPage({ params }: Props) {
   const contentKey = validContentKey((await params).contentKey);
   if (!contentKey) notFound();
-  const content = await getPublishedContentByKey(contentKey);
+  const [content, publishedContents] = await Promise.all([
+    getPublishedContentByKey(contentKey),
+    getPublishedContents(),
+  ]);
   if (!content) notFound();
+  const relatedGuides = selectRelatedPublishedContents(content, publishedContents);
 
   const storedHero = getStoragePublicUrl(content.heroImageStoragePath, "content-assets");
   const hero = content.contentType === "MODEL_GUIDE" ? null : storedHero;
@@ -237,14 +241,7 @@ export default async function ContentDetailPage({ params }: Props) {
           </section>
         </div>
 
-        <footer className="mt-14 border-t border-border pt-7">
-          <p className="text-base leading-7 text-foreground-secondary">
-            다른 점검·관리 방법이나 부품 정보를 찾고 있다면 바이크 가이드에서 검색해 보세요.
-          </p>
-          <Link className="mt-4 inline-flex min-h-11 items-center font-bold text-primary hover:text-primary-hover" href="/contents">
-            다른 가이드 찾아보기 →
-          </Link>
-        </footer>
+        <RelatedContentGuides guides={relatedGuides} />
       </article>
     </main>
   );
