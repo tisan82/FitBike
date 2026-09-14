@@ -19,6 +19,8 @@ FitBike Content는 사람들이 실제로 검색하고 궁금해하는 오토바
 5. **No Fitment Content Factory** — FitBike DB의 Tire/Battery/Brake 관계가 존재한다는 이유만으로 모델별 호환·규격 콘텐츠를 자동 생성하지 않는다. 특히 `모델명 + 타이어 규격 가이드`를 FitBike fitment 데이터에서 자동 파생하지 않는다.
 6. **Model-first Visual** — Model Guide의 대표 이미지는 해당 오토바이 모델 자체가 주 피사체여야 한다. 타이어·배터리·브레이크 제품 이미지를 Model Guide Hero/Thumbnail의 대체물로 사용하지 않는다. 검증된 모델 이미지가 없으면 잘못된 제품 이미지를 넣는 대신 대표 이미지를 생략한다.
 7. **Useful DIY & Maintenance** — 콘텐츠 포트폴리오는 점검 방법, 관리 주기 이해, 이상 징후 판단, 소모품 상태 확인, 기본 DIY 준비와 절차, 규격 읽는 법 등 실제 유지관리 질문을 중심으로 확장한다.
+8. **Reason Before Procedure** — 제목과 첫 요약·도입은 사용자가 이 정보를 찾은 이유에 바로 답한다. 무엇을 확인하는 글인지뿐 아니라 왜 필요한지, 놓쳤을 때 어떤 안전·사용상 문제가 생길 수 있는지를 과장 없이 설명한다.
+9. **Actionable Headings** — 섹션 제목은 `점검할 때 놓치기 쉬운 부분`, `정비소를 찾아야 하는 경우`처럼 다음 행동이 바로 이해되는 표현을 사용한다. 대상과 행동이 불명확한 추상형 제목을 피한다.
 
 ## DB Tables
 
@@ -98,6 +100,7 @@ Topic 선정 순서는 `User Need → Purpose/Intent → Topic → Content Type 
 - 사용자가 직접 수행할 범위를 벗어난 경우: `직접 분해하지 말고 전문 점검으로 전환`이라고 쓴다.
 - 제동·조향·타이어 구조 손상, 연료 누출, 전기 단락 위험처럼 운행이 실제로 위험한 근거가 있을 때만 `이 상태에서는 운행하지 마세요`를 사용한다.
 - `HOLD`, `BLOCKED`, `STOP_CONDITION_*`은 내부 제작·게시 상태 코드이며 사용자 본문이나 제목에 그대로 노출하지 않는다.
+- 점검 행위 자체가 위험한 상황이 아니라면 `점검을 중단`이라고 표현하지 않는다. 전문 확인이 필요한 상태는 증상, 운행 여부, 정비소 문의 순서로 안내하고 정비소 찾기 서비스로 연결한다.
 
 구체적인 문장 작성과 QA 방법은 `docs/00_ai/CONTENT_FACTORY.md`, 이미지 표현과
 alt/caption 기준은 `docs/00_ai/CONTENT_EDITORIAL_VISUAL_STANDARD.md`가 담당한다.
