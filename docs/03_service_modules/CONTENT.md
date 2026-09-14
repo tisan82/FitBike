@@ -2,6 +2,10 @@
 
 **Status:** Foundation
 
+전체 콘텐츠 서비스를 빈 환경에서 다시 구축하려면
+[`CONTENT_SERVICE_REBUILD.md`](./CONTENT_SERVICE_REBUILD.md)를 함께 따른다. 이 문서는 현재 파일의
+제품 원칙을 화면, DB, Storage, 게시 API, Factory, SEO, 배포 및 검증 절차에 연결한다.
+
 ## Responsibility
 
 FitBike Content는 사람들이 실제로 검색하고 궁금해하는 오토바이 DIY, 점검, 관리, 부품 이해, 모델 정보를 정확하고 읽기 쉽게 제공한다.
