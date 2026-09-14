@@ -143,7 +143,7 @@ Every candidate must contain enough information to judge value and duplication b
 | `risk_level` | automation and review boundary |
 | `evidence_feasibility` | whether adequate sources appear obtainable |
 | `visual_need` | whether a visual is essential, useful, or unnecessary |
-| `discovery_basis` | where the user need was observed |
+| `discovery_basis` | demand category such as rider question, site search, seasonal ownership, or content gap; do not store an individual rider post URL |
 | `duplicate_candidates` | closest existing topics/content and initial distinction |
 
 Do not register a title-only row as ready for production. If the current schema cannot store a field, preserve it in the candidate artifact until a reviewed schema change is made.
@@ -240,14 +240,15 @@ When consolidating, preserve the stronger canonical URL, merge unique value, upd
 Build the outline from the question rather than using one universal article skeleton. The default information flow is:
 
 1. **Reason** — why the reader should care and what may worsen if ignored;
-2. **Direct answer** — the short decision or principle;
-3. **Scope** — what can be seen/done safely and what varies by model;
-4. **Locate/access** — where the target is and how much removal is involved;
-5. **Observe/perform** — distinct checks or steps, supported by visuals where useful;
-6. **Interpret** — what the observed states mean without pretending to diagnose;
-7. **Act** — continue monitoring, maintain, avoid riding, or contact a shop;
-8. **Official references** — one final collapsed source group and the common model/year notice;
-9. **Continue discovery** — shop CTA when relevant and related guides.
+2. **Relatable situation** — a short rider-experience pattern when it makes the question concrete;
+3. **Direct answer** — the short decision or principle;
+4. **Scope** — what can be seen/done safely and what varies by model;
+5. **Locate/access** — where the target is and how much removal is involved;
+6. **Observe/perform** — distinct checks or steps, supported by visuals where useful;
+7. **Interpret** — what the observed states mean without pretending to diagnose;
+8. **Act** — continue monitoring, maintain, avoid riding, or contact a shop;
+9. **Official references** — one final collapsed source group and the common model/year notice;
+10. **Continue discovery** — shop CTA when relevant and related guides.
 
 Template-specific emphasis:
 
@@ -280,6 +281,37 @@ Model-specific specifications, limits, intervals, torque values, pressures, capa
 
 The internal fact register preserves each claim, source URL, source type, verification state, critical flag, and checked date. The public article shows sources only in the final collapsed `참고 공식 자료` section. Render the source name as the link text; never show a raw URL. Do not invent a missing URL.
 
+#### Rider experience as editorial context
+
+FitBike may use recurring rider situations and experience patterns to make technical content easier to relate to. The purpose is not to publish testimonials. It is to help the reader recognize why people look for the subject, what they often notice first, what they may misunderstand, and what practical inconvenience or concern follows.
+
+Examples include a seat key that becomes difficult after loading the under-seat space, a brake-disc colour change noticed before another braking symptom, a loose battery cable found while looking for corrosion, or a mirror that looks secure while parked but blurs after the engine starts.
+
+Rider experience is editorial input, not an evidence source or testimonial database:
+
+- do not store rider post URLs, usernames, screenshots, quotations, or individual experience records in `17_content_asset_source` or another source ledger;
+- do not expose a rider-experience source list in the public article;
+- do not quote, closely paraphrase, or imply that FitBike interviewed the rider;
+- synthesize only a general, broadly relatable situation in FitBike's own wording;
+- do not turn one anecdote into `많은 라이더`, `흔한 고장`, frequency, probability, or trend claims;
+- do not preserve personal, registration, location, account, or other identifying details;
+- do not use a rider's diagnosis, repair method, product preference, or numeric value as fact;
+- verify every technical explanation, safety decision, model procedure, and number through the normal evidence policy;
+- omit the experience when it is sensational, promotional, too model-specific to generalize, or adds no decision value.
+
+Do not force a rigid experience card into every article. Integrate one short passage where it improves the flow, usually in the introduction, before an easily missed check, or before state interpretation. A heading such as `라이더가 실제로 겪는 상황` is allowed only when the passage has distinct value.
+
+Use this writing pattern:
+
+```text
+상황: 실제로 마주치는 순간이나 불편
+관찰: 처음 보거나 느끼는 신호
+오해: 성급하게 단정하기 쉬운 부분
+확인: 이 글에서 구분해 볼 항목
+```
+
+Write `시트 아래에 짐을 넣은 뒤 열쇠가 잘 돌아가지 않는 경우가 있습니다` rather than inventing a named rider or saying `한 라이더는 이렇게 해결했습니다`. The passage should create recognition and lead into a useful check, not imitate a community post.
+
 ### 2.5 Writing constraints
 
 - Start with the reader's motive: why this check matters and the realistic consequence of ignoring it.
@@ -293,6 +325,8 @@ The internal fact register preserves each claim, source URL, source type, verifi
 - For `CHECK`, distinguish what is directly visible, what requires access, and what requires professional assessment.
 - Keep the common model/year disclaimer once below `참고 공식 자료`, not in every introduction.
 - Do not expose internal words such as `STOP`, `HOLD`, `BLOCKED`, or Factory error codes.
+- Use a concise rider situation when it helps the reader recognize the problem, but do not force a separate experience section into every article.
+- Describe the moment, observation, mistaken assumption, and useful check without inventing emotion or dramatic outcomes.
 
 User-facing safety copy follows `observation → meaning → next action`:
 
@@ -697,14 +731,15 @@ The current API is a creation boundary, not a general content editor. Rebuilding
 1. Read the next queue topic and its required/excluded coverage.
 2. Compare normalized intent and existing content; mark a true duplicate instead of producing it.
 3. Research claims and preserve source names and links in the package.
-4. Draft blocks for the user question, starting with why the check matters and the consequence of ignoring it.
-5. Use clear headings such as `점검할 때 주의할 점`; avoid vague headings and generic repeated introductions.
-6. State observable conditions and the next action. Do not tell users to stop inspecting when the intended action is to avoid riding and contact a shop.
-7. Plan only images that answer a distinct question. Use a swipe gallery for multiple comparable visual states.
-8. Generate or collect production assets, convert to WebP, record provenance, and upload.
-9. Run content, safety, visual, duplicate, rights, and package QA.
-10. Transition the queue through the approved states and call the publish endpoint.
-11. Verify Production DB, Storage, detail URL, list discovery, related guides, sitemap, and RSS.
+4. Extract a broadly relatable rider situation when it helps explain the search motive; do not persist the individual post, identity, URL, or quotation as evidence.
+5. Draft blocks for the user question, starting with why the check matters and the consequence of ignoring it.
+6. Use clear headings such as `점검할 때 주의할 점`; avoid vague headings and generic repeated introductions.
+7. State observable conditions and the next action. Do not tell users to stop inspecting when the intended action is to avoid riding and contact a shop.
+8. Plan only images that answer a distinct question. Use a swipe gallery for multiple comparable visual states.
+9. Generate or collect production assets, convert to WebP, record provenance, and upload.
+10. Run content, safety, visual, duplicate, rights, and package QA.
+11. Transition the queue through the approved states and call the publish endpoint.
+12. Verify Production DB, Storage, detail URL, list discovery, related guides, sitemap, and RSS.
 
 The batch is successful only at `PUBLISHED_VERIFIED`. A generated file, uploaded image, successful build, or `PUBLISHED` queue state alone is insufficient.
 
