@@ -177,9 +177,6 @@ export default async function ContentDetailPage({ params }: Props) {
           </div>
           <h1 className="mt-3 text-2xl font-bold leading-9 sm:text-3xl sm:leading-10">{content.title}</h1>
           <p className="mt-5 text-base leading-7 text-foreground-secondary sm:text-lg sm:leading-8">{content.summary}</p>
-          <p className="mt-5 text-sm leading-6 text-foreground-secondary">
-            이 글은 정비·관리 판단에 필요한 정보를 이해하기 쉽게 정리한 가이드입니다. 모델별 실제 제원이나 정비 기준은 제조사 공식 자료를 우선 확인하세요.
-          </p>
         </header>
 
         {hero ? (
@@ -226,6 +223,18 @@ export default async function ContentDetailPage({ params }: Props) {
               </div>
             </details>
           ) : null}
+          <aside className="mt-5 rounded-2xl bg-surface-secondary px-5 py-4 text-sm leading-6 text-foreground-secondary sm:px-6">
+            이 콘텐츠는 정비·관리 판단을 돕는 가이드입니다. 모델별 실제 제원과 정비 기준은 제조사 공식 자료를 우선 확인하세요.
+          </aside>
+          <section className="mt-7 rounded-2xl border border-border bg-surface p-5 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-6">
+            <div>
+              <h2 className="text-lg font-bold">전문 점검이 필요하신가요?</h2>
+              <p className="mt-2 text-sm leading-6 text-foreground-secondary">상태를 직접 판단하기 어렵거나 전문 확인이 필요한 신호가 보이면 주변 정비소에 증상과 이동 방법을 문의하세요.</p>
+            </div>
+            <Link className="mt-4 inline-flex min-h-12 shrink-0 items-center justify-center rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground transition hover:bg-primary-hover sm:mt-0" href="/shops">
+              주변 정비소 찾기
+            </Link>
+          </section>
         </div>
 
         <footer className="mt-14 border-t border-border pt-7">
