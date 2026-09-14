@@ -97,6 +97,175 @@ Use one of these purpose templates:
 
 Length follows the question, not a quota. Do not pad a short answer with generic sections. A long procedure should contain only the detail needed to perform or hand off the task safely.
 
+#### Topic discovery sources
+
+Candidate topics must come from a demonstrated user need or an intentional coverage gap. Acceptable inputs are:
+
+- questions explicitly asked by FitBike users;
+- internal site-search terms and zero-result searches;
+- Search Console queries and pages with a clear unanswered intent;
+- recurring questions from maintenance, owner, or model communities, used as discovery rather than factual evidence;
+- manufacturer manual structure, service notices, or model changes that users need explained;
+- gaps found while reviewing an existing article, such as a necessary follow-up question that would make that article too broad;
+- seasonal or ownership moments such as long-term storage, first ride after storage, rain, washing, or used-bike handover;
+- support or shop questions that can be answered safely without diagnosing an individual motorcycle.
+
+The following are not sufficient reasons by themselves:
+
+- a keyword has high volume;
+- a FitBike table contains a model/part relation;
+- a competitor has an article;
+- a new title can be generated from an existing title;
+- an available image needs somewhere to be used;
+- a content-type quota is short.
+
+When analytics are unavailable, record the topic as a hypothesis and state the observed question/source that motivated it. Do not invent demand numbers.
+
+#### Candidate record required before queue registration
+
+Every candidate must contain enough information to judge value and duplication before writing:
+
+| Field | Decision supported |
+|---|---|
+| `topic_key` | stable tracking and idempotency |
+| `working_title` | understandable editorial label, not the final SEO title |
+| `customer_question` | the exact question in the reader's language |
+| `primary_answer` | one- or two-sentence direct answer |
+| `target_reader` | experience, situation, and motorcycle context |
+| `content_goal` | decision or action the reader can complete |
+| `normalized_subject` | component or concept being discussed |
+| `normalized_action` | inspect, maintain, replace, select, understand, compare, or troubleshoot |
+| `normalized_scope` | generic, model, model-year, product, or situation |
+| `content_type`, `content_template` | composition contract |
+| `required_coverage` | questions that must be answered |
+| `excluded_claims` | claims or procedures that must not be generalized |
+| `critical_facts` | facts requiring stronger evidence |
+| `risk_level` | automation and review boundary |
+| `evidence_feasibility` | whether adequate sources appear obtainable |
+| `visual_need` | whether a visual is essential, useful, or unnecessary |
+| `discovery_basis` | where the user need was observed |
+| `duplicate_candidates` | closest existing topics/content and initial distinction |
+
+Do not register a title-only row as ready for production. If the current schema cannot store a field, preserve it in the candidate artifact until a reviewed schema change is made.
+
+#### Topic eligibility gate
+
+A candidate enters `PLANNED` only when all answers are yes:
+
+1. Is there one clear primary question?
+2. Can the article provide a useful answer inside FitBike without a forced product click?
+3. Is the intended result observable or actionable by the target reader?
+4. Can safety-critical or model-specific claims be supported adequately?
+5. Is its independent value not already satisfied by an existing or queued article?
+6. Is the scope narrow enough for one coherent article but large enough to justify its own URL?
+7. Can the content avoid diagnosis, unsupported specification, recommendation, ranking, or sales framing?
+8. Is the proposed article better than simply updating an existing article?
+
+If evidence is not yet known, the candidate may remain a research backlog item; it must not be treated as publish-ready.
+
+#### Priority selection
+
+Queue priority is based on user value, not production convenience:
+
+| Priority | Use when |
+|---:|---|
+| `1` | recurring/high-consequence user question, material safety misunderstanding, broken or missing ownership guidance, or a necessary correction |
+| `2` | broadly useful maintenance/DIY/parts question with clear evidence and independent intent |
+| `3` | narrow long-tail, seasonal, optional explanatory, or evidence/visual work that can wait |
+
+Within the same priority, process older approved candidates first. A newer candidate may move ahead only when its user impact or correction urgency is documented. Balance the portfolio across ownership moments and content types; do not publish a run of nearly identical component checks simply because they are easy to automate.
+
+#### Duplicate and cannibalization decision
+
+Duplicate review must compare the candidate against:
+
+- all published content, including inactive content that could be restored;
+- every non-archived queue topic, not only `PLANNED`;
+- blocked/review-required work and saved work packages;
+- legacy URLs, redirects, and canonical destinations;
+- model and model-year relations;
+- title, summary, headings, tables, lists, and the primary answer—not title alone.
+
+Normalize and compare these dimensions:
+
+1. user question;
+2. subject/component;
+3. requested action or decision;
+4. scope: generic, situation, model, model-year, or product;
+5. target reader and ownership moment;
+6. primary answer and expected next action;
+7. required coverage and evidence;
+8. search-result promise expressed by title and summary.
+
+Use semantic similarity only to create a review shortlist. A token-overlap score must never be the sole publish decision, especially for Korean compound terms and differently worded questions.
+
+| Classification | Meaning | Required action |
+|---|---|---|
+| `EXACT_EXISTING` | same question, answer, scope, and result already exist | link queue to existing content; do not create |
+| `INTENT_DUPLICATE` | wording differs but the user would receive substantially the same answer | mark duplicate or merge into existing content |
+| `UPDATE_EXISTING` | the candidate mainly supplies missing coverage, fresher facts, or better images | revise the existing canonical article; do not add a URL |
+| `CONSOLIDATE` | two weak/overlapping articles should become one complete answer | choose one canonical, merge value, redirect/deactivate safely |
+| `OVERLAP_BUT_DISTINCT` | same subject but a different decision, situation, scope, or next action | create only after writing the distinction statement |
+| `MODEL_VARIANT` | generic guidance exists but official model/year structure materially changes the answer | create a model article and cross-link it |
+| `NEW` | no current article resolves the primary question | create normally |
+| `HOLD_SCOPE` | distinction cannot be explained clearly | hold and redefine before research |
+
+The required distinction statement is:
+
+```text
+Existing content answers: <question/result>.
+This candidate answers: <different question/result>.
+The user needs a separate page because: <scope, evidence, or next-action difference>.
+```
+
+If that statement cannot be written without relying on wording alone, the candidate is not independent.
+
+Examples:
+
+- `브레이크 패드 마모 확인` versus `브레이크 패드 교체 시기`: usually one inspection intent; update/merge rather than create two pages.
+- `브레이크 패드 마모 확인` versus `브레이크 패드 구매 전 규격 확인`: same component, different decision and evidence; separate pages may be valid.
+- `오토바이 시트 잠금장치 확인` versus `특정 모델 시트 여는 방법`: separate only when an official model-specific mechanism or access sequence materially changes the answer.
+- `타이어 공기압 확인` versus `장기 보관 후 첫 주행 점검`: overlapping check, but the second may be a distinct situational checklist if it provides a broader decision flow.
+
+Run the duplicate gate at four moments: candidate registration, production selection, after the outline/primary answer is written, and immediately before publication. Subject drift during research can turn a previously distinct topic into a duplicate.
+
+#### New article versus existing article decision
+
+Prefer updating an existing article when the candidate adds a missing section, replaces weak images, corrects a fact, improves wording, or adds one model example without changing the primary question. Create a new article when the reader, decision, evidence set, or next action is materially different and each page can be summarized without repeating the other.
+
+When consolidating, preserve the stronger canonical URL, merge unique value, update relations and internal links, and redirect or deactivate the weaker URL according to SEO policy. Never leave two active near-identical pages merely to preserve content count.
+
+#### Content composition blueprint
+
+Build the outline from the question rather than using one universal article skeleton. The default information flow is:
+
+1. **Reason** — why the reader should care and what may worsen if ignored;
+2. **Direct answer** — the short decision or principle;
+3. **Scope** — what can be seen/done safely and what varies by model;
+4. **Locate/access** — where the target is and how much removal is involved;
+5. **Observe/perform** — distinct checks or steps, supported by visuals where useful;
+6. **Interpret** — what the observed states mean without pretending to diagnose;
+7. **Act** — continue monitoring, maintain, avoid riding, or contact a shop;
+8. **Official references** — one final collapsed source group and the common model/year notice;
+9. **Continue discovery** — shop CTA when relevant and related guides.
+
+Template-specific emphasis:
+
+| Template | Composition emphasis |
+|---|---|
+| `CHECK` | why it matters → visible scope → inspection points → state comparison → next action |
+| `HOW_TO` | suitability/safety → tools → location/access → ordered steps → restoration → result check |
+| `TROUBLESHOOT` | symptom definition → simple checks → branching table → action per result → limit of self-check |
+| `SPEC` | where marking is found → how to read it → official/actual-bike comparison → purchase check |
+| `MODEL_DATA` | exact model/year scope → concise official facts → verification location → variant warning |
+| `COMPARE` | comparison conditions → neutral table → practical difference → applicable context, no winner |
+| `PREVENT` | risk/context → preventive actions → avoid list → warning signs → follow-up timing |
+| `CHECKLIST` | situation → short ordered checklist → go/attention/professional action |
+
+Each section must contribute a new answer, observation, distinction, or action. Remove a section when deleting it does not reduce the user's ability to decide or act. Images and tables replace repetitive prose; they do not create an obligation to restate the same information below them.
+
+Before approval, create a coverage map linking every `required_coverage` item to at least one body block and every visual to one user question. Also record where each critical fact is used. This prevents a polished article from omitting the original question.
+
 ### 2.4 Research and evidence constraints
 
 Use evidence in this order:
@@ -692,6 +861,16 @@ These are current implementation facts, not target-state recommendations:
 6. Catalogue, sitemap, and RSS changes may take up to five minutes to appear.
 7. In-repository and separated Factory execution paths coexist and require an explicit consolidation decision.
 8. The detail route currently treats `MODEL_GUIDE` hero presentation differently; confirm the desired model-first visual behavior before rebuilding it unchanged.
+9. Topic normalization currently recognizes a limited hard-coded set of tyre, battery, and brake subjects. Topics such as seat locks, mirrors, stands, fluids, controls, lighting, storage, washing, and broader ownership situations can collapse into `GENERAL`, weakening duplicate detection.
+10. Some duplicate checks query only active published content, while the required comparison set also includes inactive content, all non-terminal queue states, blocked packages, and legacy canonical URLs.
+11. The current batch heuristic uses Korean/English token overlap plus a small action bonus and fixed score boundaries. It does not fully compare customer question, primary answer, target reader, required coverage, situation, or next action; semantic editorial review remains necessary.
+12. Queue registration can still accept a title and normalized fields without proving that `customer_question`, `primary_answer`, discovery basis, distinction statement, and coverage map are complete.
+13. The current duplicate redefinition automatically turns some replacement topics into compatibility-selection topics. Redefinition must be justified by observed user need rather than used as a generic way to avoid overlap.
+14. `scripts/content-factory/content-rules.json` does not list `image_gallery` although runtime types, schemas, renderer, and quality gate support it.
+15. `content-type-rules.json` still enforces minimum/target image counts and minimum actual-photo counts, conflicting with the role-based `NO_VISUAL`/no-quota policy in this guide.
+16. `content-type-rules.json` contains `generatedVisualMustBeLabeledWhenNotActualPhoto`, while visible alt/caption policy prohibits production-method labels. Provenance must carry that distinction internally.
+17. Template machine QA still searches for a broad `STOP_CONDITION` text pattern. It can reward repetitive `중단/정비소` wording instead of validating a specific observation, riding decision, and next action.
+18. No versioned coverage-map artifact currently guarantees that each `required_coverage` item and critical fact appears in a body block before approval.
 
 Resolve these deliberately. Do not silently convert a current workaround into a permanent contract.
 
