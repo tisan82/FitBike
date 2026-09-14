@@ -32,6 +32,29 @@ Queue 관리 책임에는 다음이 포함된다.
 - SKIP/HOLD 이후 같은 실행에서 다음 Candidate로 진행
 - 정상 게시 완료 후 다음 실행이 자연스럽게 다음 미제작 Topic부터 시작하도록 상태 유지
 
+### Candidate Discovery and Registration Gate
+
+주제는 FitBike DB의 모델·부품 조합이나 만들기 쉬운 이미지에서 시작하지 않는다. 사용자 질문,
+사이트 내 검색과 검색 유입, 반복되는 관리 문의, 공식 문서의 이해 난점, 기존 콘텐츠의 독립적인
+후속 질문, 계절·보관·세차·중고 인수 같은 실제 이용 상황에서 Candidate를 발견한다. 근거 Data가
+없으면 수요 수치를 만들지 않고 `discovery_basis`를 가설과 관찰 근거로 기록한다.
+
+제작 가능한 Topic으로 등록하기 전에 최소 다음 정보를 확정한다.
+
+- `customer_question`, `primary_answer`, `target_reader`, `content_goal`
+- normalized subject/action/scope와 모델·연식 범위
+- Content Type과 Purpose Template
+- `required_coverage`, `excluded_claims`, Critical Facts, Risk
+- Evidence 확보 가능성, Visual 필요성
+- 가장 가까운 기존 Topic/Content와 독립 가치 설명
+
+제목만 있는 Candidate는 바로 `PLANNED` 제작 대상으로 보지 않는다. 현재 DB column에 담기지 않는
+정보는 schema를 임의 변경하지 않고 Candidate Artifact에 보존한다.
+
+Priority 1은 반복성·영향도가 높거나 안전 오해/기존 오류를 바로잡는 질문, Priority 2는 근거가
+명확한 일반 유지관리·DIY·부품 질문, Priority 3은 좁은 Long-tail·계절성·선택적 설명 주제다.
+동일 Priority는 오래된 항목을 먼저 처리하되 긴급한 정정은 근거를 기록하고 앞당길 수 있다.
+
 ## 3. Candidate Reconciliation
 
 Candidate마다 최소 다음 세 계층을 교차 확인한다.
@@ -69,6 +92,50 @@ Exact title match만 검사해서는 안 된다.
 - `NEW`: 기존 콘텐츠가 해결하지 않는 질문 → 제작
 
 기존 콘텐츠의 단순 보강으로 해결되는 Topic은 별도 신규 콘텐츠를 만들어 SEO/Content cannibalization을 만들지 않는다.
+
+### Comparison Set and Dimensions
+
+중복 검사는 Published만 보지 않고 비활성 Content, 모든 미종료 Queue 상태, BLOCKED/Review 작업,
+저장된 Work Package, Legacy URL/Redirect/Canonical도 함께 확인한다. 비교 범위는 Title/Summary뿐
+아니라 Heading, List, Table, Body의 Primary Answer와 Model/Year Relation을 포함한다.
+
+다음 8개 축을 비교한다.
+
+1. 사용자 질문
+2. 대상 부품·개념
+3. 확인·관리·교체·선택·이해 등 행동/판단
+4. Generic·상황·Model·Model-Year·Product 범위
+5. 대상 독자와 이용 상황
+6. 핵심 답과 다음 행동
+7. 필수 Coverage와 근거
+8. 검색 결과에서 약속하는 Title/Summary
+
+단어 중첩 점수는 검토 후보를 찾는 도구일 뿐 최종 중복 판정이 아니다. 특히 한국어 복합어와
+표현이 다른 동일 질문을 의미적으로 다시 확인한다.
+
+판정과 처리는 다음과 같다.
+
+- `EXACT_EXISTING`: 같은 질문·답·범위·결과 → 기존 Content 연결, 신규 생성 금지
+- `INTENT_DUPLICATE`: 표현만 다르고 사실상 같은 답 → Duplicate 또는 기존 Content 통합
+- `UPDATE_EXISTING`: 부족한 문단·이미지·최신 근거·정정 중심 → 기존 Canonical 보강
+- `CONSOLIDATE`: 약한 중복 문서가 여러 개 → 하나로 합치고 Redirect/비활성 처리
+- `OVERLAP_BUT_DISTINCT`: 대상은 같지만 판단·상황·범위·다음 행동이 다름 → 차이를 기록하고 생성
+- `MODEL_VARIANT`: Generic과 달리 공식 모델/연식 구조가 답을 실질적으로 바꿈 → 별도 제작 가능
+- `NEW`: 기존 답이 없음 → 제작
+- `HOLD_SCOPE`: 독립 가치를 명확히 설명할 수 없음 → 범위 재정의
+
+별도 콘텐츠를 만들려면 `기존 콘텐츠가 답하는 질문`, `신규 Candidate가 답하는 다른 질문`,
+`별도 URL이 필요한 이유`를 한 문장씩 기록한다. 제목 표현만 바꿔서는 독립 가치가 아니다.
+
+중복 Gate는 Topic 등록 시, Queue에서 제작 선택 시, Outline/Primary Answer 완성 후, Publish 직전
+총 4회 수행한다. 조사 중 Subject가 바뀌면 최초 판정이 PASS였어도 다시 판정한다.
+
+### Update Before New URL
+
+기존 콘텐츠의 한 섹션 추가, 이미지 교체, 문장 개선, Fact 정정, 같은 질문에 대한 모델 예시 추가로
+해결되면 신규 URL보다 기존 문서 보강을 우선한다. 독자·판단·근거·다음 행동이 실질적으로 다를
+때만 신규 Content를 만든다. 통합 시 더 강한 Canonical을 유지하고 고유 정보를 합친 뒤 Relation,
+내부 링크, Redirect 또는 비활성 상태를 함께 정리한다.
 
 ## 5. Continue, Do Not Stop
 
