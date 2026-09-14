@@ -36,7 +36,7 @@ Admin과 API는 robots에서 제외하되 robots를 보안 수단으로 간주�
 
 JSON-LD와 화면에 표시되는 실제 데이터만 사용한다. DB 문자열은 `<`를 Unicode escape해 serialize한다. Root는 Organization과 WebSite를 사용하고 Model-Year는 Motorcycle을 사용한다. BreadcrumbList는 실제 visible breadcrumb navigation이 구현된 경우에만 사용한다. Offer, price, availability, review, rating, sameAs는 검증된 visible data가 없으면 생성하지 않는다.
 
-Content Detail은 Article의 발행일·수정일을 metadata와 JSON-LD에 제공하고 동일한 날짜를 화면에도 표시한다. BreadcrumbList의 단계와 이름은 화면의 breadcrumb navigation과 일치해야 한다. 네이버 검색 결과 가독성을 위해 Content description은 의미를 유지하는 범위에서 공백을 정규화하고 80자 이내로 제한한다.
+Content Detail은 Article의 발행일·수정일을 metadata와 JSON-LD에 제공한다. 화면에는 사용자가 최초 등록 시점을 명확히 이해할 수 있도록 `등록일`로 발행일만 표시하고 수정일은 노출하지 않는다. BreadcrumbList의 단계와 이름은 화면의 breadcrumb navigation과 일치해야 한다. 네이버 검색 결과 가독성을 위해 Content description은 의미를 유지하는 범위에서 공백을 정규화하고 80자 이내로 제한한다.
 
 ## Image SEO and Internal Linking
 

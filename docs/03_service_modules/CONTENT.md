@@ -105,9 +105,10 @@ FitBike는 모든 장면을 직접 촬영할 수 없으므로 웹에서 발견�
 
 콘텐츠 상세는 읽기 경험을 우선한다.
 
-- Header: Content Type → Title → Summary → 공식 자료 우선 안내
+- Header: Content Type + 등록일 → Title → Summary → 공식 자료 우선 안내. 화면에는 등록일(`published_at`)만 표시하고 수정일은 노출하지 않는다.
 - Hero: 콘텐츠 이해에 필요한 경우만 사용
 - Body: 충분한 문단 간격, 명확한 H2/H3 계층, 읽기 쉬운 List/Step/Table, Tip/Warning 구분
+- `확인에 참고한 자료`는 본문 이해를 방해하지 않도록 기본 접힘 상태의 펼치기 영역으로 제공한다.
 - Footer: `/contents`로 돌아가 다른 정보를 찾을 수 있는 경로 제공
 - 자동 `관련 바이크 → 모델 정보 보기` 섹션은 사용하지 않는다.
 - 차량/부품 CTA는 향후 콘텐츠별 명시적 Editorial Intent가 정의된 경우에만 추가한다.

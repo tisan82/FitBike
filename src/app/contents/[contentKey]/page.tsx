@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ContentBlockRenderer } from "@/features/content";
+import type { ContentBlock } from "@/features/content/types/content.types";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo/site";
 import { getPublishedContentByKey } from "@/services/content.service";
@@ -37,6 +38,17 @@ function metadataDescription(summary: string) {
 
 function formatKoreanDate(value: string) {
   return new Intl.DateTimeFormat("ko-KR", { dateStyle: "long", timeZone: "Asia/Seoul" }).format(new Date(value));
+}
+
+function splitReferenceBlocks(blocks: ContentBlock[]) {
+  const referenceIndex = blocks.findIndex(
+    (block) => block.type === "heading" && block.text.trim() === "확인에 참고한 자료",
+  );
+  if (referenceIndex < 0) return { contentBlocks: blocks, referenceBlocks: [] };
+  return {
+    contentBlocks: blocks.slice(0, referenceIndex),
+    referenceBlocks: blocks.slice(referenceIndex + 1),
+  };
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -84,6 +96,7 @@ export default async function ContentDetailPage({ params }: Props) {
 
   const storedHero = getStoragePublicUrl(content.heroImageStoragePath, "content-assets");
   const hero = content.contentType === "MODEL_GUIDE" ? null : storedHero;
+  const { contentBlocks, referenceBlocks } = splitReferenceBlocks(content.bodyBlocks);
   const url = `${SITE_URL}/contents/${encodeURIComponent(content.contentKey)}`;
   const jsonLd = {
     "@context": "https://schema.org",
@@ -135,13 +148,13 @@ export default async function ContentDetailPage({ params }: Props) {
 
       <article className="mx-auto max-w-3xl">
         <header className="border-b border-border pb-8">
-          <p className="text-sm font-bold text-primary">{labels[content.contentType]}</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <p className="font-bold text-primary">{labels[content.contentType]}</p>
+            <span aria-hidden="true" className="text-border">|</span>
+            <p className="text-foreground-secondary">등록일 {formatKoreanDate(content.publishedAt)}</p>
+          </div>
           <h1 className="mt-3 text-2xl font-bold leading-9 sm:text-3xl sm:leading-10">{content.title}</h1>
           <p className="mt-5 text-base leading-7 text-foreground-secondary sm:text-lg sm:leading-8">{content.summary}</p>
-          <p className="mt-4 text-sm leading-6 text-foreground-secondary">
-            게시 {formatKoreanDate(content.publishedAt)}
-            {content.updatedAt !== content.publishedAt ? ` · 수정 ${formatKoreanDate(content.updatedAt)}` : ""}
-          </p>
           <p className="mt-5 text-sm leading-6 text-foreground-secondary">
             이 글은 정비·관리 판단에 필요한 정보를 이해하기 쉽게 정리한 가이드입니다. 모델별 실제 제원이나 정비 기준은 제조사 공식 자료를 우선 확인하세요.
           </p>
@@ -163,7 +176,18 @@ export default async function ContentDetailPage({ params }: Props) {
         ) : null}
 
         <div className="mt-10 sm:mt-12">
-          <ContentBlockRenderer blocks={content.bodyBlocks} />
+          <ContentBlockRenderer blocks={contentBlocks} />
+          {referenceBlocks.length ? (
+            <details className="group mt-10 rounded-2xl border border-border bg-surface">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-bold marker:content-none sm:px-6 [&::-webkit-details-marker]:hidden">
+                <span>확인에 참고한 자료</span>
+                <span aria-hidden="true" className="text-xl font-normal text-primary transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="border-t border-border px-5 py-5 sm:px-6">
+                <ContentBlockRenderer blocks={referenceBlocks} />
+              </div>
+            </details>
+          ) : null}
         </div>
 
         <footer className="mt-14 border-t border-border pt-7">
