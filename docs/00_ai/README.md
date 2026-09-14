@@ -7,8 +7,8 @@
   영역           문서                                           책임
   -------------- ---------------------------------------------- ---------------------------
   AI 작업        `00_ai/SOP.md`                                 Task 수행 절차
-  콘텐츠 Factory `00_ai/CONTENT_FACTORY.md`                     콘텐츠 생성·QA·게시 정책
-  콘텐츠 Visual  `00_ai/CONTENT_EDITORIAL_VISUAL_STANDARD.md`   서비스용 이미지 제작 기준
+  콘텐츠 Factory `00_ai/CONTENT_FACTORY.md`                     조사·작성·QA·게시 실행 기준
+  콘텐츠 Visual  `00_ai/CONTENT_EDITORIAL_VISUAL_STANDARD.md`   이미지 기획·제작·메타데이터·QA 기준
   이미지 Reference `00_ai/GENERATED_IMAGE_REFERENCE_LIBRARY.md` 생성형 AI 참고 이미지 자산 정책
   Product        `01_product/SERVICE.md`                         서비스 목적/원칙
   Architecture   `02_framework/ARCHITECTURE.md`                  코드/레이어 경계
@@ -32,6 +32,19 @@ Task에서 확정된 지속 정책은 새 문서를 만들기 전에 위 Source 
 동일 정책을 Global 문서와 Service Module에 중복 기록하지 않는다. 새로운
 주요 Service에 지속적인 Product/UX/Data contract가 충분한데 관련 Service
 Module이 없을 때만 새 Module 문서 생성을 제안한다.
+
+## Content Policy Ownership
+
+- `03_service_modules/CONTENT.md`: 사용자가 받는 콘텐츠의 목적, 유형, 안전 표현 원칙과 게시 원칙
+- `00_ai/CONTENT_FACTORY.md`: 위 제품 원칙을 조사·작성·검수·게시 단계에서 실행하는 방법
+- `00_ai/CONTENT_EDITORIAL_VISUAL_STANDARD.md`: Image Brief, 이미지 구성, 사람 표현, alt/caption과 Image QA
+- `00_ai/CONTENT_IMAGE_STORAGE_POLICY.md`: Production 이미지 저장·전달 경로
+- `00_ai/GENERATED_IMAGE_REFERENCE_LIBRARY.md`: Reference Asset의 분류와 사용 제한
+
+세부 규칙은 위 책임 문서 한 곳에서만 정의하고 다른 문서는 링크로 참조한다.
+`FitBike-Content-Factory/policies/**`는 실행 저장소가 사용하는 동기화 사본이며
+정책 원본이 아니다. 정책 변경은 이 저장소에서 먼저 검토한 뒤 동일 커밋 내용으로
+사본을 갱신한다.
 
 ## Generated Reference Asset Rule
 

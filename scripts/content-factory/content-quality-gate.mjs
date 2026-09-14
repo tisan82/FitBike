@@ -15,6 +15,11 @@ function nonEmpty(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+const referenceHeadingPattern = /^(?:확인에\s*)?참고한?\s*(?:공식\s*)?자료$/;
+const canonicalReferenceHeading = "참고 공식 자료";
+const namedLinkPattern = /^\[[^\]]+]\(https:\/\/[^\s)]+\)$/;
+const visibleImageProductionLanguage = /생성형|생성\s*이미지|AI\s*이미지|AI로\s*생성|인공지능\s*생성|교육(?:용)?\s*이미지입니다|비교\s*이미지입니다/i;
+
 function validateTextBlock(block, index, failures) {
   const label = `bodyBlocks[${index}]`;
   if (!block || typeof block !== "object" || !nonEmpty(block.type)) {
@@ -87,6 +92,19 @@ export async function evaluateContentQuality({ contentDirectory, rules, template
   if (!nonEmpty(content.summary)) failures.push("SUMMARY_MISSING");
   if (!Array.isArray(content.bodyBlocks) || bodyBlocks.length === 0) failures.push("BODY_BLOCKS_EMPTY");
   bodyBlocks.forEach((block, index) => validateTextBlock(block, index, failures));
+
+  const referenceIndex = bodyBlocks.findIndex((block) => block?.type === "heading" && referenceHeadingPattern.test(block.text?.trim() ?? ""));
+  if (referenceIndex >= 0) {
+    if (bodyBlocks[referenceIndex].text.trim() !== canonicalReferenceHeading) failures.push("REFERENCE_HEADING_NON_CANONICAL");
+    if (referenceIndex !== bodyBlocks.map((block) => block?.type).lastIndexOf("heading")) failures.push("REFERENCE_SECTION_NOT_LAST");
+    const referenceItems = bodyBlocks.slice(referenceIndex + 1).flatMap((block) => ["bullet_list", "numbered_list"].includes(block?.type) ? block.items : block?.type === "paragraph" ? [block.text] : []);
+    if (referenceItems.length === 0) failures.push("REFERENCE_ITEMS_MISSING");
+    for (const item of referenceItems) if (/https?:\/\//i.test(item) && !namedLinkPattern.test(item.trim())) failures.push("REFERENCE_URL_MUST_USE_NAMED_LINK");
+  }
+  for (const [index, block] of bodyBlocks.entries()) {
+    const images = block?.type === "image" ? [block] : block?.type === "image_gallery" ? block.images ?? [] : [];
+    for (const image of images) if (visibleImageProductionLanguage.test(`${image?.alt ?? ""} ${image?.caption ?? ""}`)) failures.push(`IMAGE_VISIBLE_PRODUCTION_LANGUAGE:${index}`);
+  }
   if (nonEmpty(content.contentTemplate)) {
     failures.push(...validateTemplateContent({
       template: content.contentTemplate,

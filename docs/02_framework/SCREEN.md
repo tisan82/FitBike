@@ -102,6 +102,13 @@ Guide card는 Content Type → Title → Summary hierarchy를 유지하고 저�
 
 향후 Topic/Part/Model 관계 기반 탐색은 DB에 검증된 taxonomy 또는 relation이 추가된 이후 확장한다. 현재 문자열을 임의 분류해 taxonomy처럼 취급하지 않는다.
 
+### Content Detail Reference Disclosure
+
+콘텐츠가 작성 근거를 제공할 때 본문 마지막에 `참고 공식 자료` 영역을 하나만 두고
+기본 접힘 상태로 제공한다. 펼친 화면에는 자료명만 표시하며 원본 URL 문자열을
+노출하지 않는다. 연결할 공식 URL이 있으면 자료명 자체를 새 창 링크로 제공한다.
+자료 링크가 없는 항목은 자료명만 표시하고 임의 URL을 추정하지 않는다.
+
 ## Tire Model Detail Disclosure
 
 타이어 모델 상세는 모델 이해 후 판매 규격을 선택하는 Gate다. 규격명, 고객용 장착 위치, 가격을 위치별로 묶어 표시하고 선택하면 해당 SKU Detail로 이동한다. 상세 제원, Fitment, 구매 CTA는 Model Detail에서 펼치지 않고 SKU Detail에서 제공한다.

@@ -40,15 +40,36 @@ function formatKoreanDate(value: string) {
   return new Intl.DateTimeFormat("ko-KR", { dateStyle: "long", timeZone: "Asia/Seoul" }).format(new Date(value));
 }
 
+const referenceHeadingPattern = /^(?:확인에\s*)?참고한?\s*(?:공식\s*)?자료$/;
+
 function splitReferenceBlocks(blocks: ContentBlock[]) {
   const referenceIndex = blocks.findIndex(
-    (block) => block.type === "heading" && block.text.trim() === "확인에 참고한 자료",
+    (block) => block.type === "heading" && referenceHeadingPattern.test(block.text.trim()),
   );
   if (referenceIndex < 0) return { contentBlocks: blocks, referenceBlocks: [] };
   return {
     contentBlocks: blocks.slice(0, referenceIndex),
     referenceBlocks: blocks.slice(referenceIndex + 1),
   };
+}
+
+function referenceItems(blocks: ContentBlock[]) {
+  return blocks.flatMap((block) => {
+    if (block.type === "bullet_list" || block.type === "numbered_list") return block.items;
+    if (block.type === "paragraph") return [block.text];
+    return [];
+  });
+}
+
+function parseReferenceItem(value: string) {
+  const markdownLink = value.trim().match(/^\[([^\]]+)]\((https?:\/\/[^\s)]+)\)$/);
+  if (markdownLink) return { label: markdownLink[1].trim(), href: markdownLink[2] };
+
+  const url = value.match(/https?:\/\/[^\s]+/i)?.[0];
+  if (!url) return { label: value.trim(), href: null };
+
+  const label = value.replace(url, "").replace(/[\s:：–—-]+$/, "").trim();
+  return { label: label || "공식 자료", href: url };
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -97,6 +118,7 @@ export default async function ContentDetailPage({ params }: Props) {
   const storedHero = getStoragePublicUrl(content.heroImageStoragePath, "content-assets");
   const hero = content.contentType === "MODEL_GUIDE" ? null : storedHero;
   const { contentBlocks, referenceBlocks } = splitReferenceBlocks(content.bodyBlocks);
+  const sources = referenceItems(referenceBlocks).map(parseReferenceItem);
   const url = `${SITE_URL}/contents/${encodeURIComponent(content.contentKey)}`;
   const jsonLd = {
     "@context": "https://schema.org",
@@ -177,14 +199,30 @@ export default async function ContentDetailPage({ params }: Props) {
 
         <div className="mt-10 sm:mt-12">
           <ContentBlockRenderer blocks={contentBlocks} />
-          {referenceBlocks.length ? (
+          {sources.length ? (
             <details className="group mt-10 rounded-2xl border border-border bg-surface">
               <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-bold marker:content-none sm:px-6 [&::-webkit-details-marker]:hidden">
-                <span>확인에 참고한 자료</span>
+                <span>참고 공식 자료</span>
                 <span aria-hidden="true" className="text-xl font-normal text-primary transition-transform group-open:rotate-180">⌄</span>
               </summary>
               <div className="border-t border-border px-5 py-5 sm:px-6">
-                <ContentBlockRenderer blocks={referenceBlocks} />
+                <ul className="space-y-3 text-base leading-7 text-foreground-secondary">
+                  {sources.map((source, index) => (
+                    <li className="flex gap-3" key={`${source.label}-${index}`}>
+                      <span aria-hidden="true" className="mt-2.5 size-1.5 shrink-0 rounded-full bg-primary" />
+                      {source.href ? (
+                        <a
+                          className="font-medium text-primary underline decoration-primary/30 underline-offset-4 hover:text-primary-hover"
+                          href={source.href}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          {source.label}
+                        </a>
+                      ) : <span>{source.label}</span>}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </details>
           ) : null}

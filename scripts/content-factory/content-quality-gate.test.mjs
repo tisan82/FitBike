@@ -57,6 +57,36 @@ test("blocks missing image caption metadata", async () => {
   assert.ok(result.checks.failures.some((item) => item.includes("IMAGE_META_MISSING")));
 });
 
+test("blocks a non-canonical reference heading and a visibly exposed URL", async () => {
+  const data = await fixture();
+  data.packageWithImages.content.bodyBlocks.push(
+    { type: "heading", level: 2, text: "확인에 참고한 공식 자료" },
+    { type: "bullet_list", items: ["Ducati 모델 사용자 설명서: https://example.com/manual"] }
+  );
+  const result = await evaluateContentQuality({ contentDirectory: data.dir, rules, packageWithImages: data.packageWithImages, imageResult: data.imageResult });
+  assert.ok(result.checks.failures.includes("REFERENCE_HEADING_NON_CANONICAL"));
+  assert.ok(result.checks.failures.includes("REFERENCE_URL_MUST_USE_NAMED_LINK"));
+});
+
+test("allows named official reference links", async () => {
+  const data = await fixture();
+  data.packageWithImages.content.bodyBlocks.push(
+    { type: "heading", level: 2, text: "참고 공식 자료" },
+    { type: "bullet_list", items: ["[Ducati 모델 사용자 설명서](https://example.com/manual)"] }
+  );
+  const result = await evaluateContentQuality({ contentDirectory: data.dir, rules, packageWithImages: data.packageWithImages, imageResult: data.imageResult });
+  assert.equal(result.status, "PASS");
+});
+
+test("blocks image production-language disclosures", async () => {
+  const data = await fixture({ gallery: { type: "image_gallery", images: [
+    { storagePath: "one.webp", alt: "브레이크 디스크", caption: "교육 이미지입니다." },
+    { storagePath: "two.webp", alt: "브레이크 패드", caption: "확인 지점" }
+  ] } });
+  const result = await evaluateContentQuality({ contentDirectory: data.dir, rules, packageWithImages: data.packageWithImages, imageResult: data.imageResult });
+  assert.ok(result.checks.failures.some((item) => item.startsWith("IMAGE_VISIBLE_PRODUCTION_LANGUAGE")));
+});
+
 test("blocks template packages that omit real-world access context", async () => {
   const data = await fixture();
   data.packageWithImages.content.contentTemplate = "HOW_TO";
