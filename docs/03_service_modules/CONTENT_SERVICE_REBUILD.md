@@ -37,6 +37,214 @@ A rebuild is complete only when all of the following work together:
 
 The FitBike repository owns the public application, database migrations, Storage contract, protected publishing API, and canonical policy documents. Content producers must publish through the protected API or an equivalent server-only transaction; they must not write arbitrary Production rows from a browser or expose the service-role key.
 
+### 2.1 How to use this as a single document
+
+This guide is the **single rebuild entry point**. A person rebuilding the service must be able to use this file alone to understand the product, content, image, data, publishing, and operations contracts.
+
+The linked policy files remain detailed maintenance sources. Their role is to explain or test a specific area; they are not prerequisites for understanding the rebuild. Apply this precedence when documents or code disagree:
+
+1. user-approved product direction and `CONTENT.md`;
+2. this rebuild guide as the complete service contract;
+3. specialist policies under `docs/00_ai`;
+4. runtime schemas, migrations, and automated QA;
+5. individual work-package prompts.
+
+A persistent rule must not exist only in a chat, prompt, or one content package. Update the appropriate specialist policy and this consolidated section together. Runtime validation and tests must then be aligned with the documentation.
+
+### 2.2 Product foundation
+
+FitBike content answers real motorcycle maintenance, inspection, DIY, parts-understanding, and model questions. Its first goal is to resolve the user's question inside the article—not to force a product page visit, rank products, or manufacture search traffic.
+
+Every topic starts with:
+
+- the question the user is actually asking;
+- why the information matters;
+- what may happen if the condition is ignored;
+- what the user can safely observe or do;
+- what state requires adjustment, repair, avoiding a ride, or professional inspection;
+- what is different by model/year and where the official criterion is found.
+
+Do not create a topic merely because FitBike has a model-to-part relation. Do not mass-produce `model + part specification` pages from Fitment data. A model-specific article requires independent user value and official manufacturer evidence.
+
+The product is information-first. Recommendations, popularity rankings, unsupported superlatives, fear-based wording, and forced purchase CTAs are prohibited. Model, part, shop, or product links appear only when they help the next action.
+
+### 2.3 Content planning contract
+
+Before research or writing, define:
+
+- `customer_question` and `primary_answer`;
+- target reader and assumed knowledge;
+- content type and purpose template;
+- required coverage and excluded claims;
+- critical facts and safety risk;
+- existing-content intent overlap;
+- model/year scope;
+- information better explained by a visual.
+
+Use one of these purpose templates:
+
+| Template | User purpose | Required result |
+|---|---|---|
+| `CHECK` | judge condition or replacement need | observable normal/attention/professional-check states and next action |
+| `HOW_TO` | perform a task | preparation, access, steps, completion check, and professional handoff |
+| `TROUBLESHOOT` | investigate a symptom | cause branches and action per result |
+| `SPEC` | read a specification or marking | code meaning, actual-bike comparison, pre-purchase check |
+| `MODEL_DATA` | find model/year data | short officially supported data table |
+| `EXPLAIN` | understand a principle | plain definition, real context, misconception prevention |
+| `COMPARE` | understand differences | neutral comparison and applicable conditions, never a ranking |
+| `PREVENT` | prevent a problem | do, avoid, observe, and respond |
+| `CHECKLIST` | make a quick situational check | concise checks and next action |
+
+Length follows the question, not a quota. Do not pad a short answer with generic sections. A long procedure should contain only the detail needed to perform or hand off the task safely.
+
+### 2.4 Research and evidence constraints
+
+Use evidence in this order:
+
+1. manufacturer or brand official page;
+2. owner's manual, service manual, or official technical document;
+3. reliable technical and maintenance reference;
+4. specialist publication or documented real-world work;
+5. blog/community material only for access context, recurring questions, and discovery.
+
+Model-specific specifications, limits, intervals, torque values, pressures, capacities, warnings, and safety-critical claims require official evidence. A blog, marketplace listing, generated answer, or FitBike Fitment row cannot independently establish those facts. If official evidence is absent or conflicting, omit the claim or hold the content.
+
+The internal fact register preserves each claim, source URL, source type, verification state, critical flag, and checked date. The public article shows sources only in the final collapsed `참고 공식 자료` section. Render the source name as the link text; never show a raw URL. Do not invent a missing URL.
+
+### 2.5 Writing constraints
+
+- Start with the reader's motive: why this check matters and the realistic consequence of ignoring it.
+- Give the core answer early, followed by judgment criteria, inspection/action, and the next step.
+- Use concrete titles such as `점검할 때 놓치기 쉬운 부분` or `정비소를 찾아야 하는 경우`.
+- Do not use vague headings such as `한 부분만 보고 판단하지 않는 이유` when the intended action can be named.
+- Do not repeat the summary in the first paragraph or restate one fact across prose, list, table, and image.
+- Explain technical terms at the point of use so a beginner can act.
+- Distinguish no-disassembly observation, cover access, multiple-part removal, and official-procedure/professional work.
+- For `HOW_TO`, cover location, access, interference, model differences, safe handoff, and restoration/completion checks.
+- For `CHECK`, distinguish what is directly visible, what requires access, and what requires professional assessment.
+- Keep the common model/year disclaimer once below `참고 공식 자료`, not in every introduction.
+- Do not expose internal words such as `STOP`, `HOLD`, `BLOCKED`, or Factory error codes.
+
+User-facing safety copy follows `observation → meaning → next action`:
+
+- normal uncertainty: `추가 확인` or a specific re-check;
+- maintenance need: `조정·정비 필요`;
+- outside user scope: `직접 분해하지 말고 전문 점검으로 전환`;
+- professional assessment: state the symptom, riding decision, and `/shops` action;
+- verified immediate riding risk only: `이 상태에서는 운행하지 마세요`, with the reason.
+
+Do not say `점검을 중단` when the inspection itself is not hazardous. The user came to inspect; the correct outcome is usually to avoid riding, avoid further disassembly, or contact a shop.
+
+### 2.6 Image purpose and quantity
+
+An image is an information block, not decoration. Every image must clearly answer at least one question:
+
+- Where is the inspection point?
+- What exactly should be checked?
+- What condition is normal or problematic?
+- Where is the tool or measurement contact point?
+- What is the next safe action or completed state?
+
+There is no fixed image count. Use no image when it adds no information, and use multiple distinct images when location, access, state comparison, or sequence cannot be understood from one. Never add generic images to satisfy a quota.
+
+Use these roles: `HERO`, `LOCATION`, `ACCESS`, `IDENTIFY`, `NORMAL_ABNORMAL`, `ACTION`, `SEQUENCE`, `MEASUREMENT`, `RESULT`, `WARNING`, and `CONCEPT`. Hero and body images must not duplicate one another. The same production asset must not repeat inside an article.
+
+Multiple comparable states may use `image_gallery` with mobile swipe. Each slide still has one purpose. Do not compose a dashboard, presentation, multi-topic collage, or several tiny panels into a single production image.
+
+### 2.7 Mandatory image brief
+
+Create one independent brief before finding, editing, or generating each production image:
+
+```yaml
+content_key: motorcycle-example
+image_id: brake-surface-groove-01
+asset_role: BODY
+visual_role: NORMAL_ABNORMAL
+user_question: "이 홈은 정비소 확인이 필요한 상태인가?"
+inspection_target: brake disc surface
+inspection_point: groove continuity and local depth difference
+information_goal: distinguish light wear marks from a deep continuous groove
+source_strategy: REAL_ASSET_FIRST
+real_photo_required: true
+generation_allowed: CONCEPT_ONLY
+human_presence: NONE
+must_show:
+  - one clearly visible disc surface
+  - groove inspection area at mobile scale
+prohibited:
+  - fictional measurement
+  - brand mark or watermark
+  - multiple comparison panels
+mobile_requirement: core condition identifiable at 390px
+fact_dependencies:
+  - verified manufacturer inspection guidance
+production_output: one 4:3 body asset
+```
+
+The invariant is `1 brief = 1 acquisition/generation = 1 production asset`. Do not silently change `must_show`, prohibited details, geometry, model identity, or fact dependencies during generation.
+
+### 2.8 Image source, rights, and editing constraints
+
+Choose image sources in this order when suitable:
+
+1. approved direct FitBike photography;
+2. reusable/licensed real-world image with recorded permission;
+3. approved official manufacturer asset;
+4. approved brand asset—prefer available MAXXIS assets for tyres and POWEROAD assets for batteries;
+5. a newly created FitBike educational visual;
+6. no visual or image review required.
+
+Physical location, model identity, product label, wiring, access sequence, wear, damage, corrosion, leakage, and other factual states are real-image-first. A generated visual is better suited to a principle, measurement concept, decision flow, or simplified sequence. Never present a generated scene as proof of a specific real model, product, failure, or damage state.
+
+Public availability does not grant reuse rights. Record source name/URL, owner, license or permission, rights status, edit history, content use, and last check. Do not publish an asset whose provenance is missing or unapproved.
+
+Watermarked, stock-preview, third-party-logo, or copyright-marked images are not production sources. Do not remove, cover, blur, or crop out a watermark. They may be research references only; find a clean permitted source or create an independent visual from verified facts.
+
+Allowed factual edits include mobile crop, rotation/perspective correction, exposure/white balance/sharpness correction, privacy masking, non-obscuring outline/arrow/short label, and format optimization. Prohibited edits include changing product codes, terminal direction, model identity, part position, actual wear/damage, or combining different scenes as one factual photograph.
+
+### 2.9 People, text, and branding in images
+
+The default is `human_presence: NONE`. Use `HANDS_ONLY` only when hand/tool position or contact direction cannot be explained otherwise. Use `PERSON_REQUIRED` only when full posture or riding position is the information. When a person is necessary, use an adult who fits the Korean service context naturally; avoid stereotypes, unsafe clothing, jewellery, exposed skin, and a face or fashion treatment that overwhelms the motorcycle.
+
+Image text defaults to none. A short label, simple number, arrow, or necessary annotation is allowed only when HTML cannot communicate the visual relationship as clearly. Never put headlines, body copy, promotional chips, unsupported values, logos, brand marks, product numbers, or watermarks into a generated visual.
+
+At a 390px viewport, the subject and any necessary label must remain identifiable. As a starting point for a 1200px source, use roughly 49px or larger for ordinary annotations, 55px or larger for key labels, and 68px or larger for a rare title. If copy does not fit, split the image or move it to HTML rather than shrinking it.
+
+Public alt text uses `object + location/action + inspection point`. Captions add the visible check or next action without repeating the body. Never use `생성형`, `생성 이미지`, `AI 이미지`, `AI로 생성`, `인공지능 생성`, `교육 이미지입니다`, `교육용 이미지입니다`, or `비교 이미지입니다` in alt text, captions, or other visible image copy. Production method belongs only in provenance metadata.
+
+### 2.10 Production image specification
+
+| Asset | Default dimensions | Ratio | Format |
+|---|---:|---:|---|
+| Thumbnail | 1200 × 675 | 16:9 | WebP, sRGB |
+| Hero | 1600 × 900 | 16:9 | WebP, sRGB |
+| Body | 1200 × 900 | 4:3 | WebP, sRGB |
+
+Body images generally target 100–300 KB when legibility is preserved. The protected upload limit is 4 MB. Only an LCP/hero candidate may load eagerly; body images load lazily and declare responsive sizes. Production delivery must use `content-assets` Storage. External hotlinks, repository `/public` delivery, and `editorial-reference/**` paths are prohibited.
+
+Reference dashboards, collages, UI mockups, and discarded generations form a visual knowledge base only. Never crop a small panel from a reference dashboard and serve it as a production photograph. Derive a new single-purpose brief and create a new production asset.
+
+### 2.11 Consolidated publication gates
+
+Content cannot newly enter `PUBLISHED` when any critical gate fails:
+
+- the article does not answer the customer question;
+- the intent duplicates an existing article without independent value;
+- a required or safety-critical claim lacks evidence or conflicts with another source;
+- model-specific facts are not officially verified;
+- the procedure omits access, restoration, or professional handoff information;
+- safety language does not match the observed risk and next action;
+- references use inconsistent headings or expose raw URLs;
+- a block is invalid, empty, or unsupported;
+- a displayed image lacks alt/caption, provenance, approved rights, or a Storage object;
+- an image is duplicated, generic to the wrong target, misleading, watermarked, factually distorted, or unreadable on mobile;
+- an external, local-public, or reference-library path is used for production;
+- the queue state, content type, slug, relation, publication time, or asset path violates the publishing contract.
+
+Machine QA checks schemas, required fields, paths, hashes, dimensions, file format, source records, reference formatting, duplicate keys, and HTTP/Storage existence. Editorial/AI QA judges answer quality, practical usefulness, evidence sufficiency, safety meaning, reality match, readability, visual value, redundancy, and intent uniqueness. A numeric score never overrides a critical failure.
+
+If a weakness can be repaired safely, research, rewrite, find a different source, revise the brief, or regenerate within the same job. Hold only when evidence, safety conditions, model reality, rights, or schema conflicts cannot be resolved. Preserve `failed_stage`, reason, attempts, and next action.
+
 There are currently two production surfaces to account for:
 
 1. the in-repository runtime under `scripts/content-factory/**`, invoked by `.github/workflows/content-production-batch.yml`;
