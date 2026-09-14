@@ -137,6 +137,26 @@ export async function getPublishedContentByKey(
   return row ? mapDetailRow(row) : null;
 }
 
+const relatedTitleStopWords = new Set(["오토바이", "바이크", "방법", "확인", "점검", "상태", "가이드", "관리", "교체", "전", "후"]);
+
+function titleTerms(title: string) {
+  return new Set(title.toLocaleLowerCase("ko-KR").split(/[^\p{L}\p{N}]+/u).filter((term) => term.length >= 2 && !relatedTitleStopWords.has(term)));
+}
+
+export function selectRelatedPublishedContents(current: PublishedContent, candidates: ContentListItem[], limit = 6) {
+  const currentTerms = titleTerms(current.title);
+  return candidates
+    .filter((candidate) => candidate.contentId !== current.contentId)
+    .map((candidate, index) => {
+      const overlap = [...titleTerms(candidate.title)].filter((term) => currentTerms.has(term)).length;
+      const score = overlap * 10 + (candidate.contentType === current.contentType ? 3 : 0);
+      return { candidate, index, score };
+    })
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .slice(0, limit)
+    .map(({ candidate }) => candidate);
+}
+
 export async function getPublishedGuidesByBikeModelId(bikeModelId: number): Promise<RelatedGuide[]> {
   const relations = await findContentBikeModelRelationsByBikeModelId(bikeModelId);
   return (await findPublishedContentsByIds(relations.map((relation) => relation.content_id), 3)).map(mapListRow).map(({ contentId, contentKey, title, summary, contentType }) => ({ contentId, contentKey, title, summary, contentType }));
