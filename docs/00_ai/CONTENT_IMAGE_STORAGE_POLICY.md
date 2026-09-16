@@ -16,6 +16,18 @@ Not allowed for active content delivery:
 
 Local repository assets may exist as source/reference files, but before an active content record uses them they must be copied to `content-assets`, verified, and the DB path changed to the Storage object path.
 
+## Approved official manufacturer sources
+
+The operator has confirmed FitBike usage rights for official Honda, Yamaha, and BMW website information and images. When used:
+
+- record `source_type=OFFICIAL`, `source_owner`, source page URL, source asset URL, and the content-specific edit description
+- set the rights state to the schema-supported approved value and note that operator approval was confirmed
+- preserve factual model/year/trim labeling
+- convert the selected asset to a content-specific WebP derivative
+- serve only the derivative from `content-assets`; never hotlink the manufacturer URL
+
+Approval does not extend to dealer, marketplace, press re-upload, or unrelated third-party images merely depicting those brands.
+
 ## Required flow
 
 `source/reference asset → content-specific review → optimize when appropriate → content-assets Storage → verify object → DB path replacement → Production QA`
