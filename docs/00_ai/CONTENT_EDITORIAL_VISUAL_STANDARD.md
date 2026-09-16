@@ -33,6 +33,20 @@ FitBike 운영자가 사용 권리를 확인한 Honda, Yamaha, BMW 공식 사이
 ## 5. Image Must Teach
 각 이미지는 다음 중 최소 하나를 명확하게 가르쳐야 한다: `어디를 볼 것인가`, `무엇을 확인할 것인가`, `어떤 상태가 문제인가`. 모바일 390px에서 핵심 대상이 식별되지 않거나 사진만 보고 확인 목적을 설명할 수 없으면 `IMAGE_INFORMATION_VALUE_FAIL`이다.
 
+### 5.1 Tire sidewall identification
+
+타이어 규격 확인 Visual은 검은 타이어의 형태만 보여주는 이미지로 통과하지 않는다. 실제 사이드월에서
+제조사/브랜드 또는 제품 식별 정보와 규격 문자열이 함께 읽혀야 한다. 사용 승인이 확인된 MAXXIS
+공식 실사를 우선하며, 브랜드·규격 표기가 흐리거나 보이지 않으면 다른 승인 자산을 선택한다.
+
+- 실제 각인과 다른 숫자·브랜드·패턴을 생성하거나 합성하지 않는다.
+- 설명용 강조선과 라벨은 원본 각인을 가리지 않는다.
+- 모바일에서 규격 문자열을 읽을 수 있도록 필요한 범위만 고해상도로 crop할 수 있다.
+- 본문 HTML은 실제 각인을 그대로 옮겨 설명하고, 이미지에서 확인되지 않는 값을 추가하지 않는다.
+
+브랜드/제품 식별과 규격 문자열 중 하나라도 확인할 수 없으면 `TIRE_SIDEWALL_IDENTITY_MISSING`으로
+Production 사용을 차단한다.
+
 ## 6. Image Brief — Mandatory Before Generation
 모든 Production 이미지에는 생성/확보 전에 독립 Image Brief가 있어야 한다.
 
@@ -167,5 +181,7 @@ Reference Asset을 활용할 때는:
 
 ### Blocking Fail Codes
 `DASHBOARD_COMPOSITE_OUTPUT`, `MULTI_BRIEF_IMAGE`, `REFERENCE_ASSET_DIRECTLY_SERVED`, `DUPLICATE_IMAGE`, `HERO_BODY_DUPLICATE`, `GENERIC_ASSET_REUSE`, `INSPECTION_TARGET_MISMATCH`, `IMAGE_INFORMATION_VALUE_FAIL`, `EXTERNAL_HOTLINK`, `LOCAL_PUBLIC_IMAGE_REF`, `UNOPTIMIZED_ORIGINAL`, `MOBILE_TEXT_UNREADABLE`, `BROKEN_ASSET`, `EAGER_LOAD_OVERUSE`.
+
+타이어 규격 확인 Visual에는 `TIRE_SIDEWALL_IDENTITY_MISSING`도 Blocking Fail Code로 적용한다.
 
 **Blocking Fail Code가 하나라도 있으면 Content를 새로 PUBLISHED 상태로 전환하지 않는다.** 이미 게시된 콘텐츠에서 발견되면 게시를 삭제하는 대신 `IMAGE_QA_REOPEN` 대상으로 잡아 Visual Layer를 교체한다.
