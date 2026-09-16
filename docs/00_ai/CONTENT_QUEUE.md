@@ -137,6 +137,33 @@ Exact title match만 검사해서는 안 된다.
 때만 신규 Content를 만든다. 통합 시 더 강한 Canonical을 유지하고 고유 정보를 합친 뒤 Relation,
 내부 링크, Redirect 또는 비활성 상태를 함께 정리한다.
 
+### Model-specific tire-size hard gate
+
+다음 조건을 모두 만족하면 표현이 달라도 신규 Content Candidate가 아니다.
+
+- `normalized_scope = MODEL`이거나 제목이 특정 모델명을 대상으로 함
+- 핵심 질문이 앞/뒤 타이어 규격·사이즈 확인임
+- Primary Answer가 규격표와 공통 타이어 표기 읽는 법으로 끝남
+
+이 Candidate는 `MODEL_VARIANT`로 통과시키지 않고 `MODEL_DETAIL_ENRICHMENT`로 분류한다. 모델/연식별
+규격·특징·변경점은 Model + Year Detail 보강 Backlog로 보내고, 타이어 표기 읽는 법은 기존 공통
+가이드로 연결한다. Queue 등록 전, Candidate 선택, Outline 완성 후, Publish 직전 네 Gate 모두에서
+같은 규칙을 확인한다.
+
+좋은 예:
+
+```text
+타이어 규격 읽는 법 → GENERIC PARTS_GUIDE
+CBR650R 2024년형 앞/뒤 규격과 연결 상품 → Model + Year Detail 보강
+```
+
+피할 예:
+
+```text
+CBR650R 타이어 규격 가이드 → 별도 MODEL_GUIDE URL 생성
+투오노 125 타이어 규격 확인 방법 → 공통 규격 읽기 설명을 모델명만 바꿔 반복
+```
+
 ## 5. Continue, Do Not Stop
 
 개별 Candidate가 기존 제작, 중복, 보류 상태라고 해서 Queue 실행 전체를 중단하지 않는다.
@@ -316,6 +343,13 @@ Priority는 콘텐츠를 만들기 쉬운 순서나 이미지 확보 순서가 �
 #### 4. 기존 콘텐츠 보강으로 충분한데 신규 URL 생성
 
 기존 문서에 한 섹션, 이미지, 최신 근거를 추가하면 같은 질문을 충분히 해결할 수 있는 경우 `UPDATE_EXISTING`으로 판정한다. 별도 URL은 독자, 상황, 판단 또는 다음 행동이 실질적으로 달라야 한다.
+
+#### 5. 모델명만 바꾼 타이어 규격 콘텐츠
+
+모델별 타이어 규격은 모델/연식 상세가 소유한다. `모델명 + 타이어 규격/사이즈/확인 방법` 후보의
+핵심 답이 앞·뒤 규격과 공통 표기 설명이면 `ARCHIVED` 또는 현재 schema가 지원하는 비제작 상태로
+정리하고 새 URL을 만들지 않는다. 해당 모델 상세에는 공식 모델·연식 규격과 명시적으로 매핑된
+FitBike 타이어 상품상세 연결을 보강한다.
 
 ### Registration readiness
 
