@@ -418,3 +418,45 @@ Production mutation/deploy는 `AGENTS.md`의 승인 규칙과 현재 실행 환�
 - "실제 위치를 모르겠다" → LOCATION/ACCESS Visual requirement 개선
 
 지속 정책은 채팅 기억이나 개별 Prompt에만 남기지 않는다. 이 문서 또는 상위 Content Source of Truth에 반영한다.
+
+## 19. Work Production and Policy Improvement
+
+### Official production mode
+
+FitBike 콘텐츠의 공식 제작 방식은 ChatGPT Work가 수행하는 단일 Orchestration이다. 외부 OpenAI API 자동 생성, 무인 생성 Schedule, API Key 또는 Model Variable은 Production 콘텐츠 제작의 필수 조건이 아니다. 저장소의 Provider·자동 실행 코드는 호환성과 실험 목적으로 남을 수 있지만, 정책과 완료 판정을 대신하지 않는다.
+
+Work는 현재 Topic, 기존 Content, 공식 근거, 이미지 Brief, QA 결과와 게시 영수증을 하나의 작업 맥락에서 이어서 사용한다. 게시 완료는 제한 API를 통한 DB·Storage 반영과 공개 URL 검증까지 포함한다.
+
+### Problem-driven policy improvement
+
+정책은 추상적인 선호나 한 콘텐츠의 문장 수정만으로 바꾸지 않는다. 반복 가능성이 있는 문제는 다음 순서로 개선한다.
+
+1. **Observed problem** — 실제 Topic, 본문, 이미지 또는 게시 결과에서 사용자가 이해하기 어려운 부분을 기록한다.
+2. **User impact** — 어떤 질문에 답하지 못했는지, 어떤 오해·안전·검색 중복 문제가 생기는지 설명한다.
+3. **Root cause** — Topic 정의, Research, Writing, Visual, QA, Publish 중 어느 규칙이 없거나 약한지 찾는다.
+4. **Policy change** — 이 문서 또는 상위 `CONTENT.md`의 기존 절에 일반화된 규칙을 추가한다.
+5. **Good / avoid examples** — 통과 예시와 피해야 할 예시를 같은 판단축으로 작성한다.
+6. **QA translation** — 기계 검사가 가능하면 코드 QA에, 의미 판단이 필요하면 Work QA 체크리스트에 반영한다.
+7. **Regression check** — 새 규칙을 기존 정상 콘텐츠에 적용했을 때 불필요하게 차단하지 않는지 확인한다.
+
+새 정책을 별도 감사·보완 문서에 추가하지 않는다. 제품 원칙은 `docs/03_service_modules/CONTENT.md`, 제작 절차는 이 문서, 큐 선택은 `CONTENT_QUEUE.md`, 이미지 표현은 `CONTENT_EDITORIAL_VISUAL_STANDARD.md`의 기존 관련 절을 직접 수정한다.
+
+### Current problem examples
+
+| 문제 | 원인 | 개선 규칙 | 좋은 예시 | 피할 예시 |
+|---|---|---|---|---|
+| 모든 글의 도입과 소제목이 비슷함 | Template을 문장 양식으로 사용 | Template은 필수 판단 범위만 정하고 문장·블록 수는 Topic 질문에 맞춘다 | “키가 한 번에 돌아가지 않으면 힘을 더 주기 전에…” | “안전을 위해 반드시 점검해야 합니다” 반복 |
+| 상태표가 있지만 행동 차이가 불분명함 | 상태만 나열하고 다음 행동이 없음 | 표는 상태·의미·다음 행동을 함께 제공한다 | 정상 유지 / 추가 확인 / 정비 전환 | 정상 / 비정상만 표시 |
+| 이미지 수를 먼저 정함 | 정보 목적보다 수량을 목표로 함 | 서로 다른 User Question을 해결하는 이미지만 제작한다 | 위치 Hero + 균열 Close-up | 같은 구도의 Hero와 본문 반복 |
+| 전문 점검 문구가 과도함 | 내부 Risk 용어를 사용자 문장에 복사 | 확인된 신호·이유·운행 판단·정비 행동을 구분한다 | “브래킷 균열이 보이면 탈락 위험 때문에 운행 전 정비” | 모든 문단에서 “점검을 중단하세요” |
+| 모델 차이 안내가 상투적으로 반복됨 | 공통 안내와 Topic 고유 차이를 구분하지 않음 | 본문에는 답을 바꾸는 모델 차이만 쓰고 공통 안내는 서비스 공통 영역에 둔다 | 스마트키와 기계식 키의 실제 절차 차이 | “모델마다 다릅니다”만 반복 |
+
+### Change acceptance
+
+정책 변경은 다음을 모두 만족할 때 완료다.
+
+- Source of Truth 원본 문서가 직접 수정됨
+- 관련 Good / avoid example이 있음
+- 기존 QA 또는 Work QA에 판정 방법이 연결됨
+- Content Factory 저장소에 정책 전문 사본을 만들지 않음
+- 실제 콘텐츠 한 건 이상에 새 기준을 적용해 결과를 확인함
