@@ -240,3 +240,91 @@ Factory 책임:
 - 다음 실행 시 시작될 Queue 위치/다음 Candidate
 
 이 규칙의 목적은 사용자가 Queue의 내부 상태를 기억하지 않고도 `다음 콘텐츠 제작`만 요청하면 Factory가 안전하게 이어서 운영되도록 하는 것이다.
+
+## 11. Queue Policy Improvement
+
+### Queue policy review method
+
+Queue 정책도 실제 문제를 기준으로 수정한다. 검토 단위는 제목이 아니라 `customer_question → primary_answer → required_coverage → excluded_claims → risk → priority` 전체다.
+
+정책 개선 시 다음 표를 먼저 작성하고 이 문서의 관련 절을 직접 수정한다.
+
+| 항목 | 질문 |
+|---|---|
+| Observed problem | 실제 Queue에서 어떤 잘못된 선택·중복·우선순위가 발생했는가 |
+| User impact | 사용자가 어떤 답을 중복해서 보거나 필요한 답을 늦게 받는가 |
+| Root cause | 발굴, 등록 Gate, Intent 비교, Priority, Reconciliation 중 어디가 약한가 |
+| Rule | 다음 Candidate에도 적용 가능한 규칙은 무엇인가 |
+| Good example | 질문·답·범위가 분명한 Topic은 무엇인가 |
+| Avoid example | 제목만 있거나 기존 글과 답이 같은 Topic은 무엇인가 |
+| Verification | 등록 전·제작 선택·Outline 후·게시 전 중 어디에서 검사하는가 |
+
+### Current queue problems and improved examples
+
+#### 1. 제목 중심 Topic
+
+피할 예:
+
+```text
+topic: 오토바이 키 점검
+customer_question: 없음
+primary_answer: 없음
+```
+
+좋은 예:
+
+```text
+topic: 오토바이 메인 스위치와 키 작동 상태 확인 방법
+customer_question: 키가 뻑뻑하거나 한 번에 켜지지 않을 때 무엇을 확인해야 할까?
+primary_answer: 키 상태, 예비 키 비교, 핸들락 압력과 전원 반응을 확인하고 강제 조작은 피한다.
+required_coverage: 키 휨·마모, 핸들락 압력, 스위치 주변, 계기판 반응, 스마트키 차이
+excluded_claims: 공구로 키 비틀기, 임의 윤활, 도난방지 우회
+```
+
+등록 Gate는 제목만 있고 핵심 질문·답·필수 범위가 없는 Candidate를 `PLANNED`로 등록하지 않는다.
+
+#### 2. 대상만 같으면 중복으로 판정
+
+피할 판정:
+
+```text
+기존: 타이어 공기압 확인
+신규: 타이어 밸브 스템 균열 확인
+결론: 둘 다 타이어이므로 중복
+```
+
+좋은 판정:
+
+```text
+대상은 타이어로 겹치지만,
+기존은 공기압 측정,
+신규는 밸브 외관과 누기 위험을 확인하므로 OVERLAP_BUT_DISTINCT
+```
+
+Subject 일치만으로 중복 처리하지 않고 질문, 판단, 다음 행동이 같은지 비교한다.
+
+#### 3. Priority 근거 부족
+
+Priority는 콘텐츠를 만들기 쉬운 순서나 이미지 확보 순서가 아니다.
+
+- Priority 1: 안전 오해, 반복 질문, 기존 오류를 바로잡는 주제
+- Priority 2: 공식 근거가 확보된 일반 관리·부품 질문
+- Priority 3: 좁은 Long-tail, 계절성, 선택적 설명
+
+긴급 정정 외에는 동일 Priority에서 `created_at ASC → content_topic_id ASC`를 유지한다. 우선순위를 바꿀 때는 변경 이유를 Queue Artifact 또는 현재 지원되는 운영 기록에 남긴다.
+
+#### 4. 기존 콘텐츠 보강으로 충분한데 신규 URL 생성
+
+기존 문서에 한 섹션, 이미지, 최신 근거를 추가하면 같은 질문을 충분히 해결할 수 있는 경우 `UPDATE_EXISTING`으로 판정한다. 별도 URL은 독자, 상황, 판단 또는 다음 행동이 실질적으로 달라야 한다.
+
+### Registration readiness
+
+Candidate는 다음 조건을 모두 만족한 뒤에만 제작 가능한 `PLANNED`가 된다.
+
+- 사용자 질문이 한 문장으로 구체적임
+- Primary Answer가 질문에 직접 답함
+- Required Coverage와 Excluded Claims가 서로 충돌하지 않음
+- 공식 또는 권위 자료 확보 가능성을 확인함
+- 가장 가까운 기존 Content와의 차이를 설명함
+- Risk와 Automation Level이 저장됨
+- Priority와 그 근거가 정책에 부합함
