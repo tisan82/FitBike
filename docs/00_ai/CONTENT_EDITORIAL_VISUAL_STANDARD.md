@@ -1,6 +1,6 @@
 # FitBike Content Editorial & Visual Standard
 
-**Version:** v1.1
+**Version:** v1.2
 **Status:** Mandatory AI production rule  
 **Scope:** Content Factory의 Writing / Visual Planning / Image QA
 
@@ -18,6 +18,17 @@ H2/H3는 행동형 장문보다 **대상 + 목적**을 우선한다. 예: `타�
 
 ## 4. Real Image First
 실제 부품의 위치·형태·마모·누유·조작부를 알아야 하는 콘텐츠는 실사를 우선한다. 타이어 손상, 브레이크, 스로틀, 등화장치, 누유 위치, 포크 씰, 체인/벨트, 스탠드 등은 실제 구조가 식별되어야 한다. 적합한 실사가 없으면 무관한 기존 사진으로 채우지 않는다.
+
+## 4.1 Approved Manufacturer Assets
+
+FitBike 운영자가 사용 권리를 확인한 Honda, Yamaha, BMW 공식 사이트의 차량·부품·기술 이미지는 `OFFICIAL_APPROVED` 자산으로 우선 활용할 수 있다.
+
+- 특정 모델 외형·부품 위치·차량 크기 예시는 생성 이미지보다 해당 제조사의 공식 실사를 우선한다.
+- 원본 페이지 URL, 원본 이미지 URL, 제조사, 확인 일자, 편집 내용과 사용 콘텐츠를 Asset Source에 기록한다.
+- 공식 자산의 브랜드 표식은 권리 승인 범위 안에서 허용한다. 제3자 워터마크나 판매처 표식은 허용하지 않는다.
+- 외부 hotlink는 금지하며 콘텐츠별 WebP로 변환해 FitBike Storage에서 제공한다.
+- 공식 이미지라도 다른 연식·트림을 현재 예시인 것처럼 표시하지 않는다.
+- Honda·Yamaha·BMW 외 제조사 자산은 기존 권리 확인 절차를 따른다.
 
 ## 5. Image Must Teach
 각 이미지는 다음 중 최소 하나를 명확하게 가르쳐야 한다: `어디를 볼 것인가`, `무엇을 확인할 것인가`, `어떤 상태가 문제인가`. 모바일 390px에서 핵심 대상이 식별되지 않거나 사진만 보고 확인 목적을 설명할 수 없으면 `IMAGE_INFORMATION_VALUE_FAIL`이다.
