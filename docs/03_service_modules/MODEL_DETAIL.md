@@ -14,6 +14,10 @@ Core는 활성 Model-Year와 연결된 활성 Model/Brand, 동일 Model의 활�
 
 정보 순서는 Brand/Model → Year Navigation → 현재 Year → 대표 이미지 → 모델 특징 → 해당 연식의 주요 변경이다. `model_features`와 `major_changes`는 분리하며 NULL인 영역은 만들지 않는다.
 
+모델 특징, 연식별 변경점·특장점·활용도와 기본 타이어 규격은 Model + Year Detail이 소유한다. 같은
+정보를 `모델명 + 타이어 규격 가이드` Content로 반복하지 않는다. 공식 근거로 확인된 설명이 부족하면
+별도 Content URL을 만들기보다 이 화면의 모델 특징과 연식 변경 내용을 우선 보강한다.
+
 ## Image Priority
 
 대표 이미지는 활성 `10_bike_model_year_image`의 `MAIN` 중 `is_primary` 내림차순, `display_order`와 `image_id` 오름차순으로 선택한다. 없으면 `generation_image_url`, 그다음 공통 준비중 asset을 사용한다. 공통 asset이 없으면 CSS placeholder를 표시한다. Storage object path는 공통 helper로 Public URL로 변환하고 DB에 Public URL을 쓰지 않는다. 이미지는 비율 유지, `object-fit: contain`, crop 금지다.
@@ -25,6 +29,11 @@ Core는 활성 Model-Year와 연결된 활성 Model/Brand, 동일 Model의 활�
 Product row는 Brand, Product, schema에 있는 보조 정보를 공통 패턴으로 표시한다. 기존 detail route가 있는 Tire/Battery는 전체 행 링크를 사용한다. Brake detail route가 없으면 허위 링크를 만들지 않는다. Battery와 Brake group은 처음 최대 3개, 나머지는 같은 영역에서 더보기/접기로 점진 공개한다. Tire Product는 Position 규격을 카드마다 반복하지 않고, 모바일에서는 해당 Position 내부의 가로 목록, 넓은 화면에서는 responsive grid로 전체 상품을 표시한다.
 
 Tire Product의 브랜드 표시는 `brand_name`과 등록된 언어별 alias를 정규화한 공통 로컬 asset 경로를 사용하며, asset은 `public/images/brands/tire/{normalized-brand}.png`에 둔다. 로고가 없거나 로드에 실패하면 빈 이미지 영역이나 broken image 대신 기존 브랜드 텍스트를 표시한다. 로고는 상품 식별을 돕는 보조 정보로 제한하고 원본 비율을 유지한다. Tire Product 목록에는 별도의 "호환상품" label을 표시하지 않는다. 별도 pattern field가 없는 동안 Model Detail의 간결한 상품명은 브랜드명 바로 다음 토큰이 제한된 pattern 형식일 때만 사용하고, 불확실하면 원래 `product_name`으로 fallback한다.
+
+모델/연식의 타이어 사이즈 설명 다음에는 같은 `bike_model_year_id`와 명시적으로 연결된 활성 Tire
+Product만 표시한다. 각 상품은 실제 FitBike `/tire-detail/[tireProductId]`로 이동해야 하며, 사이즈가
+같다는 이유로 다른 SKU를 대신 연결하지 않는다. 활성 mapping이 없으면 `등록 상품 없음` 상태를
+보여주고 임의 추천이나 외부 상품 링크를 만들지 않는다.
 
 ## Loading and Empty State
 
