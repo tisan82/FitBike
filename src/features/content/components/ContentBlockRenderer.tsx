@@ -6,6 +6,7 @@ import type { ContentBlock, ContentImage } from "@/features/content/types/conten
 function resolveContentImage(path: string) {
   if (/^https?:\/\//i.test(path)) return path;
   if (path.startsWith("/")) return path;
+  if (path.startsWith("tire-models/")) return getStoragePublicUrl(path, "tire-assets");
   return getStoragePublicUrl(path, "content-assets");
 }
 
