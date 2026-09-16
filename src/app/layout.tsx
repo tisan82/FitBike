@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { GoogleTagManager } from "@next/third-parties/google";
 import { Providers } from "@/app/providers";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DEFAULT_DESCRIPTION, DEFAULT_OG_IMAGE, DEFAULT_TITLE, SITE_ALTERNATE_NAME, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo/site";
@@ -68,5 +69,5 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       },
     ],
   };
-  return <html className="h-full antialiased" lang="ko"><body className="min-h-full"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} /><Providers><AppLayout>{children}</AppLayout></Providers></body></html>;
+  return <html className="h-full antialiased" lang="ko"><GoogleTagManager gtmId="GTM-MCBXG4GH" /><body className="min-h-full"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} /><Providers><AppLayout>{children}</AppLayout></Providers></body></html>;
 }
