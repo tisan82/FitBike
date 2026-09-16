@@ -20,12 +20,14 @@ FitBike Content는 사람들이 실제로 검색하고 궁금해하는 오토바
 2. **Answer in Content** — 핵심 답변과 판단 기준을 본문 안에서 제공한다. 다른 서비스 화면으로 이동해야만 답을 얻을 수 있게 만들지 않는다.
 3. **Optional Connection** — Bike/Part relation은 콘텐츠 이해 또는 후속 확인에 명확한 가치가 있을 때만 사용한다. Relation 존재 자체를 CTA 노출 근거로 사용하지 않는다.
 4. **Official Facts for Model Content** — 특정 오토바이 모델의 제원·규격·정비 기준은 제조사 공식 웹사이트, Owner's Manual, Service/Technical 문서 등 공식 출처를 우선 근거로 사용한다. FitBike DB 값은 콘텐츠 사실의 원천으로 사용하지 않는다.
-5. **No Fitment Content Factory** — FitBike DB의 Tire/Battery/Brake 관계가 존재한다는 이유만으로 모델별 호환·규격 콘텐츠를 자동 생성하지 않는다. 특히 `모델명 + 타이어 규격 가이드`를 FitBike fitment 데이터에서 자동 파생하지 않는다.
+5. **No Fitment Content Factory** — FitBike DB의 Tire/Battery/Brake 관계가 존재한다는 이유만으로 모델별 호환·규격 콘텐츠를 자동 생성하지 않는다. `모델명 + 타이어 규격 가이드`, `모델명 + 타이어 사이즈`, `모델명 + 타이어 규격 확인 방법`처럼 모델명만 바꾸고 같은 규격 읽기 설명을 반복하는 Topic은 등록·제작·게시하지 않는다. 타이어 규격을 읽는 방법은 공통 `PARTS_GUIDE` 한 곳에서 설명한다.
 6. **Model-first Visual** — Model Guide의 대표 이미지는 해당 오토바이 모델 자체가 주 피사체여야 한다. 타이어·배터리·브레이크 제품 이미지를 Model Guide Hero/Thumbnail의 대체물로 사용하지 않는다. 검증된 모델 이미지가 없으면 잘못된 제품 이미지를 넣는 대신 대표 이미지를 생략한다.
 7. **Useful DIY & Maintenance** — 콘텐츠 포트폴리오는 점검 방법, 관리 주기 이해, 이상 징후 판단, 소모품 상태 확인, 기본 DIY 준비와 절차, 규격 읽는 법 등 실제 유지관리 질문을 중심으로 확장한다.
 8. **Reason Before Procedure** — 제목과 첫 요약·도입은 사용자가 이 정보를 찾은 이유에 바로 답한다. 무엇을 확인하는 글인지뿐 아니라 왜 필요한지, 놓쳤을 때 어떤 안전·사용상 문제가 생길 수 있는지를 과장 없이 설명한다.
 9. **Actionable Headings** — 섹션 제목은 `점검할 때 놓치기 쉬운 부분`, `정비소를 찾아야 하는 경우`처럼 다음 행동이 바로 이해되는 표현을 사용한다. 대상과 행동이 불명확한 추상형 제목을 피한다.
 10. **Relatable Rider Context** — 공개된 라이더 경험에서 발견한 공감 가능한 상황·관찰·오해를 FitBike 문장으로 일반화하여 도입과 판단 설명에 활용한다. 개별 후기, 닉네임, URL, 인용문은 저장·노출하지 않으며 경험을 기술 사실이나 발생 빈도의 근거로 사용하지 않는다.
+11. **Model-Year Detail Owns Model Facts** — 모델 특징, 가격 정보, 연식별 변경점·특장점·활용도와 기본 타이어 규격은 별도 반복 콘텐츠가 아니라 해당 Model + Year Detail을 보강한다. 독립 Content URL은 모델 상세로 해결되지 않는 별도의 사용자 질문과 다음 행동이 있을 때만 만든다.
+12. **Mapped Tire Product Connection** — 모델/연식의 타이어 규격을 보여줄 때는 같은 화면에서 `07_bike_model_year_tire_product`의 활성 관계와 `04_tire_product`의 활성 상품만 연결한다. 규격이 같다는 이유로 상품을 추정하지 않으며, 연결 상품이 있으면 실제 FitBike `/tire-detail/[tireProductId]`로 이동할 수 있게 한다. 연결 상품이 없으면 규격만 안내한다.
 
 ## DB Tables
 
@@ -187,6 +189,14 @@ Autonomous Batch의 부족한 Queue를 채우기 위해 FitBike DB의 모델별 
 
 단순히 `모델 + 부품명 + 규격` 조합을 대량 생성하는 것은 Topic 전략으로 사용하지 않는다.
 
+### Tire-size topic ownership
+
+- `타이어 규격 읽는 법`은 차종과 무관한 공통 `PARTS_GUIDE`로만 운영한다.
+- 모델별 앞/뒤 규격, 연식별 변경, 특징과 활용 설명은 Model + Year Detail에 추가한다.
+- 모델/연식 상세의 상품 영역은 명시적인 활성 SKU mapping이 있는 경우에만 FitBike Tire Product Detail로 연결한다.
+- 모델명이 제목에 있고 핵심 답이 앞/뒤 타이어 사이즈 표와 공통 규격 읽기 설명뿐이면 신규 Content가 아니라 Model + Year Detail 보강 대상이다.
+- 예외적으로 별도 모델 콘텐츠를 만들려면 타이어 규격 자체가 아닌 독립 질문, 공식 근거, 모델 상세와 다른 다음 행동을 기록해야 한다.
+
 ## Image Policy
 
 - Maintenance/DIY: 점검 위치, 작업 맥락, 상태 차이를 이해하는 Visual 우선
@@ -205,5 +215,7 @@ Autonomous Batch의 부족한 Queue를 채우기 위해 FitBike DB의 모델별 
 - FitBike DB 기반 문구 제거 필요 여부
 - 독립적인 사용자 검색 가치 존재 여부
 - 가치가 낮거나 공식 근거가 부족하면 수정이 아니라 비활성화/통합 대상인지 판단
+- 공통 규격 읽기 설명은 `타이어 규격 읽는 법`으로 통합하고, 모델 고유 규격·특징은 Model + Year Detail 보강 Backlog로 이관
+- 비활성화한 콘텐츠와 자산은 즉시 삭제하지 않고 이관 검토가 끝날 때까지 보존
 
 신규 Factory는 이 유형을 더 생성하지 않는다.
