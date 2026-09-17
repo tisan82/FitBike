@@ -1,7 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { prepareHoldResumeDecision, retryHoldRestorePath } from "./topic-registry.mjs";
+import { classifyTopicOwnership, prepareHoldResumeDecision, retryHoldRestorePath } from "./topic-registry.mjs";
+
+test("모델 단위 타이어·배터리·브레이크 가이드는 콘텐츠 큐가 아니라 모델/연식 상세가 소유한다", () => {
+  for (const partType of ["TIRE", "BATTERY", "BRAKE"]) {
+    assert.deepEqual(classifyTopicOwnership({ partType, bikeModelKey: "pcx125" }), {
+      owner: "MODEL_YEAR_DETAIL",
+      eligibleForContentQueue: false,
+      reason: "MODEL_SPECIFIC_PART_GUIDE_BELONGS_TO_MODEL_YEAR_DETAIL"
+    });
+  }
+});
+
+test("일반 DIY와 액세서리 주제는 콘텐츠 큐 대상이다", () => {
+  assert.equal(classifyTopicOwnership({ partType: "BATTERY", bikeModelKey: null }).eligibleForContentQueue, true);
+  assert.equal(classifyTopicOwnership({ partType: null, bikeModelKey: null }).eligibleForContentQueue, true);
+});
 
 test("retry-hold Registry 복원은 BLOCKED에서 기존 합법 전이 GENERATING을 사용한다", () => {
   assert.deepEqual(retryHoldRestorePath("BLOCKED"), ["GENERATING"]);

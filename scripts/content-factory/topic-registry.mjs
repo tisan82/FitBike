@@ -100,6 +100,18 @@ function normalizeIntent({ topic, contentType, partType = null, bikeModelKey = n
   return { subject, action, scope: bikeModelKey ? "MODEL" : "GENERIC", contentType, partType: normalizedPart, bikeModelKey };
 }
 
+function classifyTopicOwnership({ partType = null, bikeModelKey = null, normalizedScope = null }) {
+  const modelScoped = Boolean(bikeModelKey) || normalizedScope === "MODEL";
+  if (modelScoped && ["TIRE", "BATTERY", "BRAKE"].includes(partType)) {
+    return {
+      owner: "MODEL_YEAR_DETAIL",
+      eligibleForContentQueue: false,
+      reason: "MODEL_SPECIFIC_PART_GUIDE_BELONGS_TO_MODEL_YEAR_DETAIL"
+    };
+  }
+  return { owner: "CONTENT", eligibleForContentQueue: true, reason: null };
+}
+
 async function managementQuery(query, parameters = [], readOnly = true) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
@@ -157,6 +169,8 @@ async function registerTopic(args) {
   const bikeModelKey = args["bike-model-key"] ?? null;
   const priority = Number(args.priority ?? 2);
   if (!topic || !topicKey || !contentTypes.includes(contentType) || partType && !partTypes.includes(partType) || ![1, 2, 3].includes(priority)) throw new Error("INVALID_TOPIC_INPUT");
+  const ownership = classifyTopicOwnership({ partType, bikeModelKey });
+  if (!ownership.eligibleForContentQueue) return { result: "MODEL_DETAIL_ENRICHMENT", ownership };
   const bike = await resolveBikeModel(bikeModelKey);
   const intent = normalizeIntent({ topic, contentType, partType, bikeModelKey });
   const duplicate = await checkDuplicate(topicKey, topic, intent, bike?.bike_model_id ?? null);
@@ -168,7 +182,7 @@ async function registerTopic(args) {
 }
 
 async function getNextTopic() {
-  const rows = await managementQuery(`select t.content_topic_id,t.topic_key,t.topic,t.content_type,t.part_type,t.bike_model_id,b.model_key as bike_model_key,t.normalized_subject,t.normalized_action,t.normalized_scope,t.status,t.priority,t.automation_level,t.risk_level,t.attempt_count,t.last_error,t.content_id,t.created_at from public."16_content_topic" t left join public."02_bike_model" b on b.bike_model_id=t.bike_model_id where t.status='PLANNED' order by t.priority asc,t.created_at asc,t.content_topic_id asc limit 1`);
+  const rows = await managementQuery(`select t.content_topic_id,t.topic_key,t.topic,t.content_type,t.part_type,t.bike_model_id,b.model_key as bike_model_key,t.normalized_subject,t.normalized_action,t.normalized_scope,t.status,t.priority,t.automation_level,t.risk_level,t.attempt_count,t.last_error,t.content_id,t.created_at from public."16_content_topic" t left join public."02_bike_model" b on b.bike_model_id=t.bike_model_id where t.status='PLANNED' and not (t.normalized_scope='MODEL' and t.part_type in ('TIRE','BATTERY','BRAKE')) order by t.priority asc,t.created_at asc,t.content_topic_id asc limit 1`);
   return { result: rows[0] ?? null };
 }
 
@@ -305,4 +319,4 @@ if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main
   process.exitCode = 1;
 });
 
-export { prepareHoldResumeDecision, retryHoldRestorePath };
+export { classifyTopicOwnership, prepareHoldResumeDecision, retryHoldRestorePath };

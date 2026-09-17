@@ -137,24 +137,26 @@ Exact title match만 검사해서는 안 된다.
 때만 신규 Content를 만든다. 통합 시 더 강한 Canonical을 유지하고 고유 정보를 합친 뒤 Relation,
 내부 링크, Redirect 또는 비활성 상태를 함께 정리한다.
 
-### Model-specific tire-size hard gate
+### Model-specific tire, battery, and brake hard gate
 
-다음 조건을 모두 만족하면 표현이 달라도 신규 Content Candidate가 아니다.
+특정 모델 또는 모델/연식의 타이어·배터리·브레이크 정보는 표현이 달라도 신규 Content Candidate가
+아니다. 규격, 호환 제품, 장착 위치와 연식별 차이는 Model + Year Detail이 소유한다.
 
-- `normalized_scope = MODEL`이거나 제목이 특정 모델명을 대상으로 함
-- 핵심 질문이 앞/뒤 타이어 규격·사이즈 확인임
-- Primary Answer가 규격표와 공통 타이어 표기 읽는 법으로 끝남
+- `normalized_scope = MODEL`이거나 특정 모델명이 대상이고
+- 핵심 질문이 타이어 규격·사이즈, 배터리 규격·단자·호환, 브레이크 패드 규격·호환 중 하나이면
+- Content Queue에 등록하지 않고 `MODEL_DETAIL_ENRICHMENT`로 분류한다.
 
-이 Candidate는 `MODEL_VARIANT`로 통과시키지 않고 `MODEL_DETAIL_ENRICHMENT`로 분류한다. 모델/연식별
-규격·특징·변경점은 Model + Year Detail 보강 Backlog로 보내고, 타이어 표기 읽는 법은 기존 공통
-가이드로 연결한다. Queue 등록 전, Candidate 선택, Outline 완성 후, Publish 직전 네 Gate 모두에서
-같은 규칙을 확인한다.
+모델/연식별 규격·특징·변경점은 Model + Year Detail 보강 Backlog로 보낸다. 공통 원리와 DIY 확인
+방법만 Content로 제작한다. Queue 등록 전, Candidate 선택, Outline 완성 후, Publish 직전 네 Gate
+모두에서 같은 규칙을 확인한다.
 
 좋은 예:
 
 ```text
 타이어 규격 읽는 법 → GENERIC PARTS_GUIDE
 CBR650R 2024년형 앞/뒤 규격과 연결 상품 → Model + Year Detail 보강
+PCX125 연식별 배터리 규격 → Model + Year Detail 보강
+NMAX125 앞/뒤 브레이크 패드 호환 정보 → Model + Year Detail 보강
 ```
 
 피할 예:
@@ -162,7 +164,23 @@ CBR650R 2024년형 앞/뒤 규격과 연결 상품 → Model + Year Detail 보�
 ```text
 CBR650R 타이어 규격 가이드 → 별도 MODEL_GUIDE URL 생성
 투오노 125 타이어 규격 확인 방법 → 공통 규격 읽기 설명을 모델명만 바꿔 반복
+PCX125 브레이크 패드 가이드 → 모델 상세 정보를 별도 콘텐츠로 중복
+XMAX300 배터리 가이드 → 모델 상세 정보를 별도 콘텐츠로 중복
 ```
+
+### DIY and accessory topic preference
+
+신규 Candidate는 사용자가 직접 수행할 수 있는 관리·확인 작업과 액세서리 사용 질문을 우선한다.
+
+- DIY: 세척, 윤활, 교체 전 준비, 기본 공구 사용, 보관, 장착 후 재확인처럼 안전 범위가 명확한 작업
+- 액세서리: 커버, 탑박스, 캐리어, 거치대, USB 전원, 윈드스크린, 핸드가드, 잠금장치, 보호장비의
+  선택 기준·장착 전 확인·사용 중 점검
+- 모든 DIY는 준비물, 작업 전 조건, 단계, 실수하기 쉬운 부분, 완료 확인, 작업을 멈추고 정비가
+  필요한 기준을 포함한다.
+- 제동계 분해, 연료계 분해, 조향·스로틀 임의 조정처럼 사고 위험이 큰 작업은 일반 DIY 후보로
+  자동 등록하지 않는다.
+- 특정 제품 추천이나 순위를 만들지 않고 호환 조건, 규격 확인, 설치 공간, 고정 방식과 사용상
+  주의점을 설명한다.
 
 ## 5. Continue, Do Not Stop
 
