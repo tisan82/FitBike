@@ -69,5 +69,28 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       },
     ],
   };
-  return <html className="h-full antialiased" lang="ko"><GoogleTagManager gtmId="GTM-MCBXG4GH" /><body className="min-h-full"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} /><Providers><AppLayout>{children}</AppLayout></Providers></body></html>;
+
+  return (
+    <html className="h-full antialiased" lang="ko">
+      <GoogleTagManager gtmId="GTM-MCBXG4GH" />
+      <body className="min-h-full">
+        <noscript>
+          <iframe
+            height="0"
+            src="https://www.googletagmanager.com/ns.html?id=GTM-MCBXG4GH"
+            style={{ display: "none", visibility: "hidden" }}
+            title="Google Tag Manager"
+            width="0"
+          />
+        </noscript>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+        />
+        <Providers>
+          <AppLayout>{children}</AppLayout>
+        </Providers>
+      </body>
+    </html>
+  );
 }
