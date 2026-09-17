@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # FitBike Codex Development Rules
 
-**Version:** v1.0\
+**Version:** v1.1\
 **Status:** Baseline
 
 ## Role
@@ -100,6 +100,57 @@ Before changing a customer-facing public page, review `SEO_GEO.md`. Update it wi
 8.  Review whether the Task established persistent development knowledge.
 9.  Update the appropriate existing Source of Truth when required.
 10. Report result.
+
+## Execution level and efficiency
+
+Choose the smallest execution level that can complete the Task safely. State
+the chosen level only when work begins; do not ask the user to choose it.
+
+-   `FAST`: one file, one record, one content asset, or a narrowly scoped
+    correction with no contract/schema impact. Read only the owning policy and
+    target implementation. Validate the changed artifact and its direct user
+    path.
+-   `STANDARD`: several related files or a customer-facing behavior change.
+    Read the relevant Service Module and framework documents. Run targeted
+    tests first, then broader checks only when the affected boundary requires
+    them.
+-   `AUDIT`: schema, authentication, security, shared architecture, migrations,
+    bulk data changes, or broad regressions. Perform full dependency review,
+    broader tests, and explicit rollback/Production verification.
+
+The level may be raised when inspection reveals wider impact. Never lower
+these quality gates:
+
+-   Resolve the exact target and current state before mutation.
+-   Preserve unrelated user changes and use recoverable changes.
+-   Verify the affected user-visible path, not only the command exit code.
+-   For runtime or Production data changes, verify the deployed commit/data and
+    public result before reporting completion.
+-   Treat failed checks, ambiguous ownership, or cross-cutting dependencies as
+    reasons to expand inspection and validation.
+
+Token and latency rules:
+
+-   Use scoped `rg` searches and targeted file reads; do not dump or rescan the
+    repository when the target is known.
+-   Do not reread unchanged documents already loaded in the same logical Task.
+-   Query only required database rows and columns; avoid broad payloads.
+-   Use web research only for current, external, official, uncertain, or
+    high-stakes facts. Prefer primary sources.
+-   Summarize large command/tool output and retain only evidence needed for the
+    decision.
+-   Do not create a new policy document when an existing Source of Truth can be
+    updated.
+-   Keep progress updates event-based: scope decision, material finding,
+    blocker, and completion. Do not narrate routine commands.
+-   Do not delegate a small sequential Task. Parallelize only independent work
+    whose saved time exceeds coordination cost.
+
+Validation follows the execution level. Documentation-only `FAST` changes use
+`git diff --check` plus a content review. Code changes use the narrowest
+relevant lint/test first. Run the full build or regression suite for shared
+runtime boundaries, release risk, or when targeted checks cannot establish
+confidence.
 
 ## Persistent development knowledge
 
