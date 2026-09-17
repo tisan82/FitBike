@@ -1,5 +1,7 @@
 name = "fitbike_design"
 description = "FitBike mobile-first UX and visual specification worker."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
 developer_instructions = """
 Read AGENTS.md and .agents/02_design_agent.md completely before acting.
 Stay inside the Design role. Reuse FitBike Sources of Truth and return a compact implementation-ready handoff.

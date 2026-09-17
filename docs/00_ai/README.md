@@ -30,7 +30,11 @@
 | PM | `.agents/01_pm_agent.md` | 사용자 문제, 정책 소유권, 수용 기준 |
 | Design | `.agents/02_design_agent.md` | 모바일 UX, 정보 구조, 접근성, Visual 명세 |
 | Development | `.agents/03_dev_agent.md` | 코드·DB·API·Storage·통합 구현 |
-| QA | `.agents/04_qa_agent.md` | 독립 검증, Production 무결성, 사용자 여정 |
+| QA Router | `.agents/04_qa_agent.md` | 검증 범위 선택과 결과 통합 |
+| Fitment·DB QA | `.agents/05_fitment_db_qa_agent.md` | Fitment, schema, mapping, RLS, data integrity |
+| UI·SEO QA | `.agents/06_ui_seo_qa_agent.md` | 모바일 UI, 접근성, 공개 route, SEO, asset |
+| Release QA | `.agents/07_release_qa_agent.md` | GitHub, Vercel, Supabase, Storage, Production 일치 |
+| Audit Reviewer | `.agents/08_audit_reviewer.md` | 해결되지 않은 고위험 교차 시스템 검토 |
 
 역할 문서는 기존 Product/Framework/Service Module/Schema 정책을 실행하는 방법이며 새로운 정책
 원본이 아니다. 실제 Codex Custom Agent 등록은 `.codex/agents/*.toml`이 담당한다. `FAST` 작업은

@@ -1,7 +1,7 @@
-# FitBike QA Agent
+# FitBike QA Router
 
-**Purpose:** Verify the requested outcome independently from the implementation
-claim and protect Production integrity.  
+**Purpose:** Select the smallest independent QA boundary that can verify the
+requested outcome and protect Production integrity.
 **Does not:** Approve by file count, command success alone, or a numeric content
 score that hides a critical failure.
 
@@ -23,7 +23,20 @@ the affected boundary.
 6. For deployed changes, verify the exact Production commit/data, public URL,
    rendered content, assets, and applicable SEO endpoints.
 
-## FitBike QA Coverage
+## QA Routing
+
+- Use `fitbike_fitment_db_qa` for model/year/product fitment, schema, migration,
+  RLS, mappings, or Production data integrity.
+- Use `fitbike_ui_seo_qa` for responsive UI, accessibility, public route
+  rendering, images, metadata, canonical, JSON-LD, sitemap, or RSS.
+- Use `fitbike_release_qa` for commit/deployment identity, Vercel readiness,
+  Supabase/Storage/public consistency, rollback, or release completion.
+- Invoke only relevant QA agents. A documentation-only change normally needs
+  the orchestration validator, not all three QA agents.
+- When two or three QA scopes are independent, run them in parallel and let the
+  Orchestrator merge their compact results.
+
+## Shared QA Coverage
 
 - **Fitment:** exact model/year/SKU identifiers, active explicit mappings,
   position, specification, and no inferred compatibility.

@@ -1,0 +1,39 @@
+name: Agent Orchestration QA
+
+on:
+  pull_request:
+    paths:
+      - "AGENTS.md"
+      - ".agents/**"
+      - ".codex/**"
+      - "docs/00_ai/README.md"
+      - "docs/tasks/**"
+      - "scripts/agent-orchestration/**"
+      - ".github/workflows/agent-orchestration-qa.yml"
+      - "package.json"
+  push:
+    branches: [main]
+    paths:
+      - "AGENTS.md"
+      - ".agents/**"
+      - ".codex/**"
+      - "docs/00_ai/README.md"
+      - "docs/tasks/**"
+      - "scripts/agent-orchestration/**"
+      - ".github/workflows/agent-orchestration-qa.yml"
+      - "package.json"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run agent:validate
+      - run: npm run test:agent-orchestration

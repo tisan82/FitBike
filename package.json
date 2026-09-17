@@ -10,6 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "agent:validate": "node scripts/agent-orchestration/validate.mjs",
+    "test:agent-orchestration": "node --test scripts/agent-orchestration/validate.test.mjs",
     "content:qa": "node scripts/content-factory/content-quality-gate.mjs",
     "test:content-qa": "node --test scripts/content-factory/content-quality-gate.test.mjs",
     "test:content-api-boundary": "node --test scripts/content-factory/content-factory-api-boundary.test.mjs",

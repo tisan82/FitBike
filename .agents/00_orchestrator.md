@@ -60,7 +60,12 @@ Production impact:
 - `fitbike_design`: IA, component behavior, mobile UX, accessibility, visual
   evidence. Skip when UI/visual behavior does not change.
 - `fitbike_dev`: code, configuration, migration, data, Storage, integration.
-- `fitbike_qa`: independent semantic and runtime verification.
+- `fitbike_fitment_db_qa`: fitment, schema, RLS, mappings, and data integrity.
+- `fitbike_ui_seo_qa`: mobile UI, accessibility, public routes, assets, and SEO.
+- `fitbike_release_qa`: GitHub, Vercel, Supabase, Storage, and public release
+  consistency.
+- `fitbike_audit_reviewer`: final cross-system review only for unresolved
+  high-risk `AUDIT` decisions.
 
 Use the project-scoped custom agents under `.codex/agents/`. Their detailed
 execution playbooks remain under `.agents/` and are not policy Sources of Truth.
@@ -78,22 +83,25 @@ the failing or high-risk stage, not the whole pipeline.
 | Work | Default | Escalate when |
 | --- | --- | --- |
 | Deterministic inventory, extraction, formatting, metadata, log summary | `gpt-5.6-luna`, `low` | Ambiguous evidence or conflicting results |
-| PM scope and routine product analysis | `gpt-5.6-terra`, `medium` | Cross-policy ambiguity → `gpt-5.6-sol`, `high` |
-| Routine UI/design specification | `gpt-5.6-terra`, `medium` | New IA or difficult tradeoff → `gpt-5.6-sol`, `high` |
-| Normal implementation and focused debugging | `gpt-5.6-terra`, `medium` | Shared runtime, complex failure, or wide refactor → `gpt-5.6-sol`, `high` |
-| Targeted QA and regression scan | `gpt-5.6-terra`, `medium` | Fitment, DB, auth, security, release conflict, or repeated failure → `gpt-5.6-sol`, `high` |
-| Cross-system `AUDIT` integration or unresolved high-risk decision | `gpt-6-astra`, `high` | Use only when Sol cannot establish safe confidence |
+| PM, Design, and Development custom agents | Agent file default: `gpt-5.6-terra`, `medium` | Use a separately spawned Sol reviewer for a bounded difficult question |
+| UI·SEO QA | Agent file default: `gpt-5.6-terra`, `medium` | Route an unresolved high-risk conflict to Audit Reviewer |
+| Fitment·DB QA and Release QA | Agent file default: `gpt-5.6-sol`, `high` | Route only unresolved cross-system risk to Audit Reviewer |
+| Cross-system `AUDIT` review | `fitbike_audit_reviewer`: `gpt-6-astra`, `high` | Use only after normal specialist evidence is insufficient |
 
 Rules:
 
 - `FAST` normally uses the current parent model and no subagent.
+- Every custom Agent declares its own stable default `model` and
+  `model_reasoning_effort`. If the Orchestrator omits a model, the Agent file
+  remains deterministic instead of silently inheriting an arbitrary parent.
 - Do not use `max`, `xhigh`, or `ultra` by default.
 - Use `ultra` only for a genuinely parallel, high-value `AUDIT` with independent
   branches of work.
 - A higher model reviews the compact evidence and diff; it does not repeat every
   prior repository read.
-- If a preferred model is unavailable, inherit the parent model at the same or
-  nearest supported reasoning effort and continue.
+- If a configured model is unavailable, use `.codex/config.toml` defaults
+  (`gpt-5.6-terra`, `medium`), record `MODEL_FALLBACK`, and continue. Escalate to
+  the parent only when the fallback cannot satisfy the acceptance criteria.
 
 ## 5. File-Based Handoff Without Document Inflation
 

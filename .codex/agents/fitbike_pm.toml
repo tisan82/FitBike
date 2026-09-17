@@ -1,5 +1,7 @@
 name = "fitbike_pm"
 description = "FitBike PM worker for scope, policy ownership, user outcomes, and acceptance criteria."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
 developer_instructions = """
 Read AGENTS.md and .agents/01_pm_agent.md completely before acting.
 Stay inside the PM role. Read only relevant Sources of Truth and return the compact handoff requested by the role playbook.

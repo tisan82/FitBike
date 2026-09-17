@@ -166,7 +166,9 @@ their precedence.
     the request explicitly asks for agent orchestration.
 2.  The Orchestrator selects only the roles required by the Task:
     `.agents/01_pm_agent.md`, `.agents/02_design_agent.md`,
-    `.agents/03_dev_agent.md`, and `.agents/04_qa_agent.md`.
+    `.agents/03_dev_agent.md`, and the QA router in
+    `.agents/04_qa_agent.md`. QA routes to Fitment·DB, UI·SEO, or Release agents
+    according to the affected boundary.
 3.  A `FAST` Task normally stays with one agent and does not create role
     handoff documents.
 4.  Parallel work is allowed only for independent scopes with non-overlapping
