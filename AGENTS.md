@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # FitBike Codex Development Rules
 
-**Version:** v1.1\
+**Version:** v1.3\
 **Status:** Baseline
 
 ## Role
@@ -73,8 +73,10 @@ Before changing a customer-facing public page, review `SEO_GEO.md`. Update it wi
 
 ## Database guardrails
 
--   No table/column create, rename, or drop without explicit approval.
--   No production data mutation unless explicitly requested.
+-   Create, rename, or drop a table/column only when the current Task requires it,
+    the exact deployed schema is verified, and a safe migration path exists.
+-   Mutate Production data only when it is necessary to complete the current
+    Task, using exact targets and pre/post verification.
 -   Use exact identifiers from the current Supabase schema.
 -   Documentation examples are not schema truth.
 -   Avoid `SELECT *` when required fields are known.
@@ -85,7 +87,8 @@ Before changing a customer-facing public page, review `SEO_GEO.md`. Update it wi
 
 -   `/api/v1` is the baseline public API version.
 -   Preserve contracts unless the Task explicitly changes them.
--   No field removal/rename/type change without approval.
+-   Remove, rename, or change a field type only when the current Task requires
+    it and affected consumers plus the migration/compatibility path are verified.
 -   Keep business/data logic out of page components.
 
 ## Task execution
@@ -152,6 +155,32 @@ relevant lint/test first. Run the full build or regression suite for shared
 runtime boundaries, release risk, or when targeted checks cannot establish
 confidence.
 
+## Agent orchestration
+
+This repository uses one accountable Orchestrator with selectively invoked
+roles. Role files under `.agents/` are execution playbooks, not new Sources of
+Truth. Product, framework, service-module, and deployed-schema documents keep
+their precedence.
+
+1.  Read `.agents/00_orchestrator.md` for `STANDARD` and `AUDIT` Tasks, or when
+    the request explicitly asks for agent orchestration.
+2.  The Orchestrator selects only the roles required by the Task:
+    `.agents/01_pm_agent.md`, `.agents/02_design_agent.md`,
+    `.agents/03_dev_agent.md`, and `.agents/04_qa_agent.md`.
+3.  A `FAST` Task normally stays with one agent and does not create role
+    handoff documents.
+4.  Parallel work is allowed only for independent scopes with non-overlapping
+    write ownership. Sequential dependencies use compact handoffs instead.
+5.  The Orchestrator owns the final scope, conflict resolution, integration,
+    validation level, Production status, and user report.
+6.  Role outputs are temporary unless they establish durable policy. Use one
+    `docs/tasks/<task-slug>/WORK.md` for a normal persistent handoff and separate
+    artifacts only for material `AUDIT` stages. Do not create ceremonial files.
+7.  Use `.codex/agents/*.toml` for actual Codex custom-agent registration;
+    `.agents/*.md` holds the detailed FitBike role playbooks.
+8.  The user's build/fix/apply/publish/deploy request authorizes the necessary
+    pipeline actions. Do not insert a second stage-approval checkpoint.
+
 ## Persistent development knowledge
 
 After implementation and validation, determine whether the Task established a Product, UX/UI, Architecture, Data, or API rule that future Tasks must follow. Do not leave such policy only in code, conversation, or a Task result. Update the smallest appropriate existing Source of Truth document instead of creating a duplicate document.
@@ -165,7 +194,7 @@ Classify decisions before documenting them:
 
 Do not duplicate the same policy across Global and Service Module documents. If no persistent rule was established, report `Documentation Update: NONE`. When a major service gains durable Product/UX/Data contracts and has no Service Module, propose one; do not create it merely because a screen exists.
 
-If a Task conflicts with an existing Source of Truth, report `POLICY CONFLICT` with the existing rule, requested rule, and impact, then wait for a decision. Do not override a Global policy with a Feature requirement without explicit approval. If code and documentation materially differ, report `DOCUMENTATION DRIFT` and follow the Source of Truth precedence above rather than guessing which is correct.
+If a Task conflicts with an existing Source of Truth, report `POLICY CONFLICT` with the existing rule, requested rule, and impact. Apply the user's current instruction when it clearly changes that policy; otherwise preserve the higher-level Source of Truth. If code and documentation materially differ, report `DOCUMENTATION DRIFT` and follow the Source of Truth precedence above rather than guessing which is correct.
 
 ## Normal local validation
 
@@ -178,17 +207,17 @@ If a Task conflicts with an existing Source of Truth, report `POLICY CONFLICT` w
 
 These instructions do not override IDE/OS permission prompts.
 
-## Explicit approval required
+## Autonomous execution authority
 
--   `git push`
--   deployment
--   destructive Git operations
--   package install/remove
--   environment variable changes
--   Supabase schema/data mutation
--   Supabase Storage upload/move/delete
--   bulk deletion
--   broad refactoring outside Task scope
+-   The user's current request is the authority for all necessary actions within
+    its reasonable scope; do not ask for redundant confirmation between stages.
+-   When completion clearly requires it, commit, push, deploy, migrate, mutate
+    exact data/Storage targets, and verify Production autonomously.
+-   Package or environment changes must be required by the Task, minimal, and
+    verified; do not add dependencies for convenience alone.
+-   Stop only for missing credentials/permissions, ambiguous targets, an
+    unrecoverable destructive action, or unresolved policy/schema/security
+    conflict. Report these as blockers rather than approval requests.
 
 ## Completion report
 

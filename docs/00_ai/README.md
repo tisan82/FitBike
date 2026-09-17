@@ -20,6 +20,25 @@
 
 `AGENTS.md`가 AI 작업의 최상위 진입점이다.
 
+## Development Agent Orchestration
+
+개발 작업은 루트 `AGENTS.md`와 `.agents/00_orchestrator.md`를 중심으로 필요한 역할만 선택한다.
+
+| 역할 | 실행 지침 | 주요 책임 |
+| --- | --- | --- |
+| Orchestrator | `.agents/00_orchestrator.md` | 범위·실행 등급·역할·통합·최종 상태 |
+| PM | `.agents/01_pm_agent.md` | 사용자 문제, 정책 소유권, 수용 기준 |
+| Design | `.agents/02_design_agent.md` | 모바일 UX, 정보 구조, 접근성, Visual 명세 |
+| Development | `.agents/03_dev_agent.md` | 코드·DB·API·Storage·통합 구현 |
+| QA | `.agents/04_qa_agent.md` | 독립 검증, Production 무결성, 사용자 여정 |
+
+역할 문서는 기존 Product/Framework/Service Module/Schema 정책을 실행하는 방법이며 새로운 정책
+원본이 아니다. 실제 Codex Custom Agent 등록은 `.codex/agents/*.toml`이 담당한다. `FAST` 작업은
+역할을 분리하지 않고 최소 범위로 처리한다. `STANDARD`는 필요한 역할이 둘 이상일 때 하나의
+`docs/tasks/<task-slug>/WORK.md`만 사용하고, `AUDIT`에서 장기 보관 가치가 있을 때만 별도 Plan,
+Design Spec, QA Report를 만든다. 단계별 승인 요청은 만들지 않고 사용자 요청 범위 안에서 구현,
+검증, 배포까지 자율 실행한다.
+
 Task에서 확정된 지속 정책은 새 문서를 만들기 전에 위 Source of Truth에
 다음 기준으로 반영한다.
 
