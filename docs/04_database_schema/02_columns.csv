@@ -182,3 +182,134 @@ public,11_tire_model,18,feature_3_description,text,text,null,null,null,YES,null
 public,11_tire_model,19,main_image_url,text,text,null,null,null,YES,null
 public,11_tire_model,20,sub_image_url_1,text,text,null,null,null,YES,null
 public,11_tire_model,21,sub_image_url_2,text,text,null,null,null,YES,null
+public,12_content,1,content_id,bigint,int8,null,64,0,NO,null
+public,12_content,2,content_key,text,text,null,null,null,NO,null
+public,12_content,3,title,text,text,null,null,null,NO,null
+public,12_content,4,summary,text,text,null,null,null,NO,null
+public,12_content,5,content_type,text,text,null,null,null,NO,null
+public,12_content,6,thumbnail_image_storage_path,text,text,null,null,null,YES,null
+public,12_content,7,hero_image_storage_path,text,text,null,null,null,YES,null
+public,12_content,8,body_blocks,jsonb,jsonb,null,null,null,NO,'[]'::jsonb
+public,12_content,9,is_active,boolean,bool,null,null,null,NO,true
+public,12_content,10,published_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,12_content,11,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,12_content,12,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,13_content_bike_model,1,content_bike_model_id,bigint,int8,null,64,0,NO,null
+public,13_content_bike_model,2,content_id,bigint,int8,null,64,0,NO,null
+public,13_content_bike_model,3,bike_model_id,bigint,int8,null,64,0,NO,null
+public,13_content_bike_model,4,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,14_content_bike_model_year,1,content_bike_model_year_id,bigint,int8,null,64,0,NO,null
+public,14_content_bike_model_year,2,content_id,bigint,int8,null,64,0,NO,null
+public,14_content_bike_model_year,3,bike_model_year_id,bigint,int8,null,64,0,NO,null
+public,14_content_bike_model_year,4,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,15_content_part_link,1,content_part_link_id,bigint,int8,null,64,0,NO,null
+public,15_content_part_link,2,content_id,bigint,int8,null,64,0,NO,null
+public,15_content_part_link,3,part_type,text,text,null,null,null,NO,null
+public,15_content_part_link,4,scope_type,text,text,null,null,null,NO,null
+public,15_content_part_link,5,tire_model_id,bigint,int8,null,64,0,YES,null
+public,15_content_part_link,6,tire_product_id,bigint,int8,null,64,0,YES,null
+public,15_content_part_link,7,battery_product_id,bigint,int8,null,64,0,YES,null
+public,15_content_part_link,8,brake_product_id,bigint,int8,null,64,0,YES,null
+public,15_content_part_link,9,display_order,integer,int4,null,32,0,NO,0
+public,15_content_part_link,10,is_active,boolean,bool,null,null,null,NO,true
+public,15_content_part_link,11,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,15_content_part_link,12,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,16_content_topic,1,content_topic_id,bigint,int8,null,64,0,NO,null
+public,16_content_topic,2,topic_key,text,text,null,null,null,NO,null
+public,16_content_topic,3,topic,text,text,null,null,null,NO,null
+public,16_content_topic,4,content_type,text,text,null,null,null,NO,null
+public,16_content_topic,5,part_type,text,text,null,null,null,YES,null
+public,16_content_topic,6,bike_model_id,bigint,int8,null,64,0,YES,null
+public,16_content_topic,7,normalized_subject,text,text,null,null,null,NO,null
+public,16_content_topic,8,normalized_action,text,text,null,null,null,NO,null
+public,16_content_topic,9,normalized_scope,text,text,null,null,null,NO,null
+public,16_content_topic,10,status,text,text,null,null,null,NO,'PLANNED'::text
+public,16_content_topic,11,priority,integer,int4,null,32,0,NO,2
+public,16_content_topic,12,content_id,bigint,int8,null,64,0,YES,null
+public,16_content_topic,13,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,16_content_topic,14,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,16_content_topic,15,automation_level,text,text,null,null,null,NO,'L1'::text
+public,16_content_topic,16,risk_level,text,text,null,null,null,NO,'MEDIUM'::text
+public,16_content_topic,17,attempt_count,integer,int4,null,32,0,NO,0
+public,16_content_topic,18,last_error,text,text,null,null,null,YES,null
+public,16_content_topic,19,customer_question,text,text,null,null,null,YES,null
+public,16_content_topic,20,primary_answer,text,text,null,null,null,YES,null
+public,16_content_topic,21,required_coverage,jsonb,jsonb,null,null,null,NO,'[]'::jsonb
+public,16_content_topic,22,excluded_claims,jsonb,jsonb,null,null,null,NO,'[]'::jsonb
+public,16_content_topic,23,target_reader,text,text,null,null,null,NO,'GENERAL'::text
+public,16_content_topic,24,content_goal,text,text,null,null,null,NO,'UNDERSTAND'::text
+public,17_content_asset_source,1,content_asset_source_id,bigint,int8,null,64,0,NO,null
+public,17_content_asset_source,2,content_id,bigint,int8,null,64,0,YES,null
+public,17_content_asset_source,3,content_key,text,text,null,null,null,NO,null
+public,17_content_asset_source,4,asset_role,text,text,null,null,null,NO,null
+public,17_content_asset_source,5,asset_key,text,text,null,null,null,NO,null
+public,17_content_asset_source,6,storage_path,text,text,null,null,null,YES,null
+public,17_content_asset_source,7,source_type,text,text,null,null,null,NO,null
+public,17_content_asset_source,8,source_page_url,text,text,null,null,null,YES,null
+public,17_content_asset_source,9,source_asset_url,text,text,null,null,null,YES,null
+public,17_content_asset_source,10,source_owner,text,text,null,null,null,YES,null
+public,17_content_asset_source,11,license_name,text,text,null,null,null,YES,null
+public,17_content_asset_source,12,license_url,text,text,null,null,null,YES,null
+public,17_content_asset_source,13,rights_status,text,text,null,null,null,NO,'PENDING_REVIEW'::text
+public,17_content_asset_source,14,permission_contact,text,text,null,null,null,YES,null
+public,17_content_asset_source,15,permission_note,text,text,null,null,null,YES,null
+public,17_content_asset_source,16,edited,boolean,bool,null,null,null,NO,false
+public,17_content_asset_source,17,edit_description,text,text,null,null,null,YES,null
+public,17_content_asset_source,18,used_in_service,boolean,bool,null,null,null,NO,false
+public,17_content_asset_source,19,first_used_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,17_content_asset_source,20,last_checked_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,17_content_asset_source,21,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,17_content_asset_source,22,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,20_service_shop,1,service_shop_id,bigint,int8,null,64,0,NO,null
+public,20_service_shop,2,shop_name,text,text,null,null,null,NO,null
+public,20_service_shop,3,address,text,text,null,null,null,NO,null
+public,20_service_shop,4,road_address,text,text,null,null,null,YES,null
+public,20_service_shop,5,latitude,double precision,float8,null,53,null,YES,null
+public,20_service_shop,6,longitude,double precision,float8,null,53,null,YES,null
+public,20_service_shop,7,phone,text,text,null,null,null,YES,null
+public,20_service_shop,8,business_hours,jsonb,jsonb,null,null,null,YES,null
+public,20_service_shop,9,description,text,text,null,null,null,YES,null
+public,20_service_shop,10,naver_place_url,text,text,null,null,null,YES,null
+public,20_service_shop,11,website_url,text,text,null,null,null,YES,null
+public,20_service_shop,12,source_type,text,text,null,null,null,NO,'PUBLIC_WEB'::text
+public,20_service_shop,13,source_reference,text,text,null,null,null,YES,null
+public,20_service_shop,14,external_rating,numeric,numeric,null,2,1,YES,null
+public,20_service_shop,15,external_review_count,integer,int4,null,32,0,YES,null
+public,20_service_shop,16,review_summary,text,text,null,null,null,YES,null
+public,20_service_shop,17,review_keywords,ARRAY,_text,null,null,null,NO,'{}'::text[]
+public,20_service_shop,18,review_source_count,integer,int4,null,32,0,NO,0
+public,20_service_shop,19,review_checked_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,20_service_shop,20,verification_status,text,text,null,null,null,NO,'DISCOVERED'::text
+public,20_service_shop,21,verified_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,20_service_shop,22,is_active,boolean,bool,null,null,null,NO,true
+public,20_service_shop,23,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,20_service_shop,24,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,20_service_shop,25,sido_name,text,text,null,null,null,YES,null
+public,20_service_shop,26,sigungu_name,text,text,null,null,null,YES,null
+public,20_service_shop,27,subdistrict_name,text,text,null,null,null,YES,null
+public,20_service_shop,28,dong_name,text,text,null,null,null,YES,null
+public,20_service_shop,29,kakao_place_id,text,text,null,null,null,YES,null
+public,20_service_shop,30,kakao_place_url,text,text,null,null,null,YES,null
+public,20_service_shop,31,kakao_category_name,text,text,null,null,null,YES,null
+public,20_service_shop,32,discovery_query,text,text,null,null,null,YES,null
+public,20_service_shop,33,discovered_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,20_service_shop,34,last_verified_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,21_service_shop_service,1,service_shop_service_id,bigint,int8,null,64,0,NO,null
+public,21_service_shop_service,2,service_shop_id,bigint,int8,null,64,0,NO,null
+public,21_service_shop_service,3,service_type,text,text,null,null,null,NO,null
+public,21_service_shop_service,4,verification_status,text,text,null,null,null,NO,'DISCOVERED'::text
+public,21_service_shop_service,5,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,21_service_shop_service,6,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,22_service_shop_discovery_checkpoint,1,checkpoint_id,smallint,int2,null,16,0,NO,1
+public,22_service_shop_discovery_checkpoint,2,target_index,integer,int4,null,32,0,NO,0
+public,22_service_shop_discovery_checkpoint,3,cycle_no,integer,int4,null,32,0,NO,1
+public,22_service_shop_discovery_checkpoint,4,last_target,text,text,null,null,null,YES,null
+public,22_service_shop_discovery_checkpoint,5,last_started_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,22_service_shop_discovery_checkpoint,6,last_completed_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,22_service_shop_discovery_checkpoint,7,last_status,text,text,null,null,null,NO,'IDLE'::text
+public,22_service_shop_discovery_checkpoint,8,last_discovered,integer,int4,null,32,0,NO,0
+public,22_service_shop_discovery_checkpoint,9,last_inserted,integer,int4,null,32,0,NO,0
+public,22_service_shop_discovery_checkpoint,10,last_updated,integer,int4,null,32,0,NO,0
+public,22_service_shop_discovery_checkpoint,11,last_failed,integer,int4,null,32,0,NO,0
+public,22_service_shop_discovery_checkpoint,12,last_error,text,text,null,null,null,YES,null
+public,22_service_shop_discovery_checkpoint,13,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()

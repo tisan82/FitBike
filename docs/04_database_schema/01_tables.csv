@@ -10,3 +10,12 @@ public,08_battery_standard_product,BASE TABLE
 public,09_bike_model_year_brake_product,BASE TABLE
 public,10_bike_model_year_image,BASE TABLE
 public,11_tire_model,BASE TABLE
+public,12_content,BASE TABLE
+public,13_content_bike_model,BASE TABLE
+public,14_content_bike_model_year,BASE TABLE
+public,15_content_part_link,BASE TABLE
+public,16_content_topic,BASE TABLE
+public,17_content_asset_source,BASE TABLE
+public,20_service_shop,BASE TABLE
+public,21_service_shop_service,BASE TABLE
+public,22_service_shop_discovery_checkpoint,BASE TABLE

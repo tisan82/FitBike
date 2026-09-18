@@ -75,6 +75,7 @@ Supabase secret/service-role key는 FitBike 서버에만 두고 Factory에는 �
 | `GET` | `/api/internal/content-factory/queue/next` | 다음 `PLANNED` Topic의 콘텐츠 제작 필드만 조회 |
 | `PATCH` | `/api/internal/content-factory/queue/{topicKey}` | 허용된 Queue 상태 전환과 제한된 오류 기록 |
 | `POST` | `/api/internal/content-factory/assets` | 서버가 결정한 `content-assets/contents/{contentKey}/{assetKey}.webp` 경로에 WebP 업로드 |
+| `POST` | `/api/internal/content-factory/draft` | `BLOCKED` 고위험 Topic의 비공개 초안과 출처 원장을 저장 |
 | `POST` | `/api/internal/content-factory/publish` | 승인 Topic에 신규 콘텐츠·관계·출처를 원자적으로 게시하고 Queue를 `PUBLISHED`로 전환 |
 
 이 API는 회원 데이터, 사용자 인증 데이터, Fitment 원본 레코드, 임의 SQL,
@@ -94,10 +95,10 @@ Producer도 Edge Function을 직접 호출하지 않는다.
 `SUPABASE_SECRET_KEY` 설정, Preview 통합 검증, 별도 Production 배포 순으로 진행한다.
 토큰은 Git 파일이나 일반 GitHub 변수에 기록하지 않고 배포 환경 Secret으로만 둔다.
 
-2026-09-05 read-only 점검에서 운영 DB의 `17_content_asset_source`와
-`16_content_topic` editorial 컬럼이 `docs/04_database_schema` export 및 저장소 migration
-history보다 앞서 있는 Documentation Drift를 확인했다. 운영 적용 전 schema snapshot을
-별도로 동기화해야 한다.
+2026-09-18 운영 DB metadata를 기준으로 `docs/04_database_schema`의 table, column,
+constraint, index, FK, check, trigger export를 다시 동기화했다. 운영 스키마에는
+`01`~`17`, `20`~`22`의 총 20개 public table이 있다. 이후 DB 변경은 운영 적용과
+동일 Task에서 schema export와 migration history를 함께 갱신한다.
 
 ## Internal Admin API
 
