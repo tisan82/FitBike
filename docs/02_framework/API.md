@@ -85,6 +85,11 @@ Supabase secret/service-role key는 FitBike 서버에만 두고 Factory에는 �
 Topic 상태와 콘텐츠 유형, 이미지 경로, 출처 권리 상태를 재검증하며 하나의 DB
 트랜잭션에서 콘텐츠·관계·출처·Queue를 함께 반영한다.
 
+콘텐츠 자산 업로드의 유일한 운영 경계는
+`POST /api/internal/content-factory/assets`다. 과거 시드·이미지 마이그레이션 및
+직접 업로드용 Supabase Edge Function은 운영 호출 경로로 사용하지 않으며, 새로운
+Producer도 Edge Function을 직접 호출하지 않는다.
+
 활성화는 migration 검토·적용, FitBike 서버의 `CONTENT_FACTORY_PUBLISH_TOKEN` 및
 `SUPABASE_SECRET_KEY` 설정, Preview 통합 검증, 별도 Production 배포 순으로 진행한다.
 토큰은 Git 파일이나 일반 GitHub 변수에 기록하지 않고 배포 환경 Secret으로만 둔다.
