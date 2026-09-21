@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getPublicModelSlug } from "@/lib/seo/motorcycle-route";
 
 export async function findActiveModelYearsForSitemap() {
   const supabase = createServerSupabaseClient();
@@ -50,7 +51,7 @@ export async function findActiveModelsForSitemap() {
     if (!brandSlug || !yearUpdatedAt) return [];
     return [{
       brand_slug: brandSlug,
-      model_slug: model.slug,
+      model_slug: getPublicModelSlug(brandSlug, model.slug),
       updated_at: Date.parse(yearUpdatedAt) > Date.parse(model.updated_at)
         ? yearUpdatedAt
         : model.updated_at,

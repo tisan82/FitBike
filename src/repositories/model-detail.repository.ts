@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getPublicModelSlug } from "@/lib/seo/motorcycle-route";
 
 export type ModelYearDetailRow = {
   bike_model_year_id: number;
@@ -166,17 +167,20 @@ export async function findLatestModelYearBySlugs(
     .from("02_bike_model")
     .select("bike_model_id, slug")
     .eq("brand_id", brand.brand_id)
-    .eq("slug", modelSlug)
+    .in("slug", [modelSlug, `${brand.slug}-${modelSlug}`])
     .eq("is_active", true)
-    .maybeSingle();
+    .limit(2);
 
   if (modelError) throw new Error(modelError.message);
-  if (!model) return null;
+  const matchedModel = (model ?? []).find(
+    (candidate) => getPublicModelSlug(brand.slug, candidate.slug) === modelSlug,
+  );
+  if (!matchedModel) return null;
 
   const { data: modelYear, error: modelYearError } = await supabase
     .from("03_bike_model_year")
     .select("bike_model_year_id")
-    .eq("bike_model_id", model.bike_model_id)
+    .eq("bike_model_id", matchedModel.bike_model_id)
     .eq("is_active", true)
     .order("start_year", { ascending: false })
     .order("bike_model_year_id", { ascending: false })
@@ -189,7 +193,7 @@ export async function findLatestModelYearBySlugs(
   return {
     bike_model_year_id: modelYear.bike_model_year_id,
     brand_slug: brand.slug,
-    model_slug: model.slug,
+    model_slug: getPublicModelSlug(brand.slug, matchedModel.slug),
   };
 }
 
