@@ -6,11 +6,11 @@ FitBike Customer-facing 공개 페이지가 Google, Naver 및 AI 기반 검색�
 
 ## Production Domain and Canonical Policy
 
-Production origin은 `https://fitbike.co.kr`이며 공통 site config에서 관리한다. Localhost나 preview domain을 canonical로 사용하지 않는다. Indexable detail은 현재 stable ID route에 self-referencing canonical을 둔다.
+Production origin은 `https://fitbike.co.kr`이며 공통 site config에서 관리한다. Localhost나 preview domain을 canonical로 사용하지 않는다. Indexable detail은 self-referencing canonical을 둔다. 모델 대표 URL은 `/motorcycles/[brandSlug]/[modelSlug]`, 특정 연식 URL은 `/model-detail/[bikeModelYearId]`를 사용한다.
 
 ## Index / Noindex Policy
 
-실제 공개 정보와 고유 URL이 있는 Main, Bike Selector, 활성 Model + Year Detail은 index/follow 대상이다. Admin/Login/API와 query 기반 임시 결과 화면은 index 대상이 아니다. 비활성 또는 존재하지 않는 entity는 404로 응답한다.
+실제 공개 정보와 고유 URL이 있는 Main, Bike Selector, 활성 Model 대표 페이지, 활성 Model + Year Detail은 index/follow 대상이다. Admin/Login/API와 query 기반 임시 결과 화면은 index 대상이 아니다. 비활성 또는 존재하지 않는 entity는 404로 응답한다.
 
 ## Metadata Standard
 
@@ -24,7 +24,7 @@ Production origin은 `https://fitbike.co.kr`이며 공통 site config에서 관�
 
 ## Sitemap Policy
 
-Sitemap은 `/`, `/bike-selector`, `/tire-models/maxxis`, `/contents`, 활성 Model-Year URL과 공개 Content Detail URL을 포함한다. Model-Year와 Content는 실제 `updated_at`을 `lastModified`로 사용하며 요청 시각을 임의로 사용하지 않는다. 현재 규모에서는 단일 sitemap을 사용하고 존재하지 않거나 비활성인 ID를 생성하지 않는다. `/sitemap.xml`은 Runtime DB 결과를 300초 CDN response cache로 제공한다.
+Sitemap은 `/`, `/bike-selector`, `/tire-models/maxxis`, `/contents`, 활성 연식이 있는 Model 대표 URL, 활성 Model-Year URL과 공개 Content Detail URL을 포함한다. Model과 Model-Year, Content는 실제 `updated_at`을 `lastModified`로 사용하며 요청 시각을 임의로 사용하지 않는다. 현재 규모에서는 단일 sitemap을 사용하고 존재하지 않거나 비활성인 ID를 생성하지 않는다. `/sitemap.xml`은 Runtime DB 결과를 300초 CDN response cache로 제공한다.
 
 신규 Content 발견을 돕기 위해 `/rss.xml`은 최신 공개 콘텐츠의 제목, canonical URL, 발행일과 본문 텍스트를 제공한다. `/contents`와 Content Detail metadata는 이 Feed를 `application/rss+xml` alternate로 연결한다. Sitemap과 RSS는 네이버 서치어드바이저에 별도로 제출해야 하며, 구현만으로 색인이나 상위 노출을 보장하지 않는다.
 

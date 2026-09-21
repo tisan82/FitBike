@@ -1,6 +1,7 @@
 import { SITE_URL } from "@/lib/seo/site";
 import {
   findActiveBatteryProductsForSitemap,
+  findActiveModelsForSitemap,
   findActiveModelYearsForSitemap,
   findActiveTireModelsForSitemap,
   findActiveTireProductsForSitemap,
@@ -61,7 +62,8 @@ export async function GET() {
 
   let entries = staticEntries;
   try {
-    const [years, contents, tireProducts, tireModels, batteryProducts] = await Promise.all([
+    const [models, years, contents, tireProducts, tireModels, batteryProducts] = await Promise.all([
+      findActiveModelsForSitemap(),
       findActiveModelYearsForSitemap(),
       findPublishedContentsForSitemap(),
       findActiveTireProductsForSitemap(),
@@ -71,6 +73,10 @@ export async function GET() {
 
     entries = dedupeEntries([
       ...staticEntries,
+      ...models.map((model) => ({
+        url: `${SITE_URL}/motorcycles/${encodeURIComponent(model.brand_slug)}/${encodeURIComponent(model.model_slug)}`,
+        lastModified: iso(model.updated_at),
+      })),
       ...years.map((year) => ({
         url: `${SITE_URL}/model-detail/${year.bike_model_year_id}`,
         lastModified: iso(year.updated_at),
