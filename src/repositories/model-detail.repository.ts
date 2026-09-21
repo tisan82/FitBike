@@ -37,6 +37,31 @@ export type ModelYearDetailRow = {
   rear_brake_caliper_type: string | null;
   major_changes: string | null;
   model_features: string | null;
+  engine_type: string | null;
+  cooling_type: string | null;
+  fuel_system: string | null;
+  transmission_type: string | null;
+  max_power_kw: number | null;
+  max_power_ps: number | null;
+  max_power_rpm: number | null;
+  max_torque_nm: number | null;
+  max_torque_rpm: number | null;
+  length_mm: number | null;
+  width_mm: number | null;
+  height_mm: number | null;
+  wheelbase_mm: number | null;
+  seat_height_mm: number | null;
+  curb_weight_kg: number | null;
+  fuel_capacity_l: number | null;
+  price_min_krw: number | null;
+  price_max_krw: number | null;
+  price_verified_at: string | null;
+  engine_oil_change_l: number | null;
+  engine_oil_filter_change_l: number | null;
+  engine_oil_total_l: number | null;
+  engine_oil_sae: string | null;
+  engine_oil_api: string | null;
+  engine_oil_jaso: string | null;
 };
 
 export type ModelDetailRow = {
@@ -99,7 +124,7 @@ export async function findModelYearDetail(
   const { data, error } = await supabase
     .from("03_bike_model_year")
     .select(
-      "bike_model_year_id, bike_model_id, generation_key, market_code, year_range_label, start_year, end_year, generation_name, frame_code, trim_name, variant_name, category_override, engine_cc_override, generation_image_url, front_tire_full_size, front_tire_width, front_tire_ratio, front_tire_diameter, front_tire_load_index, front_tire_speed_index, front_tire_tube_type, rear_tire_full_size, rear_tire_width, rear_tire_ratio, rear_tire_diameter, rear_tire_load_index, rear_tire_speed_index, rear_tire_tube_type, battery_standard_code, battery_voltage, front_brake_spec, front_brake_caliper_type, rear_brake_spec, rear_brake_caliper_type, major_changes, model_features",
+      "bike_model_year_id, bike_model_id, generation_key, market_code, year_range_label, start_year, end_year, generation_name, frame_code, trim_name, variant_name, category_override, engine_cc_override, generation_image_url, front_tire_full_size, front_tire_width, front_tire_ratio, front_tire_diameter, front_tire_load_index, front_tire_speed_index, front_tire_tube_type, rear_tire_full_size, rear_tire_width, rear_tire_ratio, rear_tire_diameter, rear_tire_load_index, rear_tire_speed_index, rear_tire_tube_type, battery_standard_code, battery_voltage, front_brake_spec, front_brake_caliper_type, rear_brake_spec, rear_brake_caliper_type, major_changes, model_features, engine_type, cooling_type, fuel_system, transmission_type, max_power_kw, max_power_ps, max_power_rpm, max_torque_nm, max_torque_rpm, length_mm, width_mm, height_mm, wheelbase_mm, seat_height_mm, curb_weight_kg, fuel_capacity_l, price_min_krw, price_max_krw, price_verified_at, engine_oil_change_l, engine_oil_filter_change_l, engine_oil_total_l, engine_oil_sae, engine_oil_api, engine_oil_jaso",
     )
     .eq("bike_model_year_id", bikeModelYearId)
     .eq("is_active", true)
