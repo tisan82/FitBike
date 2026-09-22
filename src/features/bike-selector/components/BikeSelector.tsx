@@ -59,7 +59,7 @@ export function BikeSelector() {
         </div>
       </header>
 
-      <div className="px-5 py-5 sm:py-8">
+      <div className={`px-5 py-5 sm:py-8 ${selector.selectedBrandId !== null ? "pb-28 sm:pb-32" : ""}`}>
         <div className="mx-auto max-w-2xl">
           <form className="space-y-8" onSubmit={handleSubmit}>
             <section>
@@ -90,8 +90,10 @@ export function BikeSelector() {
             {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{error instanceof Error ? error.message : "데이터를 불러오지 못했습니다."}</div> : null}
 
             {selector.selectedBrandId !== null && (
-              <div className="sticky bottom-0 -mx-5 -mb-8 border-t border-border bg-surface px-5 py-4 sm:py-6">
-                <BikeSelectorSubmit disabled={!selector.canSubmit} onPrevious={handlePrevious} />
+              <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:px-5 sm:pt-4 sm:pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                <div className="mx-auto w-full max-w-2xl">
+                  <BikeSelectorSubmit disabled={!selector.canSubmit} onPrevious={handlePrevious} />
+                </div>
               </div>
             )}
           </form>
