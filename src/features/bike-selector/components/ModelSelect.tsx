@@ -150,7 +150,7 @@ export function ModelSelect({
           {models.length === 0 ? "등록된 모델이 없습니다" : "검색 결과가 없습니다"}
         </p>
       ) : (
-        <div className="max-h-96 space-y-1.5 overflow-y-auto">
+        <div className="space-y-1.5">
           {filteredModels.map((model) => (
             <button
               key={model.bikeModelId}
