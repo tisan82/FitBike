@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { modelSeoPath } from "@/lib/seo/motorcycle";
 
 import { storeSessionBike } from "@/components/layout/MyBikeLink";
 import { ModelDescription } from "@/features/model-detail/components/ModelDescription";
@@ -43,7 +44,7 @@ export function ModelDetail({ bikeModelYearId, initialData }: Props) {
           <section>
             <p className="text-sm font-semibold text-primary">내 바이크</p>
             <p className="mt-1 text-sm font-semibold text-foreground-secondary">{query.data.brandNameKo ?? query.data.brandNameEn}</p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground">{query.data.modelNameKo ?? query.data.modelNameEn} {query.data.yearRangeLabel}</h1>
+            <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground">{query.data.brandNameKo ?? query.data.brandNameEn} {query.data.modelNameKo ?? query.data.modelNameEn} {query.data.yearRangeLabel}</h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-foreground-secondary">이 모델의 기본 정보와 실제 등록된 부품 규격을 확인하고, 필요한 경우 관리 가이드나 주변 정비소로 이동할 수 있습니다.</p>
           </section>
 
@@ -53,7 +54,7 @@ export function ModelDetail({ bikeModelYearId, initialData }: Props) {
             <Link className="flex min-h-14 items-center justify-center rounded-xl bg-surface px-2 text-center text-sm font-bold shadow-sm transition hover:text-primary" href="/shops">정비소 찾기</Link>
           </nav>
 
-          <YearNavigation currentId={query.data.bikeModelYearId} years={query.data.yearOptions} />
+          <div className="flex flex-wrap items-center justify-between gap-3"><YearNavigation currentId={query.data.bikeModelYearId} years={query.data.yearOptions} /><Link className="text-sm font-semibold text-primary hover:underline" href={modelSeoPath(query.data.brandNameEn, query.data.modelNameEn)}>이 모델의 전체 연식 보기</Link></div>
           <ModelSummary model={query.data} />
           <ModelDescription model={query.data} />
           <div id="parts" className="scroll-mt-24"><PartsHub model={query.data} /></div>
