@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { modelSeoPath } from "@/lib/seo/motorcycle";
-
 import { storeSessionBike } from "@/components/layout/MyBikeLink";
 import { ModelDescription } from "@/features/model-detail/components/ModelDescription";
 import { ModelDetailError } from "@/features/model-detail/components/ModelDetailError";
@@ -54,7 +52,7 @@ export function ModelDetail({ bikeModelYearId, initialData }: Props) {
             <Link className="flex min-h-14 items-center justify-center rounded-xl bg-surface px-2 text-center text-sm font-bold shadow-sm transition hover:text-primary" href="/shops">정비소 찾기</Link>
           </nav>
 
-          <div className="flex flex-wrap items-center justify-between gap-3"><YearNavigation currentId={query.data.bikeModelYearId} years={query.data.yearOptions} /><Link className="text-sm font-semibold text-primary hover:underline" href={modelSeoPath(query.data.brandNameEn, query.data.modelNameEn)}>이 모델의 전체 연식 보기</Link></div>
+          <YearNavigation currentId={query.data.bikeModelYearId} years={query.data.yearOptions} />
           <ModelSummary model={query.data} />
           <ModelDescription model={query.data} />
           <div id="parts" className="scroll-mt-24"><PartsHub model={query.data} /></div>
