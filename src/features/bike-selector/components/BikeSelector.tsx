@@ -36,7 +36,9 @@ export function BikeSelector() {
       };
       storeSessionBike(stored);
     }
-    router.push(`/model-detail/${selector.selectedModelYearId}`);
+    const part = new URLSearchParams(window.location.search).get("part");
+    const targetSection = part === "battery" || part === "brake" ? `#${part}` : "";
+    router.push(`/model-detail/${selector.selectedModelYearId}${targetSection}`);
   };
 
   const handlePrevious = () => {
