@@ -1,6 +1,4 @@
 import { SITE_URL } from "@/lib/seo/site";
-import { modelSeoPath, toSeoSlug } from "@/lib/seo/motorcycle";
-import { findActiveBrandsForSeo, findActiveModelsForSeo } from "@/repositories/model-detail.repository";
 import {
   findActiveBatteryProductsForSitemap,
   findActiveModelYearsForSitemap,
@@ -56,7 +54,6 @@ export async function GET() {
     { url: SITE_URL },
     { url: `${SITE_URL}/about` },
     { url: `${SITE_URL}/bike-selector` },
-    { url: `${SITE_URL}/motorcycles` },
     { url: `${SITE_URL}/tire-models/maxxis` },
     { url: `${SITE_URL}/contents` },
     { url: `${SITE_URL}/shops` },
@@ -64,20 +61,16 @@ export async function GET() {
 
   let entries = staticEntries;
   try {
-    const [years, contents, tireProducts, tireModels, batteryProducts, brands, models] = await Promise.all([
+    const [years, contents, tireProducts, tireModels, batteryProducts] = await Promise.all([
       findActiveModelYearsForSitemap(),
       findPublishedContentsForSitemap(),
       findActiveTireProductsForSitemap(),
       findActiveTireModelsForSitemap(),
       findActiveBatteryProductsForSitemap(),
-      findActiveBrandsForSeo(),
-      findActiveModelsForSeo(),
     ]);
 
     entries = dedupeEntries([
       ...staticEntries,
-      ...brands.map((brand) => ({ url: `${SITE_URL}/motorcycles/${toSeoSlug(brand.brand_en)}` })),
-      ...models.flatMap((model) => { const brand = brands.find((item) => item.brand_id === model.brand_id); return brand ? [{ url: `${SITE_URL}${modelSeoPath(brand.brand_en, model.model_name_en)}`, lastModified: iso(model.updated_at) }] : []; }),
       ...years.map((year) => ({
         url: `${SITE_URL}/model-detail/${year.bike_model_year_id}`,
         lastModified: iso(year.updated_at),
