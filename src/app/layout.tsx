@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   title: { default: DEFAULT_TITLE, template: "%s | 핏바이크" },
   description: DEFAULT_DESCRIPTION,
   applicationName: SITE_NAME,
+  other: {
+    "google-adsense-account": "ca-pub-4192027701878971",
+  },
   verification: {
     other: {
       "naver-site-verification": "06ddda2f170be353a9574cc8f12ba29d40b72a98",
