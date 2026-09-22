@@ -1,11 +1,12 @@
 import Link from "next/link";
 
-type PartFocus = "battery" | "brake" | "all";
+type PartFocus = "battery" | "brake" | "all" | null;
 
 function detectPartFocus(title: string): PartFocus {
   if (/배터리/.test(title)) return "battery";
   if (/브레이크|패드/.test(title)) return "brake";
-  return "all";
+  if (/점검|정비/.test(title)) return "all";
+  return null;
 }
 
 const partLabels = {
@@ -38,6 +39,7 @@ function FinderLink({ part, secondary = false }: { part: "battery" | "brake"; se
 
 export function ContentBikeFinderCta({ title }: { title: string }) {
   const focus = detectPartFocus(title);
+  if (!focus) return null;
   const description = focus === "all"
     ? "점검 결과 교체가 필요하다면 먼저 내 바이크의 브랜드·모델·연식을 선택해 정확한 부품 정보를 확인하세요."
     : partLabels[focus].description;
