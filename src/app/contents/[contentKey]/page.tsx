@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ContentBlockRenderer, RelatedContentGuides } from "@/features/content";
+import { ContentBikeFinderCta } from "@/features/content/components/ContentBikeFinderCta";
 import type { ContentBlock } from "@/features/content/types/content.types";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo/site";
@@ -183,6 +184,8 @@ export default async function ContentDetailPage({ params }: Props) {
           <h1 className="mt-3 text-2xl font-bold leading-9 sm:text-3xl sm:leading-10">{content.title}</h1>
           <p className="mt-5 text-base leading-7 text-foreground-secondary sm:text-lg sm:leading-8">{content.summary}</p>
         </header>
+
+        <ContentBikeFinderCta title={content.title} />
 
         {hero ? (
           <figure className="mt-8">
