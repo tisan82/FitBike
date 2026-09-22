@@ -217,3 +217,26 @@ export const findBrakeMappings = (id: number) => findMappings("09_bike_model_yea
 export const findTireProducts = (ids: number[]) => findProducts("04_tire_product", "tire_product_id, brand_name, product_name, tire_size_full, load_index, speed_index, tube_type", "tire_product_id", ids);
 export const findBatteryProducts = (ids: number[]) => findProducts("05_battery_product", "battery_product_id, brand_name, spec_code, voltage, capacity_ah, battery_type, product_image_url, price", "battery_product_id", ids);
 export const findBrakeProducts = (ids: number[]) => findProducts("06_brake_product", "brake_product_id, brand_name, product_name, brake_type, compatible_code", "brake_product_id", ids);
+
+
+export async function findActiveModelsForSeo() {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("02_bike_model")
+    .select("bike_model_id, brand_id, model_name_en, model_name_ko, model_summary, default_category, engine_cc, updated_at")
+    .eq("is_active", true)
+    .order("bike_model_id", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function findActiveBrandsForSeo() {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("01_brand")
+    .select("brand_id, brand_en, brand_ko")
+    .eq("is_active", true)
+    .order("brand_id", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
