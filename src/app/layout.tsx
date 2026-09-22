@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import Script from "next/script";
 import { GoogleTagManager } from "@next/third-parties/google";
 import { Providers } from "@/app/providers";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -73,6 +74,13 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html className="h-full antialiased" lang="ko">
       <GoogleTagManager gtmId="GTM-MCBXG4GH" />
+      <Script
+        async
+        crossOrigin="anonymous"
+        id="google-adsense"
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4192027701878971"
+        strategy="afterInteractive"
+      />
       <body className="min-h-full">
         <noscript>
           <iframe
