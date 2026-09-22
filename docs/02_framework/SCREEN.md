@@ -102,6 +102,16 @@ Guide card는 Content Type → Title → Summary hierarchy를 유지하고 저�
 
 향후 Topic/Part/Model 관계 기반 탐색은 DB에 검증된 taxonomy 또는 relation이 추가된 이후 확장한다. 현재 문자열을 임의 분류해 taxonomy처럼 취급하지 않는다.
 
+### Content Detail Bike Fitment Gateway
+
+점검·관리 및 교체 콘텐츠의 상단에는 일반적인 설명과 실제 차량별 부품 정보를 구분하는 Bike Fitment Gateway를 제공한다.
+
+- 고객이 본문을 읽기 전에 `브랜드 → 모델 → 연식 → 부품 확인` 흐름을 이해할 수 있어야 한다.
+- 배터리 콘텐츠는 배터리 확인 CTA, 브레이크 콘텐츠는 브레이크 확인 CTA를 우선 제공한다.
+- 특정 부품이 아닌 일반 점검 콘텐츠는 배터리와 브레이크 확인 경로를 함께 제공할 수 있다.
+- CTA는 기존 Bike Selector를 재사용하고, 선택 완료 후 Model Detail의 해당 부품 영역으로 이동한다.
+- 일반적인 점검 정보가 모든 바이크에 동일하게 적용되는 것처럼 표현하지 않는다.
+
 ### Content Detail Reference Disclosure
 
 콘텐츠가 작성 근거를 제공할 때 본문 마지막에 `참고 공식 자료` 영역을 하나만 두고
