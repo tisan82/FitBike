@@ -117,7 +117,7 @@ export default async function ContentDetailPage({ params }: Props) {
     getPublishedContents(),
   ]);
   if (!content) notFound();
-  const [relatedGuides, relatedBikes] = await Promise.all([\n    Promise.resolve(selectRelatedPublishedContents(content, publishedContents)),\n    getRelatedBikesByContentId(content.contentId),\n  ]);
+  const relatedGuides = selectRelatedPublishedContents(content, publishedContents);\n  const relatedBikes = await getRelatedBikesByContentId(content.contentId);
 
   const storedHero = getStoragePublicUrl(content.heroImageStoragePath, "content-assets");
   const hero = content.contentType === "MODEL_GUIDE" ? null : storedHero;
