@@ -217,3 +217,51 @@ export const findBrakeMappings = (id: number) => findMappings("09_bike_model_yea
 export const findTireProducts = (ids: number[]) => findProducts("04_tire_product", "tire_product_id, brand_name, product_name, tire_size_full, load_index, speed_index, tube_type", "tire_product_id", ids);
 export const findBatteryProducts = (ids: number[]) => findProducts("05_battery_product", "battery_product_id, brand_name, spec_code, voltage, capacity_ah, battery_type, product_image_url, price", "battery_product_id", ids);
 export const findBrakeProducts = (ids: number[]) => findProducts("06_brake_product", "brake_product_id, brand_name, product_name, brake_type, compatible_code", "brake_product_id", ids);
+
+
+export type ModelSearchEntryRow = {
+  bike_model_year_id: number;
+  bike_model_id: number;
+  year_range_label: string;
+  start_year: number;
+  end_year: number | null;
+  updated_at: string;
+  model_name_en: string;
+  model_name_ko: string | null;
+  model_key: string;
+  brand_en: string;
+  brand_ko: string | null;
+};
+
+export async function findModelSearchEntries(): Promise<ModelSearchEntryRow[]> {
+  const supabase = createServerSupabaseClient();
+  const { data: years, error: yearError } = await supabase
+    .from("03_bike_model_year")
+    .select("bike_model_year_id, bike_model_id, year_range_label, start_year, end_year, updated_at")
+    .eq("is_active", true)
+    .order("start_year", { ascending: false })
+    .order("bike_model_year_id", { ascending: false });
+  if (yearError) throw new Error(yearError.message);
+
+  const { data: models, error: modelError } = await supabase
+    .from("02_bike_model")
+    .select("bike_model_id, brand_id, model_key, model_name_en, model_name_ko")
+    .eq("is_active", true);
+  if (modelError) throw new Error(modelError.message);
+
+  const { data: brands, error: brandError } = await supabase
+    .from("01_brand")
+    .select("brand_id, brand_en, brand_ko")
+    .eq("is_active", true);
+  if (brandError) throw new Error(brandError.message);
+
+  const modelMap = new Map((models ?? []).map((model) => [model.bike_model_id, model]));
+  const brandMap = new Map((brands ?? []).map((brand) => [brand.brand_id, brand]));
+
+  return (years ?? []).flatMap((year) => {
+    const model = modelMap.get(year.bike_model_id);
+    const brand = model ? brandMap.get(model.brand_id) : null;
+    if (!model || !brand) return [];
+    return [{ ...year, model_name_en: model.model_name_en, model_name_ko: model.model_name_ko, model_key: model.model_key, brand_en: brand.brand_en, brand_ko: brand.brand_ko }];
+  });
+}
