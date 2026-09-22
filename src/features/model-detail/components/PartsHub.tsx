@@ -165,7 +165,7 @@ export function PartsHub({ model }: { model: ModelDetailData }) {
         <Tire error={failed} items={query.data?.tire.rear} label="뒤 타이어" loading={loading} spec={model.rearTire} />
       </section>
       <Part error={failed} label="배터리" loading={loading} products={query.data?.battery} spec={model.batteryStandardCode} sub={model.batteryVoltage} />
-      <section className="space-y-4 rounded-2xl border border-border bg-surface p-5">
+      <section className="scroll-mt-24 space-y-4 rounded-2xl border border-border bg-surface p-5" id="brake">
         <h2 className="text-lg font-bold">브레이크</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Part error={failed} label="앞 브레이크" loading={loading} products={query.data?.brake.front} spec={model.frontBrakeSpec} sub={model.frontBrakeCaliperType} nested />
@@ -189,7 +189,7 @@ function Part({ label, spec, sub, products, loading, error, nested = false }: { 
   );
 
   return nested ? <div className="space-y-3">{content}</div> : (
-    <section className="space-y-4 rounded-2xl border border-border bg-surface p-5">
+    <section className="scroll-mt-24 space-y-4 rounded-2xl border border-border bg-surface p-5" id={label === "배터리" ? "battery" : undefined}>
       <h2 className="text-lg font-bold">{label}</h2>
       {content}
     </section>
