@@ -7,7 +7,7 @@ import { ContentBlockRenderer, RelatedContentGuides } from "@/features/content";
 import type { ContentBlock } from "@/features/content/types/content.types";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo/site";
-import { getPublishedContentByKey, getPublishedContents, selectRelatedPublishedContents } from "@/services/content.service";
+import { getPublishedContentByKey, getPublishedContents, getRelatedBikesByContentId, selectRelatedPublishedContents } from "@/services/content.service";
 
 type Props = { params: Promise<{ contentKey: string }> };
 
@@ -117,7 +117,7 @@ export default async function ContentDetailPage({ params }: Props) {
     getPublishedContents(),
   ]);
   if (!content) notFound();
-  const relatedGuides = selectRelatedPublishedContents(content, publishedContents);
+  const [relatedGuides, relatedBikes] = await Promise.all([\n    Promise.resolve(selectRelatedPublishedContents(content, publishedContents)),\n    getRelatedBikesByContentId(content.contentId),\n  ]);
 
   const storedHero = getStoragePublicUrl(content.heroImageStoragePath, "content-assets");
   const hero = content.contentType === "MODEL_GUIDE" ? null : storedHero;
@@ -226,6 +226,22 @@ export default async function ContentDetailPage({ params }: Props) {
                 </ul>
               </div>
             </details>
+          ) : null}
+          {relatedBikes.length ? (
+            <section className="mt-7 rounded-2xl border border-border bg-surface p-5 sm:p-6" aria-labelledby="related-bike-heading">
+              <h2 id="related-bike-heading" className="text-lg font-bold">관련 모델·연식 정보</h2>
+              <p className="mt-2 text-sm leading-6 text-foreground-secondary">이 콘텐츠와 연결된 바이크의 최신 연식 상세에서 제원과 부품 규격을 확인할 수 있습니다.</p>
+              <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                {relatedBikes.map((bike) => (
+                  <li key={bike.bikeModelId}>
+                    <Link className="flex min-h-12 items-center justify-between rounded-xl border border-border px-4 py-3 font-bold text-foreground transition hover:border-primary hover:text-primary" href={`/model-detail/${bike.bikeModelYearId}`}>
+                      <span>{bike.brandNameKo ?? bike.brandNameEn} {bike.modelNameKo ?? bike.modelNameEn} 모델·연식 상세</span>
+                      <span aria-hidden="true">→</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
           <aside className="mt-5 rounded-2xl bg-surface-secondary px-5 py-4 text-sm leading-6 text-foreground-secondary sm:px-6">
             이 콘텐츠는 정비·관리 판단을 돕는 가이드입니다. 모델별 실제 제원과 정비 기준은 제조사 공식 자료를 우선 확인하세요.
