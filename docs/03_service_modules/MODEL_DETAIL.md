@@ -14,7 +14,7 @@ Core는 활성 Model-Year와 연결된 활성 Model/Brand, 동일 Model의 활�
 
 정보 순서는 Brand/Model → Year Navigation → 현재 Year → 대표 이미지 → 모델 특징 → 해당 연식의 주요 변경이다. `model_features`와 `major_changes`는 분리하며 NULL인 영역은 만들지 않는다.
 
-`02_bike_model`의 요약·기본 카테고리·기본 배기량은 **모델 공통 정보**로 모든 연식에서 표시한다. `03_bike_model_year`의 override와 확장 제원, 가격, 규격은 **선택 연식 정보**로 표시하며 다른 연식의 값을 자동 상속하거나 복사하지 않는다. 공통 정보와 연식 정보는 화면에서 제목과 기준 문구로 구분한다.
+`02_bike_model`의 요약·기본 카테고리·기본 배기량은 모든 연식에서 사용할 수 있다. `03_bike_model_year`에 같은 항목의 확인된 값이 있으면 현재 연식 값을 우선하고, 확장 제원·가격·규격은 선택한 연식의 값만 표시한다. 다른 연식의 값을 자동 상속하거나 복사하지 않는다. 고객 화면에서는 DB 소유 범위를 설명하는 내부 용어 또는 별도 배지를 노출하지 않고 하나의 자연스러운 모델 정보로 제공한다.
 
 모델 특징, 연식별 변경점·특장점·활용도와 기본 타이어 규격은 Model + Year Detail이 소유한다. 같은
 정보를 `모델명 + 타이어 규격 가이드` Content로 반복하지 않는다. 공식 근거로 확인된 설명이 부족하면
@@ -22,7 +22,7 @@ Core는 활성 Model-Year와 연결된 활성 Model/Brand, 동일 Model의 활�
 
 ## Image Priority
 
-대표 이미지는 활성 `10_bike_model_year_image`의 `MAIN` 중 `is_primary` 내림차순, `display_order`와 `image_id` 오름차순으로 선택한다. 없으면 선택 연식의 `generation_image_url`, 모델의 `model_image_url`, 공통 준비중 asset 순서로 사용한다. 모델 공통 이미지를 사용하면 그 범위를 화면에 표시한다. 공통 asset이 없으면 CSS placeholder를 표시한다. Storage object path는 공통 helper로 Public URL로 변환하고 DB에 Public URL을 쓰지 않는다. 실제 이미지는 비율 유지, `object-fit: contain`, crop 금지다.
+대표 이미지는 활성 `10_bike_model_year_image`의 `MAIN` 중 `is_primary` 내림차순, `display_order`와 `image_id` 오름차순으로 선택한다. 없으면 선택 연식의 `generation_image_url`, 모델의 `model_image_url`, 공통 준비중 asset 순서로 사용한다. 어떤 fallback 단계가 사용됐는지는 고객 화면에 표시하지 않는다. 공통 asset이 없으면 CSS placeholder를 표시한다. Storage object path는 공통 helper로 Public URL로 변환하고 DB에 Public URL을 쓰지 않는다. 실제 이미지는 비율 유지, `object-fit: contain`, crop 금지다.
 
 ## Tire, Battery, Brake and Product Connection
 
