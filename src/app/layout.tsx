@@ -76,6 +76,18 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
 
   return (
     <html className="h-full antialiased" lang="ko">
+      <Script id="google-consent-mode-defaults" strategy="beforeInteractive">{`
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('consent', 'default', {
+          ad_storage: 'denied',
+          ad_user_data: 'denied',
+          ad_personalization: 'denied',
+          analytics_storage: 'denied',
+          region: ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LI','LV','LT','LU','MT','NL','NO','PL','PT','RO','SK','SI','ES','SE','GB','CH'],
+          wait_for_update: 500
+        });
+      `}</Script>
       <GoogleTagManager gtmId="GTM-MCBXG4GH" />
       <Script
         async
