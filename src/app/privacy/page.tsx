@@ -34,7 +34,7 @@ export default function PrivacyPage() {
           FitBike는 서비스 이용 과정에서 처리되는 개인정보와 이용정보를 필요한 범위에서
           관리하며, 어떤 정보가 어떤 목적으로 사용되는지 이용자가 확인할 수 있도록 안내합니다.
         </p>
-        <p className="mt-2 text-sm text-foreground-secondary">시행일: 2026년 9월 21일</p>
+        <p className="mt-2 text-sm text-foreground-secondary">시행일: 2026년 9월 23일</p>
       </header>
 
       <div className="mt-10 space-y-9">
@@ -101,9 +101,10 @@ export default function PrivacyPage() {
             이용자는 Google 광고 설정에서 맞춤형 광고에 관한 설정을 관리할 수 있습니다.
           </p>
           <p>
-            현재 광고 서비스가 적용되지 않은 경우 이 조항은 향후 광고 서비스 도입 시 적용될
-            처리 기준을 안내하기 위한 것입니다. 실제 광고 서비스 도입 시 적용되는 사업자와
-            처리 내용을 기준으로 본 방침을 다시 확인하고 필요한 내용을 갱신합니다.
+            유럽경제지역(EEA), 영국 및 스위스 등 동의가 필요한 지역에서는 Google의 동의 관리
+            플랫폼(CMP)을 통해 광고 및 관련 데이터 처리에 대한 동의, 거부 또는 세부 옵션 관리
+            선택지가 제공될 수 있습니다. 이용자의 선택에 따라 Google 광고 및 분석 태그의 동작이
+            조정될 수 있습니다.
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             <a
