@@ -15,12 +15,13 @@ import { getTireProductDisplayName } from "@/features/model-detail/utils/tire-pr
 
 type ProductStateProps = {
   error: boolean;
+  hasSpecification?: boolean;
   items?: ConnectedProduct[];
   label: string;
   loading: boolean;
 };
 
-function Products({ label, items, loading, error }: ProductStateProps) {
+function Products({ label, items, loading, error, hasSpecification }: ProductStateProps) {
   const [all, setAll] = useState(false);
 
   if (loading) {
@@ -30,7 +31,7 @@ function Products({ label, items, loading, error }: ProductStateProps) {
     return <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">상품 정보를 불러오지 못했습니다.</p>;
   }
   if (!items?.length) {
-    return <p className="rounded-xl bg-surface-secondary p-4 text-sm text-foreground-secondary">등록된 상품이 없습니다.</p>;
+    return <p className="rounded-xl bg-surface-secondary p-4 text-sm text-foreground-secondary">{hasSpecification ? "규격은 확인됐지만 연결된 상품은 준비 중입니다." : "이 연식의 규격 확인 후 연결 상품을 제공할 예정입니다."}</p>;
   }
 
   return (
@@ -63,7 +64,7 @@ function Products({ label, items, loading, error }: ProductStateProps) {
   );
 }
 
-function TireProducts({ items, loading, error, label }: ProductStateProps) {
+function TireProducts({ items, loading, error, label, hasSpecification }: ProductStateProps) {
   if (loading) {
     return (
       <div aria-label={`${label} 불러오는 중`} className="flex gap-3 overflow-hidden sm:grid sm:grid-cols-3" role="status">
@@ -75,7 +76,7 @@ function TireProducts({ items, loading, error, label }: ProductStateProps) {
     return <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">상품 정보를 불러오지 못했습니다.</p>;
   }
   if (!items?.length) {
-    return <p className="rounded-xl bg-surface-secondary p-4 text-sm text-foreground-secondary">등록된 상품이 없습니다.</p>;
+    return <p className="rounded-xl bg-surface-secondary p-4 text-sm text-foreground-secondary">{hasSpecification ? "규격은 확인됐지만 연결된 타이어 상품은 준비 중입니다." : "이 연식의 타이어 규격을 확인 중입니다."}</p>;
   }
 
   return (
@@ -121,6 +122,7 @@ function tireSpecification(spec: TireSpecification) {
 }
 
 function Tire({ label, spec, items, loading, error }: ProductStateProps & { spec: TireSpecification }) {
+  const hasSpecification = Boolean(spec.fullSize || (spec.width !== null && spec.diameter !== null));
   return (
     <article className="space-y-3 border-t border-border pt-4 first:border-t-0 first:pt-0">
       <div className="space-y-1">
@@ -130,7 +132,7 @@ function Tire({ label, spec, items, loading, error }: ProductStateProps & { spec
         </div>
         <p className="break-words text-base font-semibold leading-6 text-foreground">{tireSpecification(spec)}</p>
       </div>
-      <TireProducts error={error} items={items} label={label} loading={loading} />
+      <TireProducts error={error} hasSpecification={hasSpecification} items={items} label={label} loading={loading} />
     </article>
   );
 }
@@ -177,6 +179,7 @@ export function PartsHub({ model }: { model: ModelDetailData }) {
 }
 
 function Part({ label, spec, sub, products, loading, error, nested = false }: { label: string; spec: string | null; sub: string | null; products?: ConnectedProduct[]; loading: boolean; error: boolean; nested?: boolean }) {
+  const hasSpecification = Boolean(spec || sub);
   const content = (
     <>
       <div className="rounded-xl bg-surface-secondary p-4">
@@ -184,7 +187,7 @@ function Part({ label, spec, sub, products, loading, error, nested = false }: { 
         <p className="mt-1">{spec ?? "규격 정보 없음"}</p>
         {sub ? <p className="text-sm text-foreground-secondary">{sub}</p> : null}
       </div>
-      <Products error={error} items={products} label={`${label} 상품`} loading={loading} />
+      <Products error={error} hasSpecification={hasSpecification} items={products} label={`${label} 상품`} loading={loading} />
     </>
   );
 
