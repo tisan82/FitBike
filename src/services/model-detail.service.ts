@@ -49,6 +49,8 @@ export async function getModelDetail(
     modelNameEn: model.model_name_en,
     modelNameKo: model.model_name_ko,
     modelSummary: model.model_summary,
+    modelCategory: model.default_category,
+    modelEngineCc: model.engine_cc,
     category: modelYear.category_override ?? model.default_category,
     engineCc: modelYear.engine_cc_override ?? model.engine_cc,
     generationKey: modelYear.generation_key,
@@ -60,7 +62,12 @@ export async function getModelDetail(
     yearRangeLabel: modelYear.year_range_label,
     startYear: modelYear.start_year,
     endYear: modelYear.end_year,
-    imageUrl: primaryImage ?? modelYear.generation_image_url,
+    imageUrl: primaryImage ?? modelYear.generation_image_url ?? model.model_image_url,
+    imageScope: primaryImage || modelYear.generation_image_url
+      ? "YEAR"
+      : model.model_image_url
+        ? "MODEL"
+        : "PLACEHOLDER",
     engineType: modelYear.engine_type,
     coolingType: modelYear.cooling_type,
     fuelSystem: modelYear.fuel_system,
