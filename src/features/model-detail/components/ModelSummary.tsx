@@ -35,12 +35,17 @@ function formatTorque(model: ModelDetailData) {
 }
 
 export function ModelSummary({ model }: { model: ModelDetailData }) {
-  const [failed, setFailed] = useState(false);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const brand = model.brandNameKo ?? model.brandNameEn;
   const name = model.modelNameKo ?? model.modelNameEn;
   const modelImageUrl = getStoragePublicUrl(model.imageUrl);
-  const useFallback = failed || !modelImageUrl;
+  const useFallback = !modelImageUrl || failedUrl === modelImageUrl;
   const src = useFallback ? BIKE_IMAGE_FALLBACK_SRC : modelImageUrl;
+  const imageAlt = useFallback
+    ? `${brand} ${name} 이미지 준비중`
+    : model.imageScope === "MODEL"
+      ? `${brand} ${name} 모델 공통 이미지`
+      : `${brand} ${name} ${model.yearRangeLabel} 대표 이미지`;
   const dimensions = [model.lengthMm, model.widthMm, model.heightMm].every((value) => value !== null)
     ? `${model.lengthMm} × ${model.widthMm} × ${model.heightMm} mm`
     : null;
@@ -52,20 +57,37 @@ export function ModelSummary({ model }: { model: ModelDetailData }) {
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
       <div className="relative flex aspect-[16/9] items-center justify-center bg-surface-secondary">
-        <Image alt={useFallback ? `${brand} ${name} 이미지 준비중` : `${brand} ${name} ${model.yearRangeLabel} 대표 이미지`} className={useFallback ? "object-cover" : "object-contain"} fill onError={useFallback ? undefined : () => setFailed(true)} preload sizes="(max-width: 1024px) calc(100vw - 40px), 984px" src={src} unoptimized={useFallback} />
+        <Image alt={imageAlt} className={useFallback ? "object-cover" : "object-contain"} fill onError={useFallback || !modelImageUrl ? undefined : () => setFailedUrl(modelImageUrl)} preload sizes="(max-width: 1024px) calc(100vw - 40px), 984px" src={src} unoptimized={useFallback} />
+        {!useFallback && model.imageScope === "MODEL" ? <span className="absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">모델 공통 이미지</span> : null}
       </div>
       <div className="space-y-5 p-5 sm:p-7">
         <p className="text-2xl font-bold">{model.yearRangeLabel}</p>
-        {model.modelSummary ? <p className="leading-7 text-foreground-secondary">{model.modelSummary}</p> : null}
-        <dl className="grid grid-cols-2 gap-5 sm:grid-cols-4">
-          <Item label="배기량" value={model.engineCc === null ? null : `${Math.round(model.engineCc)}cc`} />
-          <Item label="카테고리" value={model.category} />
+        <section className="space-y-4" aria-labelledby="common-model-information">
+          <div>
+            <p className="text-xs font-semibold text-primary">모든 연식에서 함께 보는 정보</p>
+            <h2 className="mt-1 text-lg font-bold" id="common-model-information">모델 공통 정보</h2>
+          </div>
+          {model.modelSummary ? <p className="leading-7 text-foreground-secondary">{model.modelSummary}</p> : null}
+          <dl className="grid grid-cols-2 gap-5 sm:grid-cols-4">
+            <Item label="기본 배기량" value={model.modelEngineCc === null ? null : `${Math.round(model.modelEngineCc)}cc`} />
+            <Item label="기본 카테고리" value={model.modelCategory} />
+          </dl>
+        </section>
+        <section className="space-y-4 border-t border-border pt-5" aria-labelledby="selected-year-information">
+          <div>
+            <p className="text-xs font-semibold text-primary">선택한 {model.yearRangeLabel} 기준</p>
+            <h2 className="mt-1 text-lg font-bold" id="selected-year-information">연식별 상세 정보</h2>
+          </div>
+          <dl className="grid grid-cols-2 gap-5 sm:grid-cols-4">
+          <Item label="연식 배기량" value={model.engineCc !== model.modelEngineCc && model.engineCc !== null ? `${Math.round(model.engineCc)}cc` : null} />
+          <Item label="연식 카테고리" value={model.category !== model.modelCategory ? model.category : null} />
           <Item label="프레임 코드" value={model.frameCode} />
           <Item label="트림" value={model.trimName} />
           <Item label="버전" value={model.variantName} />
           <Item label="판매 시장" value={model.marketCode} />
           <Item label="국내 가격" value={price} />
-        </dl>
+          </dl>
+        </section>
         {hasEngine ? <SpecSection title="엔진 · 성능">
           <Item label="엔진 형식" value={model.engineType} />
           <Item label="냉각 방식" value={model.coolingType} />

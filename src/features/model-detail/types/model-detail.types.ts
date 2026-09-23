@@ -52,6 +52,8 @@ export type ModelDetailData = {
   modelNameEn: string;
   modelNameKo: string | null;
   modelSummary: string | null;
+  modelCategory: string | null;
+  modelEngineCc: number | null;
   category: string | null;
   engineCc: number | null;
   generationKey: string | null;
@@ -64,6 +66,7 @@ export type ModelDetailData = {
   startYear: number;
   endYear: number | null;
   imageUrl: string | null;
+  imageScope: "YEAR" | "MODEL" | "PLACEHOLDER";
   yearOptions: ModelYearOption[];
   engineType: string | null;
   coolingType: string | null;

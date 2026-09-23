@@ -14,13 +14,15 @@ Core는 활성 Model-Year와 연결된 활성 Model/Brand, 동일 Model의 활�
 
 정보 순서는 Brand/Model → Year Navigation → 현재 Year → 대표 이미지 → 모델 특징 → 해당 연식의 주요 변경이다. `model_features`와 `major_changes`는 분리하며 NULL인 영역은 만들지 않는다.
 
+`02_bike_model`의 요약·기본 카테고리·기본 배기량은 **모델 공통 정보**로 모든 연식에서 표시한다. `03_bike_model_year`의 override와 확장 제원, 가격, 규격은 **선택 연식 정보**로 표시하며 다른 연식의 값을 자동 상속하거나 복사하지 않는다. 공통 정보와 연식 정보는 화면에서 제목과 기준 문구로 구분한다.
+
 모델 특징, 연식별 변경점·특장점·활용도와 기본 타이어 규격은 Model + Year Detail이 소유한다. 같은
 정보를 `모델명 + 타이어 규격 가이드` Content로 반복하지 않는다. 공식 근거로 확인된 설명이 부족하면
 별도 Content URL을 만들기보다 이 화면의 모델 특징과 연식 변경 내용을 우선 보강한다.
 
 ## Image Priority
 
-대표 이미지는 활성 `10_bike_model_year_image`의 `MAIN` 중 `is_primary` 내림차순, `display_order`와 `image_id` 오름차순으로 선택한다. 없으면 `generation_image_url`, 그다음 공통 준비중 asset을 사용한다. 공통 asset이 없으면 CSS placeholder를 표시한다. Storage object path는 공통 helper로 Public URL로 변환하고 DB에 Public URL을 쓰지 않는다. 이미지는 비율 유지, `object-fit: contain`, crop 금지다.
+대표 이미지는 활성 `10_bike_model_year_image`의 `MAIN` 중 `is_primary` 내림차순, `display_order`와 `image_id` 오름차순으로 선택한다. 없으면 선택 연식의 `generation_image_url`, 모델의 `model_image_url`, 공통 준비중 asset 순서로 사용한다. 모델 공통 이미지를 사용하면 그 범위를 화면에 표시한다. 공통 asset이 없으면 CSS placeholder를 표시한다. Storage object path는 공통 helper로 Public URL로 변환하고 DB에 Public URL을 쓰지 않는다. 실제 이미지는 비율 유지, `object-fit: contain`, crop 금지다.
 
 ## Tire, Battery, Brake and Product Connection
 
@@ -37,7 +39,7 @@ Product만 표시한다. 각 상품은 실제 FitBike `/tire-detail/[tireProduct
 
 ## Loading and Empty State
 
-Brand, Model, 현재 연식, Year List, 대표 이미지, 특징/변경사항, Parts Spec은 core priority다. Product list, 추가 이미지, 관련 콘텐츠는 deferred 대상이다. Product는 viewport 접근 시 요청하고 section skeleton을 쓰며 core 화면을 비우지 않는다. 규격 없음과 등록 상품 없음은 구분한다. 이미지 실패는 broken image 대신 준비중 placeholder를 표시한다.
+Brand, Model, 현재 연식, Year List, 대표 이미지, 특징/변경사항, Parts Spec은 core priority다. Product list, 추가 이미지, 관련 콘텐츠는 deferred 대상이다. Product는 viewport 접근 시 요청하고 section skeleton을 쓰며 core 화면을 비우지 않는다. 규격이 없으면 `이 연식의 규격 확인 중`, 규격은 있지만 mapping이 없으면 `규격 확인 · 연결 상품 준비 중`으로 구분한다. 이미지 실패는 broken image 대신 준비중 placeholder를 표시한다.
 
 ## Related Guides
 
