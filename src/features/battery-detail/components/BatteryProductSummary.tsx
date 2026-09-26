@@ -48,9 +48,9 @@ export function BatteryProductSummary({ product }: Props) {
           />
         </div>
         <div className="flex flex-col justify-center p-5 sm:p-8">
-          <p className="text-sm font-bold text-primary">{product.brandName}</p>
+          <p className="text-sm font-bold text-primary">오토바이 배터리</p>
           <h1 className="mt-2 text-2xl font-bold leading-9 text-foreground sm:text-3xl">
-            {product.specCode}
+            {product.brandName} {product.specCode}
           </h1>
           <div className="mt-4 flex flex-wrap gap-2">
             {product.voltage ? <span className="rounded-full bg-selected-background px-3 py-1 text-sm font-semibold text-primary">{product.voltage}V</span> : null}
