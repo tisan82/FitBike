@@ -6,6 +6,7 @@ import {
   findBrakeMappings,
   findBrakeProducts,
   findModelDetail,
+  findLatestModelYearBySlugs,
   findModelYearOptions,
   findModelYearDetail,
   findPrimaryModelYearImage,
@@ -19,6 +20,15 @@ export class ModelDetailNotFoundError extends Error {
     super("바이크 상세 정보를 찾을 수 없습니다.");
     this.name = "ModelDetailNotFoundError";
   }
+}
+
+export async function getLatestModelDetailBySlugs(
+  brandSlug: string,
+  modelSlug: string,
+): Promise<ModelDetailData> {
+  const target = await findLatestModelYearBySlugs(brandSlug, modelSlug);
+  if (!target) throw new ModelDetailNotFoundError();
+  return getModelDetail(target.bike_model_year_id);
 }
 
 export async function getModelDetail(

@@ -4,6 +4,8 @@
 
 Model Detail의 공식 의미는 **Model + Year Detail**이며 기준 entity는 `bike_model_year`다. Bike Selector의 Brand → Model → Model Year 선택 완료 후 `bike_model_year_id`를 `/model-detail/[bikeModelYearId]`로 전달한다. Fitment Result는 별도 탐색 결과 화면으로 유지한다.
 
+모델명과 모델+부품 검색 유입을 위한 `/motorcycles/[brandSlug]/[modelSlug]`는 별도 화면을 만들지 않고 같은 Model Detail을 사용한다. 이 URL은 해당 모델의 활성 연식 중 `start_year`, `bike_model_year_id` 최신순 첫 항목을 기본 선택하고 self-referencing canonical을 사용한다. 과거 연식은 기존 `/model-detail/[bikeModelYearId]`로 이동하며 최신 연식을 다시 선택하면 모델 대표 URL로 돌아온다.
+
 ## Data Contract
 
 Core는 활성 Model-Year와 연결된 활성 Model/Brand, 동일 Model의 활성 연식 목록, 대표 이미지, 설명과 기본 부품 규격만 제공한다. Product는 실제 07/08/09 mapping과 활성 04/05/06 Product만 제공한다. 사용하지 않는 DB column은 노출하지 않고 NULL을 추정하거나 생성하지 않는다.

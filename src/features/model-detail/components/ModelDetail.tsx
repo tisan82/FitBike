@@ -15,9 +15,9 @@ import { YearNavigation } from "@/features/model-detail/components/YearNavigatio
 import { useModelDetailQuery } from "@/features/model-detail/hooks/useModelDetailQuery";
 import type { ModelDetailData } from "@/features/model-detail/types/model-detail.types";
 
-type Props = { bikeModelYearId: number | null; initialData?: ModelDetailData };
+type Props = { bikeModelYearId: number | null; initialData?: ModelDetailData; modelPagePath?: string };
 
-export function ModelDetail({ bikeModelYearId, initialData }: Props) {
+export function ModelDetail({ bikeModelYearId, initialData, modelPagePath }: Props) {
   const query = useModelDetailQuery(bikeModelYearId, initialData);
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export function ModelDetail({ bikeModelYearId, initialData }: Props) {
             <Link className="flex min-h-14 items-center justify-center rounded-xl bg-surface px-2 text-center text-sm font-bold shadow-sm transition hover:text-primary" href="/shops">정비소 찾기</Link>
           </nav>
 
-          <YearNavigation currentId={query.data.bikeModelYearId} years={query.data.yearOptions} />
+          <YearNavigation currentId={query.data.bikeModelYearId} years={query.data.yearOptions} modelPagePath={modelPagePath} />
           <ModelSummary model={query.data} />
           <ModelDescription model={query.data} />
           <div id="parts" className="scroll-mt-24"><PartsHub model={query.data} /></div>

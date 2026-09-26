@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getPublicModelSlug } from "@/lib/seo/motorcycle-route";
 
 export type ModelYearDetailRow = {
   bike_model_year_id: number;
@@ -83,6 +84,12 @@ export type BrandDetailRow = {
   brand_summary: string | null;
 };
 
+export type ModelRouteTargetRow = {
+  bike_model_year_id: number;
+  brand_slug: string;
+  model_slug: string;
+};
+
 export type ModelYearOptionRow = Pick<
   ModelYearDetailRow,
   "bike_model_year_id" | "bike_model_id" | "year_range_label" | "start_year" | "end_year"
@@ -164,6 +171,55 @@ export async function findBrandDetail(
 
   if (error) throw new Error(error.message);
   return data as BrandDetailRow | null;
+}
+
+export async function findLatestModelYearBySlugs(
+  brandSlug: string,
+  modelSlug: string,
+): Promise<ModelRouteTargetRow | null> {
+  const supabase = createServerSupabaseClient();
+  const { data: brand, error: brandError } = await supabase
+    .from("01_brand")
+    .select("brand_id, slug")
+    .eq("slug", brandSlug)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (brandError) throw new Error(brandError.message);
+  if (!brand) return null;
+
+  const { data: model, error: modelError } = await supabase
+    .from("02_bike_model")
+    .select("bike_model_id, slug")
+    .eq("brand_id", brand.brand_id)
+    .in("slug", [modelSlug, `${brand.slug}-${modelSlug}`])
+    .eq("is_active", true)
+    .limit(2);
+
+  if (modelError) throw new Error(modelError.message);
+  const matchedModel = (model ?? []).find(
+    (candidate) => getPublicModelSlug(brand.slug, candidate.slug) === modelSlug,
+  );
+  if (!matchedModel) return null;
+
+  const { data: modelYear, error: modelYearError } = await supabase
+    .from("03_bike_model_year")
+    .select("bike_model_year_id")
+    .eq("bike_model_id", matchedModel.bike_model_id)
+    .eq("is_active", true)
+    .order("start_year", { ascending: false })
+    .order("bike_model_year_id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (modelYearError) throw new Error(modelYearError.message);
+  if (!modelYear) return null;
+
+  return {
+    bike_model_year_id: modelYear.bike_model_year_id,
+    brand_slug: brand.slug,
+    model_slug: getPublicModelSlug(brand.slug, matchedModel.slug),
+  };
 }
 
 export async function findModelYearOptions(bikeModelId: number): Promise<ModelYearOptionRow[]> {
