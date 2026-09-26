@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { TireDetail } from "@/features/tire-detail";
@@ -130,8 +131,8 @@ export default async function TireDetailPage({ params }: Props) {
       {
         "@type": "BreadcrumbList",
         itemListElement: [
-          { "@type": "ListItem", position: 1, name: "FitBike", item: SITE_URL },
-          { "@type": "ListItem", position: 2, name: "타이어", item: `${SITE_URL}/tire-models/maxxis` },
+          { "@type": "ListItem", position: 1, name: "핏바이크", item: SITE_URL },
+          { "@type": "ListItem", position: 2, name: "MAXXIS 타이어", item: `${SITE_URL}/tire-models/maxxis` },
           { "@type": "ListItem", position: 3, name },
         ],
       },
@@ -141,7 +142,16 @@ export default async function TireDetailPage({ params }: Props) {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
-      <TireDetail tireProductId={id} />
+      <nav aria-label="현재 위치" className="mx-auto w-full max-w-5xl px-4 pt-5 sm:px-5 sm:pt-8">
+        <ol className="flex flex-wrap items-center gap-2 text-sm text-foreground-secondary">
+          <li><Link className="hover:text-primary" href="/">핏바이크</Link></li>
+          <li aria-hidden>›</li>
+          <li><Link className="hover:text-primary" href="/tire-models/maxxis">MAXXIS 타이어</Link></li>
+          <li aria-hidden>›</li>
+          <li aria-current="page" className="font-semibold text-foreground">{name}</li>
+        </ol>
+      </nav>
+      <TireDetail initialProduct={product} tireProductId={id} />
     </>
   );
 }
