@@ -8,6 +8,12 @@ Fitment/specification과 상품을 명시적 DB 관계로 연결한다. 명시�
 처리하며 대체 상품을 임의 추정하지 않는다. 외부 상품 URL은 Commerce
 Gateway이며 FitBike 내부 결제 계약을 의미하지 않는다.
 
+MAXXIS SKU의 네이버 스마트스토어 URL은 타이어 모델명과 전체 규격이
+모두 일치하는 판매 상품에만 연결한다. 판매 목록에 같은 SKU가 여러 번
+나오면 숫자가 가장 큰 네이버 상품번호를 현재 상품으로 사용한다. 모델명
+또는 규격 중 하나라도 다르면 임의 연결하지 않으며, 정확한 판매 상품이
+없는 SKU는 URL을 비워 구매 버튼을 노출하지 않는다.
+
 ## Tire Model and SKU Detail Contract
 
 `11_tire_model` is the shared tire-model identity and `04_tire_product` is the
