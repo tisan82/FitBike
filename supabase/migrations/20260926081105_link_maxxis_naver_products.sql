@@ -1,0 +1,154 @@
+-- Link each active MAXXIS SKU to the newest matching Naver SmartStore product.
+-- seller_product_code and category_code are retained in this migration as source
+-- evidence; the public service uses product_url and seller_name.
+
+-- Correct the one legacy model-name error confirmed by both the current and
+-- previous seller listings before applying the external product link.
+update public."04_tire_product"
+set tire_product_key = 'MAXXIS_M6233_90_80_17_M_C_46P_TL',
+    tire_model_id = (
+      select tire_model_id
+      from public."11_tire_model"
+      where tire_model_key = 'MAXXIS_M6233'
+    ),
+    product_name = '맥시스 M6233 17인치 90/80-17 M/C 46P TL'
+where tire_product_key = 'MAXXIS_M6234_90_80_17_M_C_46P_TL'
+  and product_name = '맥시스 M6234 17인치 90/80-17 M/C 46P TL';
+
+with naver_products (
+  tire_product_key,
+  naver_product_no,
+  seller_product_code,
+  category_code
+) as (
+  values
+    ('MAXXIS_MA_RS_SLICK_100_70R17_M_C_49H_TL', '13742924667', 'M001', '50003182'),
+    ('MAXXIS_MA_RS_SLICK_110_70R17_M_C_54H_TL', '13742924668', 'M002', '50003182'),
+    ('MAXXIS_MA_RS_SLICK_120_70R17_M_C_58W_TL', '13742924669', 'M003', '50003182'),
+    ('MAXXIS_MA_RS_SLICK_140_70R17_M_C_66H_TL', '13742924670', 'M004', '50003182'),
+    ('MAXXIS_MA_RS_SLICK_150_60R17_M_C_66H_TL', '13742924671', 'M005', '50003182'),
+    ('MAXXIS_MA_HS_110_70R17_M_C_54H_TL', '13742924672', 'M006', '50003182'),
+    ('MAXXIS_MA_HS_120_70ZR17_M_C_58W_TL', '13742924673', 'M007', '50003182'),
+    ('MAXXIS_MA_HS_140_70R17_M_C_66H_TL', '13742924674', 'M008', '50003182'),
+    ('MAXXIS_MA_HS_150_60R17_M_C_66H_TL', '13742924675', 'M009', '50003182'),
+    ('MAXXIS_MA_HS_160_60ZR17_M_C_69W_TL', '13742924676', 'M010', '50003182'),
+    ('MAXXIS_MA_HS_180_55ZR17_M_C_73W_TL', '13742924677', 'M011', '50003182'),
+    ('MAXXIS_MA_HS_190_55ZR17_M_C_75W_TL', '13742924678', 'M012', '50003182'),
+    ('MAXXIS_MA_SP_120_70ZR17_M_C_58W_TL', '13742924679', 'M013', '50003182'),
+    ('MAXXIS_MA_SP_160_60ZR17_M_C_69W_TL', '13742924680', 'M014', '50003182'),
+    ('MAXXIS_MA_SP_180_55ZR17_M_C_73W_TL', '13742924681', 'M015', '50003182'),
+    ('MAXXIS_MA_SP_190_55ZR17_M_C_75W_TL', '13742924682', 'M016', '50003182'),
+    ('MAXXIS_MA_SP_200_55ZR17_M_C_78W_TL', '13742924683', 'M017', '50003182'),
+    ('MAXXIS_MA_RACE_100_80R17_M_C_52S_TL', '13742924684', 'M018', '50003182'),
+    ('MAXXIS_MA_RACE_110_70R17_M_C_54H_TL', '13742924685', 'M019', '50003182'),
+    ('MAXXIS_MA_RACE_130_70R17_M_C_62S_TL', '13742924719', 'M020', '50003182'),
+    ('MAXXIS_MA_RACE_140_70R17_M_C_66H_TL', '13742924720', 'M021', '50003182'),
+    ('MAXXIS_MA_ST3_120_70ZR17_M_C_58W_TL', '13742924721', 'M022', '50003182'),
+    ('MAXXIS_MA_ST3_160_60ZR17_M_C_69W_TL', '13742924723', 'M023', '50003182'),
+    ('MAXXIS_MA_ST3_180_55ZR17_M_C_73W_TL', '13742924724', 'M024', '50003182'),
+    ('MAXXIS_MA_ST3_190_55ZR17_M_C_75W_TL', '13742924725', 'M025', '50003182'),
+    ('MAXXIS_MA_ST2_120_70ZR17_M_C_58W_TL', '13742924726', 'M026', '50003182'),
+    ('MAXXIS_MA_ST2_160_60ZR17_M_C_69W_TL', '13742924728', 'M027', '50003182'),
+    ('MAXXIS_MA_ST2_180_55ZR17_M_C_73W_TL', '13742924729', 'M028', '50003182'),
+    ('MAXXIS_MA_ST2_190_55ZR17_M_C_75W_TL', '13742924730', 'M029', '50003182'),
+    ('MAXXIS_MA_ADV_110_80R19_M_C_59V_TL', '13742924731', 'M030', '50003182'),
+    ('MAXXIS_MA_ADV_120_70ZR19_M_C_60W_TL', '13742924732', 'M031', '50003182'),
+    ('MAXXIS_MA_ADV_150_70R17_M_C_69V_TL', '13742924733', 'M032', '50003182'),
+    ('MAXXIS_MA_ADV_170_60ZR17_M_C_72W_TL', '13742924734', 'M033', '50003182'),
+    ('MAXXIS_MA_AT_90_90_21_M_C_54H_TL', '13742924735', 'M034', '50003182'),
+    ('MAXXIS_MA_AT_150_70R18_M_C_70V_TL', '13742924736', 'M035', '50003182'),
+    ('MAXXIS_MA_MT_90_90_21_M_C_54R_TL', '13742924737', 'M036', '50003182'),
+    ('MAXXIS_MA_MT_150_70R18_M_C_70R_TL', '13742924738', 'M037', '50003182'),
+    ('MAXXIS_M6233_110_70_17_M_C_54H_TL', '13742924739', 'M038', '50003182'),
+    ('MAXXIS_M6233_90_80_17_M_C_46P_TL', '13742924740', 'M039', '50003182'),
+    ('MAXXIS_M6234_130_70_17_M_C_62H_TL', '13742924791', 'M040', '50003182'),
+    ('MAXXIS_M6234_140_70_17_M_C_66H_TL', '13742924792', 'M041', '50003182'),
+    ('MAXXIS_M6234_150_60_17_M_C_66S_TL', '13742924793', 'M042', '50003182'),
+    ('MAXXIS_MA_SC_120_70R15_M_C_56H_TL', '13742924794', 'M043', '50003182'),
+    ('MAXXIS_MA_SC_140_70R14_M_C_68P_TL', '13742924795', 'M044', '50003182'),
+    ('MAXXIS_MA_SC_160_60R15_M_C_67H_TL', '13742924796', 'M045', '50003182'),
+    ('MAXXIS_M6135_120_70R15_M_C_56S_TL', '13742924797', 'M046', '50003182'),
+    ('MAXXIS_M6135_140_70_14_M_C_68P_TL', '13742924798', 'M047', '50003182'),
+    ('MAXXIS_M6135_150_70R14_M_C_66S_TL', '13742924799', 'M048', '50003182'),
+    ('MAXXIS_M6135_160_60R14_M_C_69H_TL', '13742924800', 'M049', '50003182'),
+    ('MAXXIS_MA_PRO_130_70_12_64L_TL', '13742924801', 'M050', '50003182'),
+    ('MAXXIS_MA_PRO_110_90_13_56P_TL', '13742924802', 'M051', '50003182'),
+    ('MAXXIS_MA_PRO_130_70_13_57P_TL', '13742924803', 'M052', '50003182'),
+    ('MAXXIS_MA_PRO_140_60_13_63P_TL', '13742924804', 'M053', '50003182'),
+    ('MAXXIS_MA_PRO_150_70_13_64S_TL', '13742924805', 'M054', '50003182'),
+    ('MAXXIS_MA_PRO_120_70_14_55P_TL', '13742924806', 'M055', '50003182'),
+    ('MAXXIS_M6029_90_90_10_50J_TL', '13742924807', 'M056', '50003182'),
+    ('MAXXIS_M6029_100_90_10_56J_TL', '13742924808', 'M057', '50003182'),
+    ('MAXXIS_M6029_110_80_10_58J_TL', '13742924810', 'M058', '50003182'),
+    ('MAXXIS_M6029_90_90_12_44J_TL', '13742924811', 'M059', '50003182'),
+    ('MAXXIS_M6029_110_70_12_47J_TL', '13742924852', 'M060', '50003182'),
+    ('MAXXIS_M6029_120_70_12_58P_TL', '13742924853', 'M061', '50003182'),
+    ('MAXXIS_M6029_130_70_12_62P_TL', '13742924854', 'M062', '50003182'),
+    ('MAXXIS_M6029_140_70_12_65P_TL', '13742924855', 'M063', '50003182'),
+    ('MAXXIS_M6029_110_90_13_56L_TL', '13742924856', 'M064', '50003182'),
+    ('MAXXIS_M6029_140_60_13_63P_TL', '13742924857', 'M065', '50003182'),
+    ('MAXXIS_M6029_120_70_14_55P_TL', '13742924858', 'M066', '50003182'),
+    ('MAXXIS_S98_80_90_17_M_C_50S_TL', '13742924859', 'M067', '50003182'),
+    ('MAXXIS_S98_90_80_17_M_C_46S_TL', '13742924860', 'M068', '50003182'),
+    ('MAXXIS_M6240_80_90_17_44P_TL', '13742924861', 'M069', '50003182'),
+    ('MAXXIS_M6240_90_90_17_49P_TL', '13742924862', 'M070', '50003182'),
+    ('MAXXIS_M186_2_75_17_41P_TT', '13742924863', 'M071', '50003182'),
+    ('MAXXIS_M186_3_00_17_45N_TT', '13742924864', 'M072', '50003182'),
+    ('MAXXIS_M6017_120_70_10_54L_TL', '13742924865', 'M074', '50003182'),
+    ('MAXXIS_M6017_110_70_11_45L_TL', '13742924866', 'M075', '50003182'),
+    ('MAXXIS_M6017_120_70_11_56L_TL', '13742924867', 'M076', '50003182'),
+    ('MAXXIS_MA_R1_100_90_10_M_C_55J_TL', '13742924868', 'M077', '50003182'),
+    ('MAXXIS_MA_R1_100_90_12_M_C_49J_TL', '13742924869', 'M078', '50003182'),
+    ('MAXXIS_MA_R1_120_80_12_M_C_55J_TL', '13742924870', 'M079', '50003182'),
+    ('MAXXIS_MA_R1_120_70_12_M_C_49J_TL', '13742924893', 'M080', '50003182'),
+    ('MAXXIS_MA_R1_130_70_12_M_C_55J_TL', '13742924895', 'M081', '50003182'),
+    ('MAXXIS_M6024_120_90_10_M_C_57J_TL', '13742924896', 'M082', '50003182'),
+    ('MAXXIS_M6024_130_90_10_M_C_61J_TL', '13742924897', 'M083', '50003182'),
+    ('MAXXIS_M6024_120_70_12_M_C_51J_TL', '13742924898', 'M084', '50003182'),
+    ('MAXXIS_M6024_130_70_12_M_C_56J_TL', '13742924899', 'M085', '50003182'),
+    ('MAXXIS_S98_110_70_13_M_C_54P_TL', '13742924900', 'M086', '50003182'),
+    ('MAXXIS_S98_130_70_13_M_C_63L_TL', '13742924901', 'M087', '50003182'),
+    ('MAXXIS_S98_90_90_14_M_C_46J_TL', '13742924902', 'M088', '50003182'),
+    ('MAXXIS_S98_100_90_14_M_C_57J_TL', '13742924903', 'M089', '50003182'),
+    ('MAXXIS_S98_110_80_14_M_C_48J_TL', '13742924904', 'M090', '50003182'),
+    ('MAXXIS_S98_100_80_14_M_C_53J_TL', '13742924905', 'M091', '50003182'),
+    ('MAXXIS_S98_120_70_14_M_C_61J_TL', '13742924907', 'M092', '50003182'),
+    ('MAXXIS_MA_CT1_110_70_13_M_C_54P_TL', '13742924908', 'M093', '50003182'),
+    ('MAXXIS_MA_CT1_130_70_13_M_C_63P_TL', '13742924909', 'M094', '50003182'),
+    ('MAXXIS_MA_CT1_100_80_14_M_C_48S_TL', '13742924910', 'M095', '50003182'),
+    ('MAXXIS_MA_CT1_110_70_14_M_C_50P_TL', '13742924911', 'M096', '50003182')
+)
+update public."04_tire_product" as tire
+set product_url = 'https://smartstore.naver.com/so_young/products/' || source.naver_product_no,
+    seller_name = '네이버 스마트스토어 소영'
+from naver_products as source
+where tire.tire_product_key = source.tire_product_key
+  and tire.brand_name = '맥시스'
+  and (
+    tire.product_url is distinct from 'https://smartstore.naver.com/so_young/products/' || source.naver_product_no
+    or tire.seller_name is distinct from '네이버 스마트스토어 소영'
+  );
+
+do $$
+begin
+  if (
+    select count(*)
+    from public."04_tire_product"
+    where brand_name = '맥시스'
+      and product_url like 'https://smartstore.naver.com/so_young/products/%'
+  ) <> 95 then
+    raise exception 'Expected 95 linked MAXXIS SmartStore products';
+  end if;
+
+  if not exists (
+    select 1
+    from public."04_tire_product" as tire
+    join public."11_tire_model" as model
+      on model.tire_model_id = tire.tire_model_id
+    where tire.tire_product_key = 'MAXXIS_M6233_90_80_17_M_C_46P_TL'
+      and model.tire_model_key = 'MAXXIS_M6233'
+  ) then
+    raise exception 'Expected corrected M6233 90/80-17 SKU';
+  end if;
+end
+$$;
