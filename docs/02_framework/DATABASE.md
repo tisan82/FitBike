@@ -33,8 +33,17 @@ No inferred fitment values.
 정의는 `docs/04_database_schema/`의 최신 export만을 따른다.
 
 SKU의 Bike Model + Year Fitment는 기존
-`07_bike_model_year_tire_product` 관계만 사용한다. 타이어 모델 또는 규격
-문자열을 기준으로 별도 Fitment 관계를 만들거나 추정하지 않는다.
+`07_bike_model_year_tire_product` 관계만 사용한다. 타이어 모델 또는 원문 규격
+문자열을 기준으로 별도 Fitment 관계를 만들거나 추정하지 않는다. 신규·수정
+Model-Year의 구조화 규격이 폭·편평비·휠·장착 위치와 확인 가능한 튜브 타입,
+하중지수, 속도등급을 모두 충족할 때에만 운영 배치가
+`AUTO_SIZE_MATCH` 관계를 생성할 수 있다. `COMMON` 상품, 미확인 상품값,
+낮은 하중·속도등급은 자동 연결하지 않고 검토 대상으로 남긴다.
+
+Battery는 `03_bike_model_year.battery_standard_code`와 검증된
+`08_battery_standard_product` 관계로만 상품을 연결한다. 자동 배치는 이미
+검증된 표준 코드의 공백·구분자·대소문자 표기 차이만 복제할 수 있으며,
+치수·전압·용량이 비슷하다는 이유로 호환성을 추정하지 않는다.
 
 ## Identifier Policy
 

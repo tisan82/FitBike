@@ -35,8 +35,13 @@ model list. It does not rank or recommend models.
 ### SKU Fitment Disclosure
 
 SKU fitment uses the existing `07_bike_model_year_tire_product` relationship.
-Do not create a tire-model fitment table or infer fitment from tire size,
-position, product name, or another SKU.
+Do not create a tire-model fitment table or infer fitment in a customer-facing
+query from free-form tire size, product name, or another SKU. The controlled
+daily fitment-link batch may create an explicit `AUTO_SIZE_MATCH` relationship
+only when the Model-Year and active SKU have matching structured width, ratio,
+diameter and allowed position, and every available tube/load/speed requirement
+is satisfied. It must not auto-map a `COMMON` product or treat a missing SKU
+attribute as verified compatibility.
 
 SKU Detail resolves Fitment in reverse from the selected `04_tire_product`
 through active mappings to active Bike Model + Year rows. Tire Model Detail may
@@ -122,6 +127,16 @@ Position은 다음 규칙으로 연결한다.
 -   Product `REAR`는 Mapping `REAR` 후보만 가능하다.
 -   Product `BOTH`는 Mapping `FRONT` 또는 `REAR` 후보가 될 수 있다.
 -   Product `COMMON`은 자동 Mapping하지 않고 Position 검증이 필요하다.
+
+## Daily Fitment-Link Batch
+
+Production은 매일 `00:00 Asia/Seoul`에 신규 또는 최근 수정된 활성
+Model-Year를 확인한다. 조건을 충족한 Tire SKU만
+`07_bike_model_year_tire_product.match_type = AUTO_SIZE_MATCH`로 idempotent
+연결한다. Battery는 검증된 `08_battery_standard_product` 표준 코드의 표기
+차이만 연결하며 새로운 전기적·치수 호환 관계를 만들지 않는다. 규격 누락,
+상품 미등록, 안전 등급 미충족, 검증되지 않은 Battery 표준은 실패로 추정
+보완하지 않고 배치 이력의 unresolved 항목으로 남긴다.
 
 Customer-facing Tire Product Detail은 Position DB code를 그대로 노출하지
 않고 `FRONT`는 `앞 타이어`, `REAR`는 `뒤 타이어`, `BOTH`는
