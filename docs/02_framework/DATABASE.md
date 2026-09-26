@@ -37,8 +37,11 @@ SKU의 Bike Model + Year Fitment는 기존
 문자열을 기준으로 별도 Fitment 관계를 만들거나 추정하지 않는다. 신규·수정
 Model-Year의 구조화 규격이 폭·편평비·휠·장착 위치와 확인 가능한 튜브 타입,
 하중지수, 속도등급을 모두 충족할 때에만 운영 배치가
-`AUTO_SIZE_MATCH` 관계를 생성할 수 있다. `COMMON` 상품, 미확인 상품값,
-낮은 하중·속도등급은 자동 연결하지 않고 검토 대상으로 남긴다.
+`AUTO_SIZE_MATCH` 관계를 생성할 수 있다. `COMMON` 상품은 상품 자체의
+장착 위치가 정해지지 않은 스쿠터 SKU에 한해 같은 안전 조건으로 후보가 될
+수 있으며, Mapping 위치는 Model-Year의 검증된 FRONT/REAR 규격에서
+결정한다. 미확인 상품값과 낮은 하중·속도등급은 자동 연결하지 않고 검토
+대상으로 남긴다.
 
 Battery는 `03_bike_model_year.battery_standard_code`와 검증된
 `08_battery_standard_product` 관계로만 상품을 연결한다. 자동 배치는 이미
