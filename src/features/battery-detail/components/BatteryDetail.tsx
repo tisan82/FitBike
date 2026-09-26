@@ -10,9 +10,11 @@ import { BatteryDetailLoading } from "@/features/battery-detail/components/Batte
 import { BatteryProductSummary } from "@/features/battery-detail/components/BatteryProductSummary";
 import { BatterySpecification } from "@/features/battery-detail/components/BatterySpecification";
 import { useBatteryDetailQuery } from "@/features/battery-detail/hooks/useBatteryDetailQuery";
+import type { BatteryProductDetail } from "@/features/battery-detail/types/battery-detail.types";
 
 type Props = {
   batteryProductId: number | null;
+  initialProduct?: BatteryProductDetail;
 };
 
 function BatteryPurchaseGuide() {
@@ -48,8 +50,8 @@ function BatteryPurchaseGuide() {
   );
 }
 
-export function BatteryDetail({ batteryProductId }: Props) {
-  const query = useBatteryDetailQuery(batteryProductId);
+export function BatteryDetail({ batteryProductId, initialProduct }: Props) {
+  const query = useBatteryDetailQuery(batteryProductId, initialProduct);
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-5 sm:py-14">
