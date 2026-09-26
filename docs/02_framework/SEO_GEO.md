@@ -46,6 +46,8 @@ Content Detail은 Article의 발행일·수정일을 metadata와 JSON-LD에 제�
 
 Brand, Model, Year, model features, major changes와 기본 fitment spec은 server-rendered HTML에 포함한다. SEO를 이유로 모든 Product를 core payload에 넣지 않는다. 대표 이미지 비율 영역을 확보하고 하단 Product 영역은 deferred loading을 유지해 LCP, CLS와 JS 비용을 관리한다.
 
+공개 Tire/Battery Product Detail은 상품명, 실제 저장 규격, 가격(있는 경우), 호환 정보 요약을 최초 server-rendered HTML에 제공한다. 동일 서버 조회 결과를 Client Query의 initial data로 재사용해 metadata, JSON-LD, visible content가 같은 상품 상태를 설명하도록 한다. Product Detail은 활성 상품만 index하며 sitemap의 stable ID URL, self-canonical, 실제 화면과 일치하는 BreadcrumbList를 함께 제공한다.
+
 ## Google, Naver and AI / GEO
 
 Robots, sitemap, canonical과 semantic HTML을 일관되게 제공한다. AI 전용 schema, hidden content, fake FAQ, 자동 생성 설명, keyword stuffing을 만들지 않는다. GEO는 명확한 entity, 신뢰 가능한 DB 데이터, semantic heading, textual spec과 crawlable link를 기반으로 한다.
