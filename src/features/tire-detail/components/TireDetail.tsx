@@ -11,13 +11,15 @@ import { TireProductSummary } from "@/features/tire-detail/components/TireProduc
 import { TireSizeGuide } from "@/features/tire-detail/components/TireSizeGuide";
 import { TireSpecification } from "@/features/tire-detail/components/TireSpecification";
 import { useTireDetailQuery } from "@/features/tire-detail/hooks/useTireDetailQuery";
+import type { TireProductDetail } from "@/features/tire-detail/types/tire-detail.types";
 
 type Props = {
   tireProductId: number | null;
+  initialProduct?: TireProductDetail;
 };
 
-export function TireDetail({ tireProductId }: Props) {
-  const query = useTireDetailQuery(tireProductId);
+export function TireDetail({ tireProductId, initialProduct }: Props) {
+  const query = useTireDetailQuery(tireProductId, initialProduct);
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 sm:space-y-10 sm:px-5 sm:py-14">

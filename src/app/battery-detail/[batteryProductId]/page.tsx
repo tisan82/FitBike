@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BatteryDetail } from "@/features/battery-detail";
@@ -48,10 +49,22 @@ export default async function BatteryDetailPage({ params }: Props) {
   const jsonLd = { "@context": "https://schema.org", "@graph": [
     { "@type": "Product", "@id": `${url}#product`, name, description: batteryDescription(product), sku: product.batteryPartKey, brand: { "@type": "Brand", name: product.brandName }, url, ...(image ? { image: [image] } : {}), additionalProperty, ...(product.price !== null && product.productUrl ? { offers: { "@type": "Offer", priceCurrency: "KRW", price: product.price, url: product.productUrl } } : {}) },
     { "@type": "BreadcrumbList", itemListElement: [
-      { "@type": "ListItem", position: 1, name: "FitBike", item: SITE_URL },
+      { "@type": "ListItem", position: 1, name: "핏바이크", item: SITE_URL },
       { "@type": "ListItem", position: 2, name: "내 바이크 찾기", item: `${SITE_URL}/bike-selector` },
       { "@type": "ListItem", position: 3, name, item: url },
     ] },
   ] };
-  return <><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} /><BatteryDetail batteryProductId={id} /></>;
+  return <>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+    <nav aria-label="현재 위치" className="mx-auto w-full max-w-5xl px-4 pt-5 sm:px-5 sm:pt-8">
+      <ol className="flex flex-wrap items-center gap-2 text-sm text-foreground-secondary">
+        <li><Link className="hover:text-primary" href="/">핏바이크</Link></li>
+        <li aria-hidden>›</li>
+        <li><Link className="hover:text-primary" href="/bike-selector?part=battery">내 바이크 찾기</Link></li>
+        <li aria-hidden>›</li>
+        <li aria-current="page" className="font-semibold text-foreground">{name}</li>
+      </ol>
+    </nav>
+    <BatteryDetail batteryProductId={id} initialProduct={product} />
+  </>;
 }
