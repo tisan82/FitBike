@@ -40,8 +40,10 @@ query from free-form tire size, product name, or another SKU. The controlled
 daily fitment-link batch may create an explicit `AUTO_SIZE_MATCH` relationship
 only when the Model-Year and active SKU have matching structured width, ratio,
 diameter and allowed position, and every available tube/load/speed requirement
-is satisfied. It must not auto-map a `COMMON` product or treat a missing SKU
-attribute as verified compatibility.
+is satisfied. A `COMMON` scooter SKU may be auto-mapped when all of those
+safety checks pass; the mapping position comes from the verified Model-Year
+FRONT/REAR specification. A missing SKU attribute is never treated as verified
+compatibility.
 
 SKU Detail resolves Fitment in reverse from the selected `04_tire_product`
 through active mappings to active Bike Model + Year rows. Tire Model Detail may
@@ -126,7 +128,9 @@ Position은 다음 규칙으로 연결한다.
 -   Product `FRONT`는 Mapping `FRONT` 후보만 가능하다.
 -   Product `REAR`는 Mapping `REAR` 후보만 가능하다.
 -   Product `BOTH`는 Mapping `FRONT` 또는 `REAR` 후보가 될 수 있다.
--   Product `COMMON`은 자동 Mapping하지 않고 Position 검증이 필요하다.
+-   Product `COMMON`은 Model-Year의 FRONT/REAR 구조화 규격과 튜브 타입,
+    하중지수, 속도등급을 모두 충족할 때 해당 Model-Year 위치로 자동 Mapping할
+    수 있다. 하나라도 미확인이거나 등급이 낮으면 연결하지 않는다.
 
 ## Daily Fitment-Link Batch
 
