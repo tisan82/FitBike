@@ -8,6 +8,8 @@ const title = "POWEROAD 오토바이 배터리 전체 상품";
 const description = "POWEROAD 오토바이 배터리의 규격, 전압, 용량, CCA와 호환 바이크 모델·연식을 확인하세요.";
 const path = "/battery-products/poweroad";
 
+export const revalidate = 300;
+
 export const metadata: Metadata = {
   title,
   description,
