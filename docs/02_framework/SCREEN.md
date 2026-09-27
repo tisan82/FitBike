@@ -90,6 +90,8 @@ Guide card는 `/contents/{contentKey}`로 직접 연결한다. 저장된 Thumbna
 
 Home 하단은 콘텐츠 탐색 이후에도 Model-Year 기준 확인으로 복귀할 수 있도록 Bike Finder CTA를 다시 제공한다. 일반적인 관리 정보와 실제 차량 규격을 동일한 것으로 표현하지 않는다.
 
+Home은 Primary Bike Finder와 경쟁하지 않는 별도 브랜드 상품 탐색 영역에서 MAXXIS 타이어 및 POWEROAD 배터리 전체 목록으로 연결할 수 있다. 이 영역은 추천이나 인기 순위를 만들지 않으며, 상품 목록에서 규격을 살펴본 뒤 모델·연식 기준 호환 확인으로 이어지는 보조 Gate다.
+
 ### Content Hub Discovery Hierarchy
 
 `/contents`는 전체 공개 콘텐츠를 탐색하는 Hub다. 콘텐츠 수가 증가해도 사용자가 전체 카드 목록을 순차적으로 훑는 방식에 의존하지 않아야 한다.
@@ -138,3 +140,7 @@ SKU 선택은 모바일 horizontal swipe card와 명확한 selected state를 사
 ## Tire Model Directory
 
 `/tire-models/maxxis`는 활성 MAXXIS 타이어 모델을 `model_name` 오름차순으로 보여주는 탐색 page다. 모바일은 2열, 넓은 화면은 3~4열 card grid를 사용하며 각 card는 실제 대표 이미지, 모델명, 저장된 summary와 Model Detail link를 제공한다. 추천, 인기순, 임의 ranking을 만들지 않는다. 분류 filter는 실제 DB의 검증된 category/riding 값이 있을 때만 제공하고 NULL 모델은 항상 전체 결과에 남긴다.
+
+## Battery Product Directory
+
+`/battery-products/poweroad`는 활성 POWEROAD 배터리 상품을 `spec_code` 오름차순으로 보여주는 공개 탐색 page다. 모바일은 2열, 넓은 화면은 3~4열 card grid를 사용하며 각 card는 실제 상품 이미지, 규격 코드와 저장된 전압·용량·CCA·크기·가격만 제공한다. 각 card는 Battery Product Detail로 연결하고, 상단에서는 Bike Selector의 배터리 확인 흐름으로 이동할 수 있어야 한다. 추천, 인기순, 임의 호환 추정은 제공하지 않는다.

@@ -51,6 +51,23 @@ export async function findActiveBatteryProductById(
   return data as BatteryProductDetailRow | null;
 }
 
+export async function findActiveBatteryProductsByBrandName(
+  brandName: string,
+): Promise<BatteryProductDetailRow[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("05_battery_product")
+    .select(
+      "battery_product_id, battery_part_key, brand_name, spec_code, voltage, length_mm, width_mm, height_mm, weight_kg, capacity_ah, watt_hour, internal_resistance_mohm, continuous_discharge_cca, max_discharge_cca, battery_type, terminal_polarity, terminal_type, product_image_url, product_url, seller_name, price",
+    )
+    .ilike("brand_name", brandName)
+    .eq("is_active", true)
+    .order("spec_code", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as BatteryProductDetailRow[];
+}
+
 export async function findCompatibleModelsByBatteryProductId(
   batteryProductId: number,
 ): Promise<CompatibleBatteryModelRow[]> {

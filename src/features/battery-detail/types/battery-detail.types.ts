@@ -31,3 +31,19 @@ export type BatteryProductDetail = {
   price: number | null;
   compatibleModels: CompatibleBatteryModel[];
 };
+
+export type BatteryProductListItem = Pick<
+  BatteryProductDetail,
+  | "batteryProductId"
+  | "brandName"
+  | "specCode"
+  | "voltage"
+  | "capacityAh"
+  | "continuousDischargeCca"
+  | "lengthMm"
+  | "widthMm"
+  | "heightMm"
+  | "batteryType"
+  | "productImageUrl"
+  | "price"
+>;
