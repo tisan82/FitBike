@@ -26,6 +26,7 @@ The public detail routes are:
 - SKU Detail: `/tire-detail/[tireProductId]`
 - Tire Model Detail: `/tire-detail/model/[tireModelKey]`
 - MAXXIS Tire Model Directory: `/tire-models/maxxis`
+- POWEROAD Battery Product Directory: `/battery-products/poweroad`
 
 Model Detail resolves an active `11_tire_model` by `tire_model_key` and lists
 all active `04_tire_product` rows with the resolved `tire_model_id`. Inactive
@@ -37,6 +38,11 @@ The MAXXIS directory resolves active `11_tire_model` rows with
 card to Tire Model Detail. Category/riding filters may use only stored,
 verified values; when those values are NULL the directory remains an unfiltered
 model list. It does not rank or recommend models.
+
+The POWEROAD battery directory resolves active `05_battery_product` rows with
+`brand_name = 'POWEROAD'`, orders them by `spec_code` ascending, and links each
+card to Battery Product Detail. It presents only stored product specifications
+and must not infer fitment from code, dimensions, voltage, or another product.
 
 ### SKU Fitment Disclosure
 

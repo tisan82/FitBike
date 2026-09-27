@@ -102,6 +102,32 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <section className="px-5 py-12 sm:py-16" aria-labelledby="brand-products-title">
+        <div className="mx-auto max-w-5xl">
+          <div className="max-w-2xl">
+            <p className="text-sm font-semibold text-primary">브랜드 상품 탐색</p>
+            <h2 className="mt-2 text-2xl font-bold leading-8" id="brand-products-title">등록된 타이어와 배터리를 살펴보세요.</h2>
+            <p className="mt-3 text-base leading-7 text-foreground-secondary">
+              상품 전체 목록에서 규격을 살펴본 뒤, 내 바이크 모델·연식에 맞는지는 상세 화면에서 확인할 수 있습니다.
+            </p>
+          </div>
+          <div className="mt-7 grid gap-4 sm:grid-cols-2">
+            <Link className="group rounded-3xl border border-border bg-surface p-6 transition hover:border-primary sm:p-8" href="/tire-models/maxxis">
+              <p className="text-sm font-bold text-primary">MAXXIS</p>
+              <h3 className="mt-2 text-xl font-bold">맥시스 타이어 전체 보기</h3>
+              <p className="mt-3 text-base leading-7 text-foreground-secondary">타이어 모델별 특징과 판매 규격을 확인하고 상세 상품으로 이동합니다.</p>
+              <p className="mt-6 font-bold text-primary">타이어 탐색하기 →</p>
+            </Link>
+            <Link className="group rounded-3xl border border-border bg-surface p-6 transition hover:border-primary sm:p-8" href="/battery-products/poweroad">
+              <p className="text-sm font-bold text-primary">POWEROAD</p>
+              <h3 className="mt-2 text-xl font-bold">파워로드 배터리 전체 보기</h3>
+              <p className="mt-3 text-base leading-7 text-foreground-secondary">배터리별 전압·용량·CCA와 연결된 바이크 모델·연식을 확인합니다.</p>
+              <p className="mt-6 font-bold text-primary">배터리 탐색하기 →</p>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section className="px-5 py-12 sm:py-16" id="guides">
         <div className="mx-auto max-w-5xl">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

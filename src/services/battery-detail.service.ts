@@ -1,6 +1,10 @@
-import type { BatteryProductDetail } from "@/features/battery-detail/types/battery-detail.types";
+import type {
+  BatteryProductDetail,
+  BatteryProductListItem,
+} from "@/features/battery-detail/types/battery-detail.types";
 import {
   findActiveBatteryProductById,
+  findActiveBatteryProductsByBrandName,
   findCompatibleModelsByBatteryProductId,
 } from "@/repositories/battery-detail.repository";
 
@@ -49,4 +53,25 @@ export async function getBatteryProductDetail(
       yearRangeLabel: item.year_range_label,
     })),
   };
+}
+
+export async function getActiveBatteryProductsByBrandName(
+  brandName: string,
+): Promise<BatteryProductListItem[]> {
+  const products = await findActiveBatteryProductsByBrandName(brandName);
+
+  return products.map((product) => ({
+    batteryProductId: product.battery_product_id,
+    brandName: product.brand_name,
+    specCode: product.spec_code,
+    voltage: product.voltage,
+    capacityAh: product.capacity_ah,
+    continuousDischargeCca: product.continuous_discharge_cca,
+    lengthMm: product.length_mm,
+    widthMm: product.width_mm,
+    heightMm: product.height_mm,
+    batteryType: product.battery_type,
+    productImageUrl: product.product_image_url,
+    price: product.price,
+  }));
 }

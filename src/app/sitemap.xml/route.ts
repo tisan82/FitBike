@@ -55,6 +55,7 @@ export async function GET() {
     { url: `${SITE_URL}/about` },
     { url: `${SITE_URL}/bike-selector` },
     { url: `${SITE_URL}/tire-models/maxxis` },
+    { url: `${SITE_URL}/battery-products/poweroad` },
     { url: `${SITE_URL}/contents` },
     { url: `${SITE_URL}/shops` },
   ];
