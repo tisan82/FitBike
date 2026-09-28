@@ -544,31 +544,14 @@ Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Ta
 - Producer 출력에는 Contract hash 일부를 포함해 어떤 입력 계약으로 처리했는지 추적할 수 있게 한다.
 
 
-## Scheduled Visual Source Strategy and Source Ingest
+
+## Scheduled Visual Source Strategy
 
 Writer는 Image Brief를 만들 때 **실제 외형 자체가 사용자 답의 Fact인지** 먼저 판단한다.
 
 - 특정 모델/제품의 실제 위치, 형상, UI, 포트, 라벨, 각인, 배선, 마모/손상, 장착 상태처럼 실제 외형이 검증 대상이면 `REAL_ASSET_FIRST` / `generation_allowed=false`를 사용한다.
 - 일반 공구 사용, 일반 측정 위치, 작업 흐름, 단위/변환, 비교/경고, 일반 배터리 극성 측정, 폐유 회수·밀폐 보관처럼 특정 제품 외형이 Fact가 아니면 `GENERATED_EDUCATIONAL_VISUAL` / `generation_allowed=true`를 기본으로 한다.
-- Rights Gate를 피하기 위한 목적이 아니라 사용자에게 실제 외형 증거가 필요한 경우에만 Real Asset을 강제한다.
+- Rights Gate 때문에 불필요하게 Real Asset을 선택하지 않는다. 실제 외형 증거가 사용자 답에 필요할 때만 강제한다.
 - 실제 외형이 Fact가 아닌데 `generation_allowed=false`인 Brief는 Writer Self QA 실패다.
-
-Scheduled Worker는 Real Asset 원본을 ephemeral local file로 직접 다운로드하는 것을 Production 의존성으로 삼지 않는다.
-
-`content_pipeline_request_source_ingest_v1`는 active Image Claim과 승인된 Rights metadata에 묶인 서버측 Ingest 요청을 생성한다. `24_content_pipeline_asset_ingest`가 요청 상태를 추적하고, Supabase `pg_net`이 `content-pipeline-source-ingest` Edge Function을 호출한다.
-
-Source Ingest Function은 다음을 수행한다.
-
-1. one-time ingest token 검증
-2. HTTPS source URL 및 redirect의 public-address 검증
-3. image MIME / 8MB source limit 검증
-4. ImageMagick WASM으로 최대 1600px, WebP quality 82 정규화
-5. 4MB output limit
-6. `content-assets/contents/<content-key>/<asset-key>.webp` 저장
-7. SHA-256 재다운로드 검증
-8. `17_content_asset_source` provenance 기록
-9. Image Task에 file/upload/storage/SHA 결과 반영
-
-Worker가 arbitrary server-side fetch 권한을 직접 가지지 않는다. Rights status는 `OWNED_APPROVED | LICENSED_APPROVED | PERMISSION_CONFIRMED`만 Ingest 요청에 사용할 수 있다. Ingest 요청 후 현재 Image Claim은 `SOURCE_INGEST_PENDING + VERIFY_INGESTED_SOURCE`로 RETRY 종료하고, 다음 Claim이 Storage 결과를 QA한 뒤 Image Complete를 수행한다.
-
-Generated path와 Real Asset path는 분리한다. Generated Asset은 기존 Upload Ticket 경로를 사용하고, Ingested Real Asset은 Source Ingest가 이미 WebP/Storage/SHA를 완료했으므로 overwrite하지 않는다.
+- Image Producer의 생성 요청 주변에는 다른 콘텐츠의 구체적인 Visual 예시를 넣지 않는다. 생성 도구가 대화 문맥을 참고할 수 있으므로 현재 `generationContract`의 subject/scene/objective/must-show/not-show만 생성 의도로 사용한다.
+- Real Asset의 서버측 Source Ingest는 검증된 WebP 변환 경로가 확보되기 전까지 Production Worker 계약으로 사용하지 않는다. 현재 Scheduled 환경에서 원본 바이너리를 확보할 수 없으면 `SOURCE_BINARY_UNAVAILABLE + REACQUIRE_SOURCE`로 RETRY하며 임의 생성으로 대체하지 않는다.
