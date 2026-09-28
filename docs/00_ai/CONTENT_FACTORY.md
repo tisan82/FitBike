@@ -542,3 +542,16 @@ Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Ta
 - Queue는 PENDING을 RETRY보다 우선할 수 있다. 반복 `BRIEF_MISMATCH` 2회 이상은 해당 Image에 60분 cooldown을 적용해 다른 Image Task가 진행될 수 있게 한다.
 - `next_eligible_at` 이전 Task는 Claim 대상이 아니다.
 - Producer 출력에는 Contract hash 일부를 포함해 어떤 입력 계약으로 처리했는지 추적할 수 있게 한다.
+
+
+
+## Scheduled Visual Source Strategy
+
+Writer는 Image Brief를 만들 때 **실제 외형 자체가 사용자 답의 Fact인지** 먼저 판단한다.
+
+- 특정 모델/제품의 실제 위치, 형상, UI, 포트, 라벨, 각인, 배선, 마모/손상, 장착 상태처럼 실제 외형이 검증 대상이면 `REAL_ASSET_FIRST` / `generation_allowed=false`를 사용한다.
+- 일반 공구 사용, 일반 측정 위치, 작업 흐름, 단위/변환, 비교/경고, 일반 배터리 극성 측정, 폐유 회수·밀폐 보관처럼 특정 제품 외형이 Fact가 아니면 `GENERATED_EDUCATIONAL_VISUAL` / `generation_allowed=true`를 기본으로 한다.
+- Rights Gate 때문에 불필요하게 Real Asset을 선택하지 않는다. 실제 외형 증거가 사용자 답에 필요할 때만 강제한다.
+- 실제 외형이 Fact가 아닌데 `generation_allowed=false`인 Brief는 Writer Self QA 실패다.
+- Image Producer의 생성 요청 주변에는 다른 콘텐츠의 구체적인 Visual 예시를 넣지 않는다. 생성 도구가 대화 문맥을 참고할 수 있으므로 현재 `generationContract`의 subject/scene/objective/must-show/not-show만 생성 의도로 사용한다.
+- Real Asset의 서버측 Source Ingest는 검증된 WebP 변환 경로가 확보되기 전까지 Production Worker 계약으로 사용하지 않는다. 현재 Scheduled 환경에서 원본 바이너리를 확보할 수 없으면 `SOURCE_BINARY_UNAVAILABLE + REACQUIRE_SOURCE`로 RETRY하며 임의 생성으로 대체하지 않는다.
