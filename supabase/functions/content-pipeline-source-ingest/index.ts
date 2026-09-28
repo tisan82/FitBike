@@ -2,8 +2,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { ImageMagick, initializeImageMagick, MagickFormat } from "npm:@imagemagick/magick-wasm@^0";
 
-const wasmBytes = await Deno.readFile(new URL("magick.wasm", import.meta.resolve("npm:@imagemagick/magick-wasm@^0")));
-await initializeImageMagick(wasmBytes);
+const wasmResponse = await fetch("https://cdn.jsdelivr.net/npm/@imagemagick/magick-wasm@0.0.43/dist/magick.wasm");
+if (!wasmResponse.ok) throw new Error("MAGICK_WASM_LOAD_FAILED");
+await initializeImageMagick(new Uint8Array(await wasmResponse.arrayBuffer()));
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const BUCKET = "content-assets";
