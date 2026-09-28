@@ -542,6 +542,9 @@ Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Ta
 - Queue는 PENDING을 RETRY보다 우선할 수 있다. 반복 `BRIEF_MISMATCH` 2회 이상은 해당 Image에 60분 cooldown을 적용해 다른 Image Task가 진행될 수 있게 한다.
 - `next_eligible_at` 이전 Task는 Claim 대상이 아니다.
 - Producer 출력에는 Contract hash 일부를 포함해 어떤 입력 계약으로 처리했는지 추적할 수 있게 한다.
+- 예약의 Image Generation 호출은 현재 Image Contract의 단일 콘텐츠 장면만 입력한다. 실행 결과 표, Worker 보고서, QA 대시보드, 이전 대화 이미지 등은 생성 입력이나 Production Asset이 아니다. 보고는 이미지 생성 완료 후 텍스트로만 작성한다.
+- 생성 도구 결과를 설명하는 메시지와 실제 픽셀 파일을 구분한다. 원본 바이너리에 접근해 육안 QA, WebP 변환, SHA-256 계산, Upload 응답 및 Storage 객체 확인까지 끝내지 못하면 Image Complete를 호출하지 않는다. 파일 접근 불가 시 Claim을 Fail RPC로 닫고 `SOURCE_BINARY_UNAVAILABLE`을 기록한다.
+- DB의 Image DONE 전환은 canonical `content-assets/contents/<content-key>/<asset-key>.webp` Storage 객체, WebP 메타데이터, 4MB 제한, 현재 Claim에 결합된 소비된 Upload Ticket이 있을 때만 허용한다. Worker의 PASS 문장만으로는 완료 상태를 증명하지 않는다.
 
 
 
