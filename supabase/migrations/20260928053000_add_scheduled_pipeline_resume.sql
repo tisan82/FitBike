@@ -30,3 +30,35 @@ end $$;
 
 revoke all on function public.content_pipeline_resume_stage_v1(bigint) from public,anon,authenticated;
 grant execute on function public.content_pipeline_resume_stage_v1(bigint) to service_role;
+
+
+create or replace function public.content_pipeline_fail_stage_v1(
+ p_pipeline_id bigint,p_pipeline_run_id bigint,p_expected_stage text,p_failure_status text,p_error text
+) returns jsonb language plpgsql security definer set search_path='' as $$
+declare p public."18_content_pipeline"%rowtype; v_reason text; v_retryable boolean;
+begin
+ if p_failure_status not in ('HOLD','BLOCKED') then raise exception using errcode='22023',message='CONTENT_PIPELINE_INVALID_FAILURE_STATUS'; end if;
+ v_reason := case
+   when p_error ilike '%UNSUPPORTED_EXECUTION_ENVIRONMENT%' then 'UNSUPPORTED_EXECUTION_ENVIRONMENT'
+   when p_error ilike '%ASSET_PRODUCTION_REQUIRED%' then 'ASSET_PRODUCTION_REQUIRED'
+   when p_error ilike '%STORAGE_UPLOAD_FAILED%' then 'STORAGE_UPLOAD_FAILED'
+   when p_error ilike '%RIGHTS_NOT_CONFIRMED%' then 'RIGHTS_NOT_CONFIRMED'
+   when p_error ilike '%FACT_CONFLICT%' then 'FACT_CONFLICT'
+   else p_failure_status
+ end;
+ v_retryable := v_reason in ('ASSET_PRODUCTION_REQUIRED','STORAGE_UPLOAD_FAILED');
+ update public."18_content_pipeline"
+ set stage=p_failure_status,last_error=left(p_error,2000),retry_count=retry_count+1,
+     resume_stage=p_expected_stage,hold_reason=v_reason,retryable=v_retryable,updated_at=now()
+ where pipeline_id=p_pipeline_id and stage=p_expected_stage and ownership_state='CLAIMED'
+ returning * into p;
+ if not found then raise exception using errcode='40001',message='CONTENT_PIPELINE_STATE_CONFLICT'; end if;
+ update public."19_content_pipeline_run"
+ set status=p_failure_status,completed_at=now(),error=left(p_error,2000),
+     metadata=coalesce(metadata,'{}'::jsonb)||jsonb_build_object('resumeStage',p_expected_stage,'holdReason',v_reason,'retryable',v_retryable)
+ where pipeline_run_id=p_pipeline_run_id and pipeline_id=p_pipeline_id and status='RUNNING';
+ return jsonb_build_object('pipelineId',p.pipeline_id,'topicKey',p.topic_key,'stage',p.stage,'resumeStage',p.resume_stage,'holdReason',p.hold_reason,'retryable',p.retryable,'error',p.last_error);
+end $$;
+
+revoke all on function public.content_pipeline_fail_stage_v1(bigint,bigint,text,text,text) from public,anon,authenticated;
+grant execute on function public.content_pipeline_fail_stage_v1(bigint,bigint,text,text,text) to service_role;
