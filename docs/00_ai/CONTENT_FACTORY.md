@@ -37,7 +37,7 @@ Content Factory는 콘텐츠 한 건을 하나의 Orchestration Context로 처�
 - `COMPLETE`는 DB insert만으로 기록하지 않고 실제 Production URL과 공개 Content 상태를 확인한 뒤 기록한다.
 - Pipeline/Run 테이블과 예약 RPC는 내부 자동화용이며 `service_role` 전용이다. 공개 클라이언트에서 직접 접근하지 않는다.
 - 예약 Worker는 단계별 실행 시각을 서로 기다리지 않고 자신의 Ready Queue를 독립적으로 소비한다. Planning+Research는 RESEARCHED, Writer는 DRAFTED/Image Brief, Image Producer는 이미지 단위 준비 상태, Final QA는 모든 필수 이미지 준비 상태를 기준으로 Claim한다.
-- Writer가 확정하는 이미지 수는 콘텐츠마다 가변이다. Image Producer는 콘텐츠 전체가 아니라 미완료 Image Brief를 처리하며 한 실행에서 최대 2건까지 처리할 수 있다. 이미 성공한 Generation/Image QA/WebP 결과는 후속 실패 때문에 재생성하지 않는다.
+- Writer가 확정하는 이미지 수는 콘텐츠마다 가변이다. Image Producer는 콘텐츠 전체가 아니라 미완료 Image Brief를 처리하며 한 실행에서 최대 1건만 Claim하고 처리한다. 이미 성공한 Generation/Image QA/WebP 결과는 후속 실패 때문에 재생성하지 않는다.
 - 예약 Image Producer는 `fitbike.co.kr` HTTP API를 경유하지 않는다. `content_pipeline_issue_asset_upload_ticket_v1`로 해당 Pipeline/Image에만 유효한 짧은 수명의 1회 Upload Ticket을 발급받은 뒤 Supabase Edge Function `content-pipeline-asset-upload`로 WebP를 직접 전송한다. Edge Function은 Ticket의 Pipeline, Content Key, Asset Key, 만료와 1회 사용 여부를 검증하고 Supabase 내부 `service_role`로 `content-assets`에 저장한 뒤 SHA-256을 재검증한다. 장기 `CONTENT_FACTORY_PUBLISH_TOKEN` 또는 `service_role`은 Prompt/Artifact/Worker에 노출하지 않는다. 일반 `anon`/`authenticated` Storage 쓰기 정책도 열지 않는다.
 - 생성 이미지에는 제3자 Web Asset 권리 Gate를 적용하지 않는다. 현재 Schema가 허용하는 `sourceType=GENERATED`, `rightsStatus=NOT_REQUIRED` 등 검증된 값을 사용하고, 외부/공식 실사 재사용에만 별도 권리 확인을 적용한다.
 
@@ -499,14 +499,14 @@ Scheduled Visual 작업의 동시성 Source of Truth는 Content 단위 `18_conte
 
 - `21_content_pipeline_image`: Image 1건의 현재 Queue/Claim/단계 상태
 - `23_content_pipeline_image_run`: 각 Image 처리 시도의 이력
-- `content_pipeline_sync_images_v1`: Writer의 `image_manifest`를 Image Task로 동기화
+- `content_pipeline_sync_images_v1`: Writer의 `image_briefs`(구형 Artifact는 `image_manifest`)를 활성 Image Task로 동기화하며 제외된 기존 Task는 `CANCELLED`로 이력과 함께 보존
 - `content_pipeline_claim_image_v1`: 처리 가능한 Image 1건을 원자적으로 Claim한다. `PROCESSING` Claim은 20분 TTL이며 만료된 Claim은 다시 회수할 수 있다.
 - `content_pipeline_complete_image_v1`: Generation, Image QA, WebP, Upload, Storage Verify가 모두 통과한 Image만 `DONE` 처리한다.
 - `content_pipeline_fail_image_v1`: 실패 단계를 Image 단위로 `RETRY/HOLD/BLOCKED`에 기록하고 Content 전체를 불필요하게 HOLD하지 않는다.
-- 각 Producer는 Image를 한 번에 하나씩 Claim한다. 최대 2개를 처리하는 실행도 첫 Image 완료/실패 기록 후 두 번째 Image를 새로 Claim한다.
+- 각 Producer는 실행당 Image Task 최대 1건을 Claim한다. Complete/Fail RPC로 Claim을 닫으면 성공·실패와 관계없이 종료하며 두 번째 Image를 Claim하지 않는다.
 - `SOURCE_BINARY_LOST`처럼 재생성 가능한 실행환경 문제는 `RETRY + REGENERATE`로 기록한다.
 - Content의 `IMAGE_READY` 전환은 해당 Pipeline의 Image Task가 1개 이상 존재하고 모두 `DONE`일 때만 허용한다.
-- `required_image_count`는 Image Task 수, `ready_image_count`는 `DONE` Task 수로 계산한다.
+- `required_image_count`는 `CANCELLED`를 제외한 활성 Image Task 수, `ready_image_count`는 `DONE` Task 수로 계산한다. Writer가 재작성하여 제외한 Task는 실패 이력을 유지하고 `CANCELLED`로 보존한다.
 - Final QA Worker는 `IMAGE_READY` Content만 처리하며 미완료 Visual Content를 HOLD시키지 않는다.
 
 
@@ -518,8 +518,8 @@ Scheduled Visual 작업의 동시성 Source of Truth는 Content 단위 `18_conte
 | --- | --- | --- |
 | Planning + Research | :00 | `content_pipeline_claim_planning_v1` → Planning complete → 동일 `pipeline_id`를 `content_pipeline_claim_stage_by_id_v1(..., 'PLANNED', 'RESEARCHING')`로 Research claim → Research complete/fail |
 | Writer + Visual Plan | :10 | `content_pipeline_claim_stage_v1('RESEARCHED','WRITING')` → Writer Artifact complete → `content_pipeline_sync_images_v1`로 Image Task 동기화 |
-| Image Producer 1 | :20 | `content_pipeline_claim_image_v1('image-producer-1')` → 이미지 단위 complete/fail, 회당 최대 2개 순차 처리 |
-| Image Producer 2 | :35 | `content_pipeline_claim_image_v1('image-producer-2')` → 이미지 단위 complete/fail, 회당 최대 2개 순차 처리 |
+| Image Producer 1 | :20 | `content_pipeline_claim_image_v1('image-producer-1')` → 이미지 단위 complete/fail, 회당 최대 1개 처리 |
+| Image Producer 2 | :35 | `content_pipeline_claim_image_v1('image-producer-2')` → 이미지 단위 complete/fail, 회당 최대 1개 처리 |
 | Final QA + Assembly | :50 | `content_pipeline_claim_stage_v1('IMAGE_READY','QA')` → Assembly/QA → QA_PASS complete/fail |
 
 Planning과 Research를 한 예약에서 연속 수행할 때 범용 Stage Claim으로 다른 `PLANNED` Item을 가져오지 않는다. 방금 Planning한 동일 Pipeline을 이어받기 위해 ID-scoped Claim RPC를 사용한다.
