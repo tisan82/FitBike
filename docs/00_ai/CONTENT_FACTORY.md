@@ -508,3 +508,24 @@ Scheduled Visual 작업의 동시성 Source of Truth는 Content 단위 `18_conte
 - Content의 `IMAGE_READY` 전환은 해당 Pipeline의 Image Task가 1개 이상 존재하고 모두 `DONE`일 때만 허용한다.
 - `required_image_count`는 Image Task 수, `ready_image_count`는 `DONE` Task 수로 계산한다.
 - Final QA Worker는 `IMAGE_READY` Content만 처리하며 미완료 Visual Content를 HOLD시키지 않는다.
+
+
+## Scheduled Worker Timing and RPC Contract
+
+예약 기반 Content Factory의 표준 실행 시각은 KST 기준 매시간 `:00 → :10 → :20 → :35 → :50`이다. 시각은 처리 순서를 보조하지만 Worker는 다른 Worker를 기다리지 않고 자신의 Ready Queue만 소비한다.
+
+| Worker | Time | Claim / Completion responsibility |
+| --- | --- | --- |
+| Planning + Research | :00 | `content_pipeline_claim_planning_v1` → Planning complete → 동일 `pipeline_id`를 `content_pipeline_claim_stage_by_id_v1(..., 'PLANNED', 'RESEARCHING')`로 Research claim → Research complete/fail |
+| Writer + Visual Plan | :10 | `content_pipeline_claim_stage_v1('RESEARCHED','WRITING')` → Writer Artifact complete → `content_pipeline_sync_images_v1`로 Image Task 동기화 |
+| Image Producer 1 | :20 | `content_pipeline_claim_image_v1('image-producer-1')` → 이미지 단위 complete/fail, 회당 최대 2개 순차 처리 |
+| Image Producer 2 | :35 | `content_pipeline_claim_image_v1('image-producer-2')` → 이미지 단위 complete/fail, 회당 최대 2개 순차 처리 |
+| Final QA + Assembly | :50 | `content_pipeline_claim_stage_v1('IMAGE_READY','QA')` → Assembly/QA → QA_PASS complete/fail |
+
+Planning과 Research를 한 예약에서 연속 수행할 때 범용 Stage Claim으로 다른 `PLANNED` Item을 가져오지 않는다. 방금 Planning한 동일 Pipeline을 이어받기 위해 ID-scoped Claim RPC를 사용한다.
+
+Writer의 완료 책임은 `WRITING → DRAFTED` 저장으로 끝나지 않는다. Writer Artifact의 `image_briefs`를 `21_content_pipeline_image`로 동기화하고, 동기화된 Task 수가 `required_image_count`와 일치하는지 확인해야 한다. Image Queue의 실행 상태 Source of Truth는 `21_content_pipeline_image`, 시도 이력은 `23_content_pipeline_image_run`이다.
+
+Image Producer만 이미지 생성/확보, Image QA, WebP, Upload, Storage Verify를 수행한다. Final QA는 Upload Ticket 발급, 이미지 생성·재생성, Upload Retry를 수행하지 않는다. 모든 Image Task가 DONE이면 Image Complete RPC가 Content를 `IMAGE_READY`로 전환하며, Final QA는 그 상태만 Claim한다.
+
+Final QA는 `IMAGE_READY → QA → QA_PASS`까지만 담당한다. QA_PASS는 Publish 완료가 아니며 실제 Publish는 별도 Publish Queue의 책임이다.
