@@ -1,0 +1,1 @@
+-- Production migration 20260928050849. Scheduled pipeline state is isolated from Work queue status.\n-- See docs/00_ai/CONTENT_FACTORY.md for the ownership/state contract.\n
