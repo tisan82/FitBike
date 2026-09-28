@@ -1,0 +1,1 @@
+-- Production migration 20260928050910. Adds content_pipeline_publish_v1 for scheduled publishing without mutating Work queue status.\n-- Final content tables remain shared with the service.\n
