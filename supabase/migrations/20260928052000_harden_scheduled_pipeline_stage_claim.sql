@@ -1,0 +1,4 @@
+-- Production migration: harden scheduled pipeline stage claims.
+-- Follow-up stages may claim only rows whose ownership_state is CLAIMED.
+-- This prevents RELEASED/COMPLETE scheduled rows from re-entering Research/Writer/Visual/QA/Publish.
+-- Production DB function: public.content_pipeline_claim_stage_v1(text,text)
