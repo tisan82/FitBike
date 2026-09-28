@@ -38,7 +38,7 @@ Content Factory는 콘텐츠 한 건을 하나의 Orchestration Context로 처�
 - Pipeline/Run 테이블과 예약 RPC는 내부 자동화용이며 `service_role` 전용이다. 공개 클라이언트에서 직접 접근하지 않는다.
 - 예약 Worker는 단계별 실행 시각을 서로 기다리지 않고 자신의 Ready Queue를 독립적으로 소비한다. Planning+Research는 RESEARCHED, Writer는 DRAFTED/Image Brief, Image Producer는 이미지 단위 준비 상태, Final QA는 모든 필수 이미지 준비 상태를 기준으로 Claim한다.
 - Writer가 확정하는 이미지 수는 콘텐츠마다 가변이다. Image Producer는 콘텐츠 전체가 아니라 미완료 Image Brief를 처리하며 한 실행에서 최대 2건까지 처리할 수 있다. 이미 성공한 Generation/Image QA/WebP 결과는 후속 실패 때문에 재생성하지 않는다.
-- 예약 Image Producer가 Production Asset API를 사용할 때 장기 `CONTENT_FACTORY_PUBLISH_TOKEN`을 Prompt나 Artifact에 복사하지 않는다. 대신 `content_pipeline_issue_asset_upload_ticket_v1`로 해당 Pipeline/Image에만 유효한 짧은 수명의 1회 Upload Ticket을 발급받아 사용한다. API는 Ticket의 Pipeline, Content Key, Asset Key, 만료와 1회 사용 여부를 검증한 뒤에만 Storage 저장을 허용한다.
+- 예약 Image Producer는 `fitbike.co.kr` HTTP API를 경유하지 않는다. `content_pipeline_issue_asset_upload_ticket_v1`로 해당 Pipeline/Image에만 유효한 짧은 수명의 1회 Upload Ticket을 발급받은 뒤 Supabase Edge Function `content-pipeline-asset-upload`로 WebP를 직접 전송한다. Edge Function은 Ticket의 Pipeline, Content Key, Asset Key, 만료와 1회 사용 여부를 검증하고 Supabase 내부 `service_role`로 `content-assets`에 저장한 뒤 SHA-256을 재검증한다. 장기 `CONTENT_FACTORY_PUBLISH_TOKEN` 또는 `service_role`은 Prompt/Artifact/Worker에 노출하지 않는다. 일반 `anon`/`authenticated` Storage 쓰기 정책도 열지 않는다.
 - 생성 이미지에는 제3자 Web Asset 권리 Gate를 적용하지 않는다. 현재 Schema가 허용하는 `sourceType=GENERATED`, `rightsStatus=NOT_REQUIRED` 등 검증된 값을 사용하고, 외부/공식 실사 재사용에만 별도 권리 확인을 적용한다.
 
 
