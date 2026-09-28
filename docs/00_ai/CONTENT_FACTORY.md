@@ -529,3 +529,16 @@ Writer의 완료 책임은 `WRITING → DRAFTED` 저장으로 끝나지 않는�
 Image Producer만 이미지 생성/확보, Image QA, WebP, Upload, Storage Verify를 수행한다. Final QA는 Upload Ticket 발급, 이미지 생성·재생성, Upload Retry를 수행하지 않는다. 모든 Image Task가 DONE이면 Image Complete RPC가 Content를 `IMAGE_READY`로 전환하며, Final QA는 그 상태만 Claim한다.
 
 Final QA는 `IMAGE_READY → QA → QA_PASS`까지만 담당한다. QA_PASS는 Publish 완료가 아니며 실제 Publish는 별도 Publish Queue의 책임이다.
+
+
+### Image Generation Contract
+
+Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Task의 유일한 생성/확보 입력으로 사용한다. Claim RPC는 broad Writer/Research Artifact 대신 정규화된 Contract와 SHA-256 `generationContractHash`를 반환하고 Run metadata에 동일 계약을 보존한다.
+
+- Contract는 pipeline/content/image/asset 식별자, subject, visual objective, source strategy, generation allowed, must show/not show, fact/safety dependency, text/mobile 요구를 포함한다.
+- 이전 Content, 이전 Image, 이전 생성 결과 또는 대화 컨텍스트의 Visual Prompt를 현재 작업에 상속하지 않는다.
+- `generation_allowed=false`이면 생성 모델 호출을 금지하고 실제/공식 Asset 전략만 사용한다.
+- Contract와 다른 주제의 결과는 `BRIEF_MISMATCH`이며 업로드하지 않는다.
+- Queue는 PENDING을 RETRY보다 우선할 수 있다. 반복 `BRIEF_MISMATCH` 2회 이상은 해당 Image에 60분 cooldown을 적용해 다른 Image Task가 진행될 수 있게 한다.
+- `next_eligible_at` 이전 Task는 Claim 대상이 아니다.
+- Producer 출력에는 Contract hash 일부를 포함해 어떤 입력 계약으로 처리했는지 추적할 수 있게 한다.
