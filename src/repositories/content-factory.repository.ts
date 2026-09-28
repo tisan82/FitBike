@@ -38,6 +38,25 @@ export async function publishContentFactoryPackage(payload: PublishRequest) {
   return data;
 }
 
+export async function consumeContentPipelineAssetUploadTicket(
+  pipelineId: number,
+  contentKey: string,
+  assetKey: string,
+  ticket: string,
+) {
+  const { data, error } = await createContentFactorySupabaseClient().rpc(
+    "content_pipeline_consume_asset_upload_ticket_v1",
+    {
+      p_pipeline_id: pipelineId,
+      p_content_key: contentKey,
+      p_asset_key: assetKey,
+      p_ticket: ticket,
+    },
+  );
+  if (error) throw new Error(`CONTENT_PIPELINE_UPLOAD_TICKET_FAILED:${error.message}`);
+  return data === true;
+}
+
 export async function uploadContentFactoryAsset(objectPath: string, bytes: Uint8Array) {
   const client = createContentFactorySupabaseClient();
   const expectedHash = createHash("sha256").update(bytes).digest("hex");
