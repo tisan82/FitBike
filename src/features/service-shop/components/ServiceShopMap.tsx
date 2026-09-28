@@ -104,21 +104,24 @@ export function ServiceShopMap({ shops, naverMapClientId }: Props) {
 
   useEffect(() => {
     if (!naverMapClientId) return;
+    let cancelled = false;
+    const onReady = () => { if (!cancelled) setMapReady(true); };
     if (getNaver()) {
-      setMapReady(true);
-      return;
+      queueMicrotask(onReady);
+      return () => { cancelled = true; };
     }
     const existing = document.querySelector<HTMLScriptElement>("script[data-fitbike-naver-map]");
     if (existing) {
-      existing.addEventListener("load", () => setMapReady(true), { once: true });
-      return;
+      existing.addEventListener("load", onReady, { once: true });
+      return () => { cancelled = true; existing.removeEventListener("load", onReady); };
     }
     const script = document.createElement("script");
     script.async = true;
     script.dataset.fitbikeNaverMap = "true";
     script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(naverMapClientId)}&submodules=geocoder`;
-    script.addEventListener("load", () => setMapReady(true), { once: true });
+    script.addEventListener("load", onReady, { once: true });
     document.head.appendChild(script);
+    return () => { cancelled = true; script.removeEventListener("load", onReady); };
   }, [naverMapClientId]);
 
   useEffect(() => {
