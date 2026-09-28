@@ -1,4 +1,5 @@
 import {
+  consumeContentPipelineAssetUploadTicket,
   findNextContentFactoryTopic,
   publishContentFactoryPackage,
   storeBlockedContentFactoryPackage,
@@ -12,9 +13,7 @@ const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 export class ContentFactoryConflictError extends Error {}
 export class ContentFactoryValidationError extends Error {}
 
-export async function getNextContentFactoryTopic() {
-  return findNextContentFactoryTopic();
-}
+export async function getNextContentFactoryTopic() { return findNextContentFactoryTopic(); }
 
 export async function transitionContentFactoryTopic(topicKey: string, update: QueueUpdate) {
   return updateContentFactoryTopic(topicKey, update);
@@ -29,6 +28,16 @@ export async function publishContentFactory(payload: PublishRequest) {
     throw new ContentFactoryValidationError("publishedAt은 현재 시각보다 미래일 수 없습니다.");
   }
   return publishContentFactoryPackage(payload);
+}
+
+export async function verifyScheduledAssetUploadTicket(
+  pipelineId: number,
+  contentKey: string,
+  assetKey: string,
+  ticket: string,
+) {
+  if (!Number.isSafeInteger(pipelineId) || pipelineId <= 0 || !ticket) return false;
+  return consumeContentPipelineAssetUploadTicket(pipelineId, contentKey, assetKey, ticket);
 }
 
 export async function storeContentFactoryAsset(contentKey: string, assetKey: string, file: File) {
