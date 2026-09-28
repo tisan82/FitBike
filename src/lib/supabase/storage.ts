@@ -28,6 +28,10 @@ export function getStoragePublicUrl(
     return normalizedPath;
   }
 
+  if (normalizedPath.startsWith("/brand-logos/")) {
+    return normalizedPath;
+  }
+
   const objectPath = normalizedPath.replace(/^\/+/, "");
   const resolvedBucketName =
     bucketName ?? (objectPath.startsWith("tire-models/") ? "tire-assets" : "bike-assets");
