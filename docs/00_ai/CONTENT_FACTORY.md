@@ -28,13 +28,14 @@ Content Factory는 콘텐츠 한 건을 하나의 Orchestration Context로 처�
 
 예약 기반 Content Factory는 단계 간 상태를 채팅 문맥에 의존하지 않는다.
 
-- `18_content_pipeline`: 콘텐츠 1건의 현재 Pipeline stage와 Planning/Research/Writer/Image/QA/Publish Artifact를 저장한다.
+- `18_content_pipeline`: 콘텐츠 1건의 예약 Pipeline stage와 Planning/Research/Writer/Image/QA/Publish Artifact를 저장한다.
 - `19_content_pipeline_run`: 각 예약 실행의 시작, PASS/HOLD/BLOCKED, 오류와 완료 시각을 기록한다.
-- Queue 원장은 계속 `16_content_topic`이며, Planning이 Candidate를 Claim할 때 기존 상태를 `PLANNED → GENERATING`으로 원자적으로 전환한다.
-- Research/Writer/Visual/QA/Publish 예약은 `18_content_pipeline.stage`가 자신의 선행 완료 상태일 때만 실행한다.
-- QA PASS 시 Topic은 기존 Publish API 계약에 맞게 `GENERATING → APPROVED`로 전환하고, 실제 게시는 기존 `content_factory_publish_v1`을 사용한다.
-- `COMPLETE`는 Content DB insert가 아니라 실제 Production URL과 게시 Topic/Content 연결이 확인된 뒤에만 기록한다.
-- Pipeline/Run 테이블과 상태 변경 RPC는 내부 자동화용이며 `service_role` 전용이다. 공개 클라이언트에서 직접 접근하지 않는다.
+- Queue 원장은 계속 `16_content_topic`이지만 예약 Pipeline은 기존 Work 진행 상태를 변경하지 않는다. Planning이 Candidate를 Claim해도 `16_content_topic.status`는 유지한다.
+- 주제 소유권은 공유한다. `18_content_pipeline.ownership_state`가 `CLAIMED` 또는 `COMPLETE`인 Topic은 기존 Work Queue의 `content_factory_next_topic_v1` 대상에서 제외하여 같은 주제를 Work와 예약이 중복 제작하지 않는다.
+- Research/Writer/Visual/QA/Publish 예약의 단계 상태와 HOLD/BLOCKED는 `18_content_pipeline`과 `19_content_pipeline_run`에서만 관리한다.
+- 예약 게시는 기존 Work용 `content_factory_publish_v1`을 변경하거나 호출하지 않고 예약 전용 `content_pipeline_publish_v1`을 사용한다. 최종 서비스 원장(`12_content`, 관계 테이블, `17_content_asset_source`)은 동일하게 사용한다.
+- `COMPLETE`는 DB insert만으로 기록하지 않고 실제 Production URL과 공개 Content 상태를 확인한 뒤 기록한다.
+- Pipeline/Run 테이블과 예약 RPC는 내부 자동화용이며 `service_role` 전용이다. 공개 클라이언트에서 직접 접근하지 않는다.
 
 
 기본 흐름:
