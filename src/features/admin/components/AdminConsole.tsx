@@ -36,7 +36,17 @@ export function AdminConsole() {
   }, [router]);
 
   useEffect(() => {
-    if (authReady && section === "data") void load();
+    if (!authReady || section !== "data") return;
+    let cancelled = false;
+    listResource(config, search).then((result) => {
+      if (!cancelled) setRows(result);
+    }).catch((cause) => {
+      if (!cancelled) setMessage(cause instanceof Error ? cause.message : "조회에 실패했습니다.");
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  // Search is submitted with the 조회 button, not on every keystroke.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authReady, resourceIndex, section]);
 
@@ -62,7 +72,7 @@ export function AdminConsole() {
     <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-primary">FitBike</p><h1 className="mt-1 text-3xl font-bold">Admin</h1></div><button className="min-h-11 rounded-xl border border-border px-4 font-semibold" onClick={async () => { await signOutAdmin(); router.replace("/admin/login"); }}>로그아웃</button></div>
     <nav className="mt-8 flex gap-2 overflow-x-auto pb-2" aria-label="관리자 메뉴">
       <button type="button" onClick={() => { setSection("operations"); setEditing(null); }} className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-bold ${section === "operations" ? "bg-primary text-primary-foreground" : "border border-border"}`}>운영 어드민</button>
-      {ADMIN_RESOURCES.map((item, index) => <button key={item.key} type="button" onClick={() => { setSection("data"); setResourceIndex(index); setEditing(null); }} className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold ${section === "data" && index === resourceIndex ? "bg-primary text-primary-foreground" : "border border-border"}`}>{item.label}</button>)}
+      {ADMIN_RESOURCES.map((item, index) => <button key={item.key} type="button" onClick={() => { if (section === "data" && index === resourceIndex) void load(); else setLoading(true); setSection("data"); setResourceIndex(index); setEditing(null); }} className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold ${section === "data" && index === resourceIndex ? "bg-primary text-primary-foreground" : "border border-border"}`}>{item.label}</button>)}
     </nav>
     {section === "operations" ? <OperationsAdmin /> : <section className="mt-8" aria-labelledby="data-admin-title">
       <div><p className="text-sm font-semibold text-primary">기준 데이터</p><h2 id="data-admin-title" className="mt-1 text-2xl font-bold">{config.label} 관리</h2></div>

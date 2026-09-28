@@ -49,7 +49,17 @@ export function OperationsAdmin() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    adminApi<OperationsOverview>("/api/internal/admin/operations").then((result) => {
+      if (!cancelled) setOverview(result);
+    }).catch((error) => {
+      if (!cancelled) setMessage(error instanceof Error ? error.message : "운영 현황을 불러오지 못했습니다.");
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const topics = useMemo(() => {
     if (!overview) return [];

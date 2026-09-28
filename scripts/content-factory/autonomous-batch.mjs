@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -9,10 +9,7 @@ import { classifyTopicRisk } from "./automation-policy.mjs";
 import { runAutonomousBatch } from "./autonomous-batch-engine.mjs";
 import { deriveModelCandidates } from "./autonomous-policy.mjs";
 import { evaluateCapabilities } from "./production-capabilities.mjs";
-import { repairContentDirectory } from "./content-repair.mjs";
-import { synchronizePublishArtifacts } from "./artifact-synchronization.mjs";
-import { isHoldResumeStateMachineFailure, resolveHoldResumePolicy } from "./hold-resume-policy.mjs";
-import { createFailureEntry } from "./failure-isolation.mjs";
+import { resolveHoldResumePolicy } from "./hold-resume-policy.mjs";
 import { resolveVisualHandoff } from "./visual-handoff.mjs";
 
 const execute = promisify(execFile);
