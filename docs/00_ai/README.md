@@ -17,6 +17,7 @@
   UX             `02_framework/SCREEN.md`                        공통 UX
   Feature        `03_service_modules/*`                          기능별 정책
   Model-Year Data `03_service_modules/MODEL_YEAR_DATA.md`         브랜드·모델·연식 Audit/보강 기준
+  Product Fitment `03_service_modules/PRODUCT_FITMENT.md`          타이어·배터리 상품/Fitment 운영 기준
   Actual DB      `04_database_schema/*`                          현재 Supabase 정확한 구조
 
 `AGENTS.md`가 AI 작업의 최상위 진입점이다.
