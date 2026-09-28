@@ -24,6 +24,19 @@ Content Factory는 콘텐츠 한 건을 하나의 Orchestration Context로 처�
 
 각 단계는 앞 단계의 구조화된 Artifact를 재사용한다. 이미 검증된 사실과 출처를 다음 단계에서 처음부터 다시 조사하지 않는다.
 
+### Scheduled Pipeline State
+
+예약 기반 Content Factory는 단계 간 상태를 채팅 문맥에 의존하지 않는다.
+
+- `18_content_pipeline`: 콘텐츠 1건의 현재 Pipeline stage와 Planning/Research/Writer/Image/QA/Publish Artifact를 저장한다.
+- `19_content_pipeline_run`: 각 예약 실행의 시작, PASS/HOLD/BLOCKED, 오류와 완료 시각을 기록한다.
+- Queue 원장은 계속 `16_content_topic`이며, Planning이 Candidate를 Claim할 때 기존 상태를 `PLANNED → GENERATING`으로 원자적으로 전환한다.
+- Research/Writer/Visual/QA/Publish 예약은 `18_content_pipeline.stage`가 자신의 선행 완료 상태일 때만 실행한다.
+- QA PASS 시 Topic은 기존 Publish API 계약에 맞게 `GENERATING → APPROVED`로 전환하고, 실제 게시는 기존 `content_factory_publish_v1`을 사용한다.
+- `COMPLETE`는 Content DB insert가 아니라 실제 Production URL과 게시 Topic/Content 연결이 확인된 뒤에만 기록한다.
+- Pipeline/Run 테이블과 상태 변경 RPC는 내부 자동화용이며 `service_role` 전용이다. 공개 클라이언트에서 직접 접근하지 않는다.
+
+
 기본 흐름:
 
 `TOPIC → PLAN → RESEARCH → FACT REGISTER → CONTENT OUTLINE → VISUAL PLAN → WRITE → ASSET RESEARCH → IMAGE BRIEF → CREATE/EDIT → ASSEMBLY → QA → PUBLISH GATE`
