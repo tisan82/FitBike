@@ -491,3 +491,20 @@ Work는 현재 Topic, 기존 Content, 공식 근거, 이미지 Brief, QA 결과�
 - 기존 QA 또는 Work QA에 판정 방법이 연결됨
 - Content Factory 저장소에 정책 전문 사본을 만들지 않음
 - 실제 콘텐츠 한 건 이상에 새 기준을 적용해 결과를 확인함
+
+
+## Scheduled Image Task Queue
+
+Scheduled Visual 작업의 동시성 Source of Truth는 Content 단위 `18_content_pipeline`의 `image_manifest`만으로 관리하지 않는다.
+
+- `21_content_pipeline_image`: Image 1건의 현재 Queue/Claim/단계 상태
+- `23_content_pipeline_image_run`: 각 Image 처리 시도의 이력
+- `content_pipeline_sync_images_v1`: Writer의 `image_manifest`를 Image Task로 동기화
+- `content_pipeline_claim_image_v1`: 처리 가능한 Image 1건을 원자적으로 Claim한다. `PROCESSING` Claim은 20분 TTL이며 만료된 Claim은 다시 회수할 수 있다.
+- `content_pipeline_complete_image_v1`: Generation, Image QA, WebP, Upload, Storage Verify가 모두 통과한 Image만 `DONE` 처리한다.
+- `content_pipeline_fail_image_v1`: 실패 단계를 Image 단위로 `RETRY/HOLD/BLOCKED`에 기록하고 Content 전체를 불필요하게 HOLD하지 않는다.
+- 각 Producer는 Image를 한 번에 하나씩 Claim한다. 최대 2개를 처리하는 실행도 첫 Image 완료/실패 기록 후 두 번째 Image를 새로 Claim한다.
+- `SOURCE_BINARY_LOST`처럼 재생성 가능한 실행환경 문제는 `RETRY + REGENERATE`로 기록한다.
+- Content의 `IMAGE_READY` 전환은 해당 Pipeline의 Image Task가 1개 이상 존재하고 모두 `DONE`일 때만 허용한다.
+- `required_image_count`는 Image Task 수, `ready_image_count`는 `DONE` Task 수로 계산한다.
+- Final QA Worker는 `IMAGE_READY` Content만 처리하며 미완료 Visual Content를 HOLD시키지 않는다.
