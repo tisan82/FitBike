@@ -99,8 +99,31 @@ Deno.serve(async (req) => {
       const bytes = new Uint8Array(await existing.arrayBuffer());
       const existingHash = await crypto.subtle.digest("SHA-256", bytes);
       const existingSha = Array.from(new Uint8Array(existingHash), (x) => x.toString(16).padStart(2, "0")).join("");
-      if (existingSha !== sha256) return out({ error: "ASSET_CONFLICT" }, 409);
-      return out({ status: "REUSED", bucket: BUCKET, storagePath, sha256, width, height, bytes: webp.length }, 200);
+      if (existingSha === sha256) {
+        return out({ status: "REUSED", bucket: BUCKET, storagePath, sha256, width, height, bytes: webp.length }, 200);
+      }
+      if (body.replaceExisting !== true) return out({ error: "ASSET_CONFLICT" }, 409);
+
+      const { error: replaceError } = await supabase.storage.from(BUCKET).upload(storagePath, webp, {
+        contentType: "image/webp",
+        upsert: true,
+        metadata: {
+          sourceAssetUrl,
+          sourcePageUrl: String(body.sourcePageUrl ?? ""),
+          sourceOwner: String(body.sourceOwner ?? ""),
+          rightsStatus: String(body.rightsStatus ?? "PENDING_OPERATOR_APPROVAL"),
+          pipelineImageId: String(pipelineImageId),
+        },
+      });
+      if (replaceError) return out({ error: "STORAGE_REPLACE_FAILED", detail: replaceError.message }, 500);
+
+      const { data: replaced, error: replaceVerifyError } = await supabase.storage.from(BUCKET).download(storagePath);
+      if (!replaced || replaceVerifyError) return out({ error: "STORAGE_VERIFY_FAILED" }, 500);
+      const replacedBytes = new Uint8Array(await replaced.arrayBuffer());
+      const replacedHash = await crypto.subtle.digest("SHA-256", replacedBytes);
+      const replacedSha = Array.from(new Uint8Array(replacedHash), (x) => x.toString(16).padStart(2, "0")).join("");
+      if (replacedSha !== sha256) return out({ error: "STORAGE_VERIFY_FAILED" }, 500);
+      return out({ status: "REPLACED", bucket: BUCKET, storagePath, sha256, width, height, bytes: webp.length }, 200);
     }
 
     const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, webp, {
