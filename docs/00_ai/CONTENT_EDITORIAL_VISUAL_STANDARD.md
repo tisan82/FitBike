@@ -207,3 +207,32 @@ Reference Asset을 활용할 때는:
 - 출처·원본 URL·운영자/저작자·편집 이력·권리 상태가 기록되고 이미지 자체가 QA를 통과하면 WebP/Storage 적재와 Image DONE까지 진행할 수 있다.
 - Image DONE은 “Production Asset 제작 완료”를 의미하며 “공개 게시 권리 승인 완료”를 의미하지 않는다.
 - 외부 실사의 권리 상태는 provenance/운영 이력으로 유지하며, 권리 상태 자체를 Visual 또는 Publish 자동 차단 조건으로 사용하지 않는다. 운영자가 별도로 관리한다.
+
+
+### Semantic Visual QA — Mandatory
+
+Technical file validation is necessary but not sufficient. Before an Image Task can become DONE, the worker must inspect the **actual final rendered image itself**, not only the source page text, filename, alt text, metadata, HTTP response, or generation prompt.
+
+PASS requires all of the following:
+
+1. **Actual Render Inspection** — inspect the final Production asset pixels after conversion/upload.
+2. **Visual Objective Match** — the visible scene directly supports `visual_objective`.
+3. **Must-show Evidence** — every `must_show` item is visibly identifiable in the image at the required mobile viewing size.
+4. **Must-not-show Absence** — no `must_not_show` item is visibly present.
+5. **User Question Test** — when shown without surrounding article text, the image must materially help answer `user_question_supported`. A merely related motorcycle/product/lifestyle photo is FAIL.
+6. **Information Density Test** — decorative scenery, brand splash/boot screens, generic parked-bike photos, or product beauty shots are FAIL when they do not expose the actual check point, state, location, relationship, or action the reader needs.
+7. **Source Asset Verification** — for REAL_ASSET_FIRST, verify the exact selected asset/frame. A relevant official source page does not make every image on that page relevant.
+8. **Mobile Test** — the intended check point must remain recognizable at approximately 390px viewport width.
+
+If Semantic Visual QA fails:
+- do not upload when failure is visible before upload;
+- if already uploaded, do not mark DONE;
+- if already DONE, reopen the Image Task for rework;
+- record the semantic mismatch reason;
+- do not weaken the Brief merely to make the existing asset pass.
+
+The final gate is therefore:
+
+`Semantic Render QA → Storage SHA → HTTP 200 → MIME → WebP Signature → Decode/Render → expected SHA → DONE`
+
+The worker must never infer Semantic PASS solely from source metadata or technical verifier output.
