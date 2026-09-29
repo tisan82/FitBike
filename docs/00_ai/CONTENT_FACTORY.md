@@ -549,6 +549,21 @@ Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Ta
 
 
 
+## Visual Claim Ordering — Mandatory
+
+3단계 Visual Image Producer의 실행 순서는 **Topic Queue 우선순위 → 하나의 Topic 고정 → Image ordinal 순차 처리 → Topic Image Complete → 다음 Topic**으로 고정한다.
+
+- Topic 선택은 `16_content_topic.priority ASC → content_topic_id ASC → pipeline_id ASC`를 따른다.
+- 선택된 최우선 미완료 Topic에 DONE이 아닌 Image가 하나라도 있으면 다른 Topic Image를 Claim하지 않는다.
+- 같은 Topic 안에서는 `ordinal ASC`를 따른다. 앞 ordinal이 DONE이 아니면 뒤 ordinal을 먼저 Claim하지 않는다.
+- 앞 Image가 `RETRY`이고 `next_eligible_at`을 기다리는 중이어도 다음 Topic으로 넘어가지 않는다. 해당 실행은 Claim 없이 종료하고 다음 실행에서 같은 Topic을 다시 확인한다.
+- 앞 Image가 유효한 `PROCESSING` Claim을 보유하고 있어도 다른 Topic으로 넘어가지 않는다.
+- Claim 만료 시 같은 Image를 reclaim하고, 그 Image가 DONE된 뒤에만 다음 ordinal로 이동한다.
+- Topic의 Required Image가 모두 DONE되어 Pipeline이 `IMAGE_READY`가 된 후에만 다음 Topic Queue로 이동한다.
+- 따라서 여러 예약 Worker가 동시에 실행되더라도 서로 다른 Topic을 병렬 제작하는 것을 기본 동작으로 사용하지 않는다.
+
+이 규칙은 프롬프트 권고가 아니라 `content_pipeline_claim_image_v1`에서 DB 레벨로 강제한다.
+
 ## Scheduled Visual Source Strategy
 
 Writer는 Image Brief를 만들 때 **실제 외형 자체가 사용자 답의 Fact인지** 먼저 판단한다.
