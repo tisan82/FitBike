@@ -275,3 +275,38 @@ The final gate is therefore:
 `Semantic Render QA → Storage SHA → HTTP 200 → MIME → WebP Signature → Decode/Render → expected SHA → DONE`
 
 The worker must never infer Semantic PASS solely from source metadata or technical verifier output.
+
+## 18. Image Producer E2E Completion Gate
+
+3단계는 개별 도구 성공이 아니라 아래 E2E 체인이 한 Image Task에서 끝나는 것을 완료 기준으로 한다.
+
+`Claim → Contract Isolation → Source/Generation → Semantic QA → Mobile QA → WebP → Generated Handoff/Source Ingest → Server-side Upload → Storage SHA Verify → Complete RPC → DONE`
+
+### Generated asset upload
+
+- 생성 이미지의 WebP binary는 Worker가 Supabase Function URL에 직접 HTTP 업로드하지 않는다.
+- QA PASS 후 `content_pipeline_begin_generated_asset_handoff_v1` 및 chunk RPC로 handoff를 완성한다.
+- `content_pipeline_dispatch_generated_asset_upload_v1`를 호출하여 DB의 `pg_net`이 Edge Function을 호출하게 한다.
+- 짧게 대기한 뒤 `content_pipeline_finalize_dispatched_upload_v1`를 호출한다. 응답이 아직 없으면 같은 Claim 안에서 제한적으로 재확인한다.
+- finalize가 DONE을 반환하기 전에는 다음 Image/Topic을 Claim하지 않는다.
+- `UPLOAD_RUNTIME_NETWORK_BLOCKED`, Worker DNS 실패를 이유로 직접 HTTP 재시도를 반복하지 않는다.
+
+### Retry classification
+
+- Semantic mismatch: 동일 Contract에서 새 자산 생성/탐색.
+- Source binary acquisition failure: 다른 독립 Source/Source Ingest 경로로 전환.
+- Generated upload failure: 새 이미지를 생성하지 않고 handoff/upload 구간만 재개.
+- Storage/SHA mismatch: 해당 자산을 DONE 처리하지 않고 binary/handoff 무결성부터 재검증.
+- 이미 DONE인 Image Task는 명시적 Replan/Rework 승인 없이 다시 생성하지 않는다.
+
+### Stabilization exit criteria
+
+3단계 구조 개선은 아래 조건을 모두 만족하면 완료로 본다.
+
+1. 서로 다른 Generated Image Task 3건 연속 E2E DONE.
+2. Real Asset Source Ingest Image Task 2건 연속 E2E DONE.
+3. Worker outbound DNS/HTTP 없이 Generated Asset Storage 업로드 성공.
+4. Storage path가 SHA suffix immutable 규칙을 준수하고 재다운로드 SHA 검증 PASS.
+5. DONE Image가 명시적 Replan 없이 다시 PENDING/RETRY로 회귀하지 않음.
+6. 실패 시 새 이미지를 불필요하게 재생성하지 않고 실패 Stage부터 재개.
+
