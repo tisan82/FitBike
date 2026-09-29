@@ -18,7 +18,7 @@ Local repository assets may exist as source/reference files, but before an activ
 
 ## Approved official manufacturer sources
 
-The operator has confirmed FitBike usage rights for official Honda, Yamaha, and BMW website information and images. When used:
+The operator manages and has confirmed FitBike usage rights for official website information and images from **all motorcycle manufacturers currently held/served in FitBike Production**. Do not maintain a fixed Honda/Yamaha/BMW whitelist; the current Production brand set defines the manufacturer scope. When used:
 
 - record `source_type=OFFICIAL`, `source_owner`, source page URL, source asset URL, and the content-specific edit description
 - set the rights state to the schema-supported approved value and note that operator approval was confirmed
@@ -36,7 +36,7 @@ Dealer, marketplace, press, blog, community, workshop, or other third-party imag
 - `PENDING_OPERATOR_APPROVAL` does not block source acquisition, content-specific editing, WebP conversion, upload to `content-assets`, Storage verification, or Image Task DONE
 - Storage presence is an internal Production Asset state and does **not** itself authorize public publication
 - never relabel a pending third-party source as `OFFICIAL_APPROVED`, `OPERATOR_APPROVED`, or FitBike-created
-- the Publish Gate must verify that any pending external-source asset has moved to a publication-allowed rights state before the content becomes publicly active
+- rights state is provenance/operations metadata; it must not by itself block Visual completion or Publish. The operator manages rights issues separately
 - rights-pending alone is not a Visual failure code; Visual failures remain technical/information failures such as source mismatch, binary acquisition failure, Image QA failure, WebP failure, upload failure, or Storage verification failure
 
 ## Required flow
