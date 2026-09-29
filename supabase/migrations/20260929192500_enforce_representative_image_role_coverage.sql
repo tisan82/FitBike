@@ -3,6 +3,8 @@ create or replace function public.content_pipeline_image_role_coverage_ready_v1(
 returns boolean language sql security invoker set search_path='' as $$
 select count(*) filter (where i.status<>'CANCELLED') > 0
  and count(*) filter (where i.status<>'CANCELLED') = count(*) filter (where i.status='DONE')
+ and count(*) filter (where i.status<>'CANCELLED' and upper(coalesce(i.image_brief->>'asset_role',i.image_brief->'image_brief'->>'asset_role','BODY')) in ('THUMBNAIL','THUMBNAIL_HERO')) > 0
+ and count(*) filter (where i.status<>'CANCELLED' and upper(coalesce(i.image_brief->>'asset_role',i.image_brief->'image_brief'->>'asset_role','BODY')) in ('HERO','THUMBNAIL_HERO')) > 0
  and not exists (
    select 1 from public."21_content_pipeline_image" x
    where x.pipeline_id=p_pipeline_id and x.status<>'CANCELLED'
