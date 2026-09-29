@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const INTERNAL_INGEST_KEY = Deno.env.get("CONTENT_PIPELINE_INTERNAL_INGEST_KEY") ?? "";
 const BUCKET = "content-assets";
 const CONTENT_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ASSET_KEY = /^(thumbnail|hero|body-[0-9]{2})$/;
@@ -11,6 +12,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     const ticket = req.headers.get("x-fitbike-upload-ticket") ?? "";
+    const internalKey = req.headers.get("x-fitbike-internal-ingest-key") ?? "";
+    const internalAuthorized = Boolean(INTERNAL_INGEST_KEY) && internalKey === INTERNAL_INGEST_KEY;
     const contentType = (req.headers.get("content-type") ?? "").toLowerCase();
 
     let pipelineId = 0;
@@ -59,7 +62,7 @@ Deno.serve(async (req: Request) => {
 
     if (
       !Number.isSafeInteger(pipelineId) || pipelineId <= 0 ||
-      !CONTENT_KEY.test(contentKey) || !ASSET_KEY.test(assetKey) || !ticket
+      !CONTENT_KEY.test(contentKey) || !ASSET_KEY.test(assetKey) || (!ticket && !internalAuthorized)
     ) return json({ error: "VALIDATION_ERROR" }, 422);
 
     if (bytes && (bytes.length < 1 || bytes.length > MAX_IMAGE_BYTES || !isWebP(bytes))) {
@@ -74,11 +77,13 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const { data: authorized, error: ticketError } = await supabase.rpc(
-      "content_pipeline_consume_asset_upload_ticket_v1",
-      { p_pipeline_id: pipelineId, p_content_key: contentKey, p_asset_key: assetKey, p_ticket: ticket },
-    );
-    if (ticketError || authorized !== true) return json({ error: "UPLOAD_TICKET_INVALID" }, 401);
+    if (!internalAuthorized) {
+      const { data: authorized, error: ticketError } = await supabase.rpc(
+        "content_pipeline_consume_asset_upload_ticket_v1",
+        { p_pipeline_id: pipelineId, p_content_key: contentKey, p_asset_key: assetKey, p_ticket: ticket },
+      );
+      if (ticketError || authorized !== true) return json({ error: "UPLOAD_TICKET_INVALID" }, 401);
+    }
 
     if (handoffId) {
       const { data: handoff, error: handoffError } = await supabase.rpc(
