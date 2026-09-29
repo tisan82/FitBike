@@ -454,3 +454,35 @@ Source provenance가 없더라도 현재 운영 정책상 사용 가능한 자�
 5. DONE Image가 명시적 Replan 없이 다시 PENDING/RETRY로 회귀하지 않음.
 6. 실패 시 새 이미지를 불필요하게 재생성하지 않고 실패 Stage부터 재개.
 
+
+
+## 19. Visual Location Guidance Production
+
+Image Contract의 목적이 사용자가 실제 바이크에서 점검 대상 또는 점검 위치를 쉽게 찾도록 안내하는 것이라면, 단순 실사 확보만으로 충분한지 먼저 판단한다.
+
+- 실사만으로 모바일에서 위치 식별이 어려우면 `guidance_mode: LOCATION_GUIDANCE`를 사용한다.
+- 원형/박스 Highlight, 화살표, 짧은 한글 Label, 단일 Callout을 허용한다.
+- 한 이미지에는 가능한 한 하나의 핵심 점검 대상을 표시한다. 다중 카드/대시보드/콜라주는 금지한다.
+- 실제 존재하지 않는 경고등·부품·손상·누유·수치·고장 상태를 추가하지 않는다.
+- 위치 안내 생성이 필요한 Contract는 `generation_allowed: true`, `guidance_mode: LOCATION_GUIDANCE`, `inspection_target`, `inspection_point`, `label_text`, `marker_allowed: true`를 명시한다.
+- Image Producer는 `generation_allowed: false`를 임의로 무시하지 않는다. Location Guidance가 필요한데 false이면 Contract 수정 대상으로 반환한다.
+
+### 19.1 Mobile Guidance QA
+
+390px에서 Target Visibility Gate와 Location Context Gate를 동시에 만족하고 다음을 추가 확인한다.
+
+- Marker가 실제 대상과 정확히 연결되는가.
+- Label이 읽히는가.
+- Label/Marker가 핵심 대상을 가리지 않는가.
+- 화살표가 다른 부품을 가리키지 않는가.
+- 불필요한 텍스트가 없는가.
+
+하나라도 실패하면 DONE 처리하지 않는다.
+
+### 19.2 Image SEO Preservation
+
+Writer의 ALT/ALT Draft와 최종 Production Asset의 의미 일치를 확인한다. ALT에는 반복 키워드, 이미지에 없는 상태, 확인되지 않은 원인, 제작 방법, AI/생성형 표현, 파일명/Asset ID를 넣지 않는다. Location Guidance 편집 후 ALT가 실제 이미지와 다르면 DONE 처리하지 않는다.
+
+THUMBNAIL/HERO/THUMBNAIL_HERO는 기존 `representativeImageQa`, `cardCropQa`, `heroCropQa`를 유지한다. BODY는 해당 Section 및 실제 점검 위치와 의미상 연결되어야 한다. SEO를 위해 관련 없는 이미지를 추가하지 않는다.
+
+Production 결과에는 가능한 경우 `asset_role`, `storage_path`, `sha256`, `alt`, `caption`, `section_context`와 대표 이미지 QA 결과를 유지한다. Image Producer는 SEO Title, Meta Description, Heading, 검색 키워드를 변경하지 않는다.
