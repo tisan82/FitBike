@@ -2,7 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const CONTENT_LIST_COLUMNS =
   "content_id,content_key,title,summary,content_type,thumbnail_image_storage_path,published_at";
-const CONTENT_DETAIL_COLUMNS = `${CONTENT_LIST_COLUMNS},hero_image_storage_path,body_blocks,created_at,updated_at`;
+const CONTENT_DETAIL_COLUMNS = `${CONTENT_LIST_COLUMNS},hero_image_storage_path,seo_title,h1,meta_description,thumbnail_alt,hero_alt,body_blocks,created_at,updated_at`;
 
 export type ContentListRow = {
   content_id: number;
@@ -16,6 +16,11 @@ export type ContentListRow = {
 
 export type ContentDetailRow = ContentListRow & {
   hero_image_storage_path: string | null;
+  seo_title: string | null;
+  h1: string | null;
+  meta_description: string | null;
+  thumbnail_alt: string | null;
+  hero_alt: string | null;
   body_blocks: unknown;
   created_at: string;
   updated_at: string;
