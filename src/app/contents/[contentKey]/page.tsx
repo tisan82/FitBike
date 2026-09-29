@@ -81,9 +81,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const path = `/contents/${encodeURIComponent(content.contentKey)}`;
   const hero = getStoragePublicUrl(content.heroImageStoragePath, "content-assets");
   const image = hero ?? absoluteUrl(DEFAULT_OG_IMAGE);
-  const description = metadataDescription(content.summary);
+  const seoTitle = content.seoTitle ?? content.title;
+  const description = content.metaDescription ?? metadataDescription(content.summary);
+  const imageAlt = content.heroAlt ?? content.thumbnailAlt ?? content.h1 ?? content.title;
   return {
-    title: content.title,
+    title: seoTitle,
     description,
     alternates: {
       canonical: path,
@@ -94,16 +96,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: "article",
       siteName: SITE_NAME,
       locale: "ko_KR",
-      title: `${content.title} | FitBike`,
+      title: `${seoTitle} | FitBike`,
       description,
       url: path,
-      images: [{ url: image, alt: content.title }],
+      images: [{ url: image, alt: imageAlt }],
       publishedTime: content.publishedAt,
       modifiedTime: content.updatedAt,
     },
     twitter: {
       card: "summary_large_image",
-      title: `${content.title} | FitBike`,
+      title: `${seoTitle} | FitBike`,
       description,
       images: [image],
     },
@@ -132,8 +134,8 @@ export default async function ContentDetailPage({ params }: Props) {
       {
         "@type": "Article",
         "@id": `${url}#article`,
-        headline: content.title,
-        description: content.summary,
+        headline: content.h1 ?? content.title,
+        description: content.metaDescription ?? content.summary,
         articleSection: labels[content.contentType],
         inLanguage: "ko-KR",
         datePublished: content.publishedAt,
@@ -181,7 +183,7 @@ export default async function ContentDetailPage({ params }: Props) {
             <span aria-hidden="true" className="text-border">|</span>
             <p className="text-foreground-secondary">등록일 {formatKoreanDate(content.publishedAt)}</p>
           </div>
-          <h1 className="mt-3 text-2xl font-bold leading-9 sm:text-3xl sm:leading-10">{content.title}</h1>
+          <h1 className="mt-3 text-2xl font-bold leading-9 sm:text-3xl sm:leading-10">{content.h1 ?? content.title}</h1>
           <p className="mt-5 text-base leading-7 text-foreground-secondary sm:text-lg sm:leading-8">{content.summary}</p>
         </header>
 
@@ -190,7 +192,7 @@ export default async function ContentDetailPage({ params }: Props) {
         {hero ? (
           <figure className="mt-8">
             <Image
-              alt={content.title}
+              alt={content.heroAlt ?? content.thumbnailAlt ?? content.h1 ?? content.title}
               className="aspect-video w-full rounded-2xl object-cover"
               height={675}
               priority
