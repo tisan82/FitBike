@@ -104,8 +104,8 @@ Deno.serve(async (req: Request) => {
       return json({ error: "GENERATED_HANDOFF_INTEGRITY_MISMATCH" }, 422);
     }
 
-    const objectPath = `contents/${contentKey}/${assetKey}.webp`;
     const sha256 = actualSha;
+    const objectPath = `contents/${contentKey}/${assetKey}-${sha256.slice(0, 12)}.webp`;
 
     const { data: existing, error: downloadError } = await supabase.storage.from(BUCKET).download(objectPath);
     if (existing && !downloadError) {
