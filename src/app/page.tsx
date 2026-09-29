@@ -7,7 +7,7 @@ import { DEFAULT_OG_IMAGE } from "@/lib/seo/site";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
 import { getPublishedContents } from "@/services/content.service";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: { absolute: "핏바이크 | 오토바이 부품 규격·정비 관리 가이드" },
