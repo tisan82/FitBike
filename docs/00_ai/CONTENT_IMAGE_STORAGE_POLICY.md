@@ -93,4 +93,19 @@ ChatGPT Work 또는 예약 Image Producer의 생성 파일이 로컬 런타임�
 - 조립된 binary의 byte 수 또는 SHA가 다르면 `GENERATED_HANDOFF_INTEGRITY_MISMATCH`로 Storage 반영을 거부한다.
 - 성공/실패와 관계없이 소비된 chunk binary는 즉시 삭제한다.
 - 재작업에서 기존 object를 바꿀 때만 `replaceExisting=true`를 사용한다.
-- 최종 DONE 전에 Storage 재다운로드 SHA 검증과 public URL HTTP 200 + `image/webp`를 확인한다.
+- 최종 DONE 전에 아래 Final Render Gate를 모두 통과해야 한다. HTTP 200 또는 MIME만으로 DONE 처리하지 않는다.
+
+### Final Render Gate — Mandatory
+
+모든 Hero/Thumbnail/Body Asset은 Image Task DONE 전에 다음 순서를 모두 통과해야 한다.
+
+`Storage SHA → Public HTTP 200 → MIME image/webp → RIFF/WEBP signature → actual WebP decode → DONE`
+
+- Storage에 저장된 binary를 다시 읽어 기록된 SHA-256과 일치해야 한다.
+- Public URL은 HTTP 200과 `image/webp`를 반환해야 한다.
+- binary header는 RIFF/WEBP signature를 만족해야 한다.
+- 실제 WebP decoder가 binary를 열어 width/height를 1px 이상으로 읽어야 한다.
+- Production `content-pipeline-image-verify`의 `decode=PASS`를 Final Render Gate 기준으로 사용한다.
+- HTTP 200 + `image/webp`라도 decode가 실패하면 `BROKEN_IMAGE_RESPONSE`로 보고 DONE/PASS 처리하지 않는다.
+- Source Ingest, Generated Asset Upload, DB Handoff, 재작업 교체 모두 동일 Gate를 적용한다.
+- 재작업은 cache-busted Public URL 검증 후 새 SHA와 decode 결과를 Image Run metadata에 기록한다.
