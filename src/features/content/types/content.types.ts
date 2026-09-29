@@ -42,6 +42,11 @@ export type ContentListItem = {
 
 export type PublishedContent = ContentListItem & {
   heroImageStoragePath: string | null;
+  seoTitle: string | null;
+  h1: string | null;
+  metaDescription: string | null;
+  thumbnailAlt: string | null;
+  heroAlt: string | null;
   bodyBlocks: ContentBlock[];
   createdAt: string;
   updatedAt: string;
