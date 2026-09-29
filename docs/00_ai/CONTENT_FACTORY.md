@@ -150,7 +150,7 @@ FitBike 콘텐츠에서 이미지는 장식물이 아니라 독립적인 정보 
 Visual Planner는 본문 작성과 별개로 다음 질문을 판단한다.
 
 - 사용자가 실제로 무엇을 봐야 이해할 수 있는가?
-- 실제 사진이 필요한가, 편집 이미지가 필요한가, 교육용 생성 이미지가 필요한가?
+- 실제 사진이 필요한가, 편집 이미지가 필요한가, 고객 점검 안내용 생성 이미지가 필요한가?
 - 위치, 접근, 정상/이상, 측정, 작업, 완료 상태 중 무엇을 보여줘야 하는가?
 - 모바일 390px 수준에서도 핵심을 식별할 수 있는가?
 
@@ -186,7 +186,7 @@ Visual 하나는 최소 하나의 명확한 Role과 User Question을 가져야 �
 3. 블로그의 실제 작업/실차 이미지
 4. 신뢰 가능한 전문 자료의 실제 이미지
 5. 기타 현장 맥락을 확인할 수 있는 웹 자료
-6. FitBike 교육용 신규 생성 이미지
+6. FitBike 점검 안내용 신규 생성 이미지
 
 공식/블로그/웹 이미지는 단순 복사하여 FitBike 최종 자산으로 취급하지 않는다. 원본은 Research/Editorial Source로 기록하고, 서비스 목적에 맞는 정보 구조를 먼저 정의한 뒤 허용된 편집 또는 독립적인 FitBike 교육용 Visual 생성에 사용한다.
 
@@ -202,7 +202,7 @@ Visual 하나는 최소 하나의 명확한 Role과 User Question을 가져야 �
 - 워터마크 영역만 Crop하여 사실상 제거하는 방식도 사용하지 않는다.
 - 해당 이미지는 사실/장면/Visual Requirement를 이해하기 위한 Research Reference로만 사용할 수 있다.
 - 같은 정보를 보여주는 워터마크 없는 공식/블로그/실제 자료를 다시 탐색한다.
-- 적절한 원본이 없으면 원본의 표현을 복제하지 않고, 검증된 사실과 Visual Requirement를 바탕으로 FitBike 목적의 독립적인 교육 이미지를 신규 생성한다.
+- 적절한 원본이 없으면 원본의 표현을 복제하지 않고, 검증된 사실과 Visual Requirement를 바탕으로 FitBike 목적의 독립적인 점검 안내 이미지를 신규 생성한다.
 
 ## 9. Real Asset vs Generated Visual
 
@@ -219,9 +219,9 @@ Visual 하나는 최소 하나의 명확한 Role과 User Question을 가져야 �
 
 생성 이미지가 특정 모델의 실제 구조나 실제 손상을 기록한 사진처럼 오인되게 만들지 않는다.
 
-### Generated Visual Preferred
+### Generated Guidance Visual
 
-다음은 독립적인 교육용 생성 이미지가 효과적이다.
+다음은 독립적인 고객 점검 안내용 생성 이미지가 효과적이다.
 
 - 작동 원리
 - 측정 원리와 접점
@@ -552,12 +552,15 @@ Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Ta
 
 Writer는 Image Brief를 만들 때 **실제 외형 자체가 사용자 답의 Fact인지** 먼저 판단한다.
 
-- 특정 모델/제품의 실제 위치, 형상, UI, 포트, 라벨, 각인, 배선, 마모/손상, 장착 상태처럼 실제 외형이 검증 대상이면 `REAL_ASSET_FIRST` / `generation_allowed=false`를 사용한다.
-- 일반 공구 사용, 일반 측정 위치, 작업 흐름, 단위/변환, 비교/경고, 일반 배터리 극성 측정, 폐유 회수·밀폐 보관처럼 특정 제품 외형이 Fact가 아니면 `GENERATED_EDUCATIONAL_VISUAL` / `generation_allowed=true`를 기본으로 한다.
+- 고객이 실제 바이크에서 찾아야 하는 위치, 실제 부품 형상, UI, 포트, 라벨, 각인, 배선, 마모/손상, 체결·장착 상태처럼 실제 외형 자체가 확인 정보이면 `REAL_ASSET_FIRST` / `generation_allowed=false`를 사용한다.
+- 특정 모델·제품의 정확한 구조가 확인 정보는 아니지만 실제 바이크를 다루는 고객에게 점검 위치·대상·행동·관계를 보여줄 필요가 있으면 `GENERATED_GUIDANCE_VISUAL` / `generation_allowed=true`를 사용할 수 있다. 생성 결과도 실제 바이크 점검 맥락이어야 하며 추상 교육자료·대시보드·카드·보고서·장식 이미지로 만들지 않는다.
 - Rights Gate 때문에 불필요하게 Real Asset을 선택하지 않는다. 실제 외형 증거가 사용자 답에 필요할 때만 강제한다.
 - Real Asset이 필요하고 적합한 원본을 확보했다면 권리 확인 대기만으로 Visual 작업을 실패시키지 않는다. 출처·실제 원본 URL·운영자/저작자·확인 시점·편집 이력과 `PENDING_OPERATOR_APPROVAL`을 기록하고 Image QA → WebP → Storage Verify → Image DONE까지 진행한다.
 - `NO_APPROVED_REAL_SOURCE`처럼 “승인된 권리 자산이 아직 없다”는 이유만으로 Visual Claim을 RETRY/HOLD/BLOCKED하지 않는다. Visual 실패는 Brief 충돌, 적합한 원본 부재, 바이너리 확보 실패, Image QA, WebP, Upload 또는 Storage Verify 실패처럼 제작 자체의 실패에 사용한다.
 - Publish Queue는 `PENDING_OPERATOR_APPROVAL` 외부 실사가 포함된 콘텐츠를 공개하기 전에 운영자 권리 확인 상태를 Gate로 검사한다.
+- Writer는 Source 후보를 찾기 전에 `고객이 실제 바이크에서 무엇을 확인해야 하는가`를 먼저 정의한다. 실제 외형·위치·상태가 확인 대상이면 Real Asset, 특정 구조가 Fact가 아니고 일반 점검 맥락을 안내하는 것이 목적이면 Generated Guidance를 검토한다. 실제 물체가 등장한다는 이유만으로 Real Asset을 선택하지 않는다.
+- `must_show` 전체가 한 장의 이미지에서 동시에 관찰 가능한지 One Image Feasibility Check를 수행한다. 차량 전체+작은 부품 근접+내부 배선+키 상태처럼 서로 다른 시야 수준을 한 장에 강제하면 Brief를 축소하거나 분리한다.
 - 실제 외형이 Fact가 아닌데 `generation_allowed=false`인 Brief는 Writer Self QA 실패다.
+- Generated Guidance 기본 계약은 `1 Scene + 1 User Question + 1 Check Point/Relationship + No Text`다.
 - Image Producer의 생성 요청 주변에는 다른 콘텐츠의 구체적인 Visual 예시를 넣지 않는다. 생성 도구가 대화 문맥을 참고할 수 있으므로 현재 `generationContract`의 subject/scene/objective/must-show/not-show만 생성 의도로 사용한다.
 - Real Asset은 Production `content-pipeline-source-ingest` Edge Function을 사용한다. 현재 PROCESSING Image Claim에 결합된 `content_pipeline_issue_source_ingest_ticket_v1` 1회용 Ticket으로 외부 HTTP(S) 원본을 서버에서 확보하고, MIME/용량 검증 → ImageMagick WASM decode → 최대 2000px 리사이즈 → WebP → SHA-256 → `content-assets/contents/<content-key>/<asset-key>.webp` 업로드 → Storage 재검증까지 수행한다. Ticket은 15분 만료·1회 소비이며 장기 secret을 Worker에 노출하지 않는다. 적합한 후보 하나의 ingest가 실패하면 같은 URL을 반복하지 말고 다음 독립 후보를 시도한다. 모든 독립 후보가 실패한 경우에만 `SOURCE_BINARY_UNAVAILABLE + REACQUIRE_SOURCE`로 RETRY한다.
