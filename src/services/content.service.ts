@@ -116,6 +116,11 @@ function mapDetailRow(row: ContentDetailRow): PublishedContent {
   return {
     ...mapListRow(row),
     heroImageStoragePath: row.hero_image_storage_path,
+    seoTitle: row.seo_title,
+    h1: row.h1,
+    metaDescription: row.meta_description,
+    thumbnailAlt: row.thumbnail_alt,
+    heroAlt: row.hero_alt,
     bodyBlocks: rawBlocks.map(parseBlock).filter((block): block is ContentBlock => block !== null),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
