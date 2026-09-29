@@ -141,3 +141,15 @@ Rules:
 5. Worker가 직접 Supabase Function URL로 curl/fetch하는 경로는 fallback으로도 사용하지 않는다.
 
 이 경로의 목적은 ChatGPT/예약 실행 환경별 outbound network 차이로 인한 `UPLOAD_RUNTIME_NETWORK_BLOCKED` 반복을 제거하는 것이다.
+
+## PDF source ingest
+
+공식 매뉴얼·카탈로그 등 PDF가 Visual Contract의 근거/자산으로 지정된 경우 `content-pipeline-source-ingest`가 PDF page를 직접 렌더링할 수 있다.
+
+- 입력 MIME: `application/pdf`
+- 필수 입력: `sourcePdfPage` (1-based page number)
+- 처리: PDF.js parse → page operator list → SVG → resvg WASM rasterize → ImageMagick WebP normalize
+- 최종 저장: 기존과 동일한 `contents/{contentKey}/{assetKey}-{sha12}.webp` immutable path
+- 저장 후 Storage 재다운로드 및 SHA-256 일치 검증을 반드시 수행한다.
+- PDF 페이지가 기술적으로 정상 렌더됐다는 사실은 Semantic QA PASS를 의미하지 않는다. 현재 Image Contract의 `must_show`, `must_not_show`, user question, mobile requirement를 별도로 검사한다.
+- PDF 전체를 임의로 이미지화하지 않는다. Writer/Research가 page를 특정할 수 있으면 Contract에 page를 전달하고, 특정하지 못한 경우 3단계가 공식 문서에서 관련 page를 먼저 확인한다.
