@@ -21,16 +21,16 @@ H2/H3는 행동형 장문보다 **대상 + 목적**을 우선한다. 예: `타�
 
 ## 4.1 Approved Manufacturer Assets
 
-FitBike 운영자가 사용 권리를 확인한 Honda, Yamaha, BMW 공식 사이트의 차량·부품·기술 이미지는 `OFFICIAL_APPROVED` 자산으로 우선 활용할 수 있다.
+FitBike 운영자는 **현재 FitBike Production에 보유·서비스하는 모든 바이크 제조사**의 공식 사이트 차량·부품·기술 이미지 활용 권리를 확보·관리한다. 특정 브랜드 whitelist를 두지 않으며, 현재 서비스 브랜드의 제조사 공식 자산은 `OFFICIAL_APPROVED` 자산으로 우선 활용할 수 있다.
 
 - 특정 모델 외형·부품 위치·차량 크기 예시는 생성 이미지보다 해당 제조사의 공식 실사를 우선한다.
 - 원본 페이지 URL, 원본 이미지 URL, 제조사, 확인 일자, 편집 내용과 사용 콘텐츠를 Asset Source에 기록한다.
 - 공식 자산의 브랜드 표식은 권리 승인 범위 안에서 허용한다. 제3자 워터마크나 판매처 표식은 허용하지 않는다.
 - 외부 hotlink는 금지하며 콘텐츠별 WebP로 변환해 FitBike Storage에서 제공한다.
 - 공식 이미지라도 다른 연식·트림을 현재 예시인 것처럼 표시하지 않는다.
-- Honda·Yamaha·BMW 외 제조사 및 제3자 자산은 출처와 권리 상태를 정확히 기록한다. 운영자 최종 확인 전에는 `PENDING_OPERATOR_APPROVAL`로 관리할 수 있으며, 이 상태만으로 Visual Production을 중단하지 않는다.
+- 현재 FitBike 서비스 브랜드의 제조사 공식 자산은 특정 브랜드명에 관계없이 동일한 승인 정책을 적용한다. 제3자 자산도 출처와 권리 상태를 정확히 기록하되, 권리 상태는 제작 제한 조건으로 사용하지 않는다.
 - `PENDING_OPERATOR_APPROVAL` 자산도 Image QA를 통과하면 콘텐츠별 WebP로 `content-assets`에 내재화할 수 있다. 이는 공개 게시 승인을 의미하지 않는다.
-- 실제 공개 Publish 전에는 Publish Gate가 해당 자산의 권리 상태를 다시 확인한다.
+- 권리 상태는 provenance/운영 이력으로 유지하며 Visual 또는 Publish 자동 차단 조건으로 사용하지 않는다. 운영자가 권리 문제를 별도 관리한다.
 
 ## 5. Image Must Teach
 각 이미지는 고객이 실제 바이크를 다룰 때 다음 중 최소 하나를 명확하게 확인할 수 있게 해야 한다: `어디를 볼 것인가`, `무엇을 확인할 것인가`, `어떤 상태가 문제인가`. 모바일 390px에서 핵심 대상이 식별되지 않거나 사진만 보고 확인 목적을 설명할 수 없으면 `IMAGE_INFORMATION_VALUE_FAIL`이다.
@@ -196,4 +196,4 @@ Reference Asset을 활용할 때는:
 - 권리 대기 상태만으로 Visual Task를 RETRY/HOLD/BLOCKED하지 않는다.
 - 출처·원본 URL·운영자/저작자·편집 이력·권리 상태가 기록되고 이미지 자체가 QA를 통과하면 WebP/Storage 적재와 Image DONE까지 진행할 수 있다.
 - Image DONE은 “Production Asset 제작 완료”를 의미하며 “공개 게시 권리 승인 완료”를 의미하지 않는다.
-- 외부 실사의 실제 공개 가능 여부는 Publish Gate에서 별도로 확인한다.
+- 외부 실사의 권리 상태는 provenance/운영 이력으로 유지하며, 권리 상태 자체를 Visual 또는 Publish 자동 차단 조건으로 사용하지 않는다. 운영자가 별도로 관리한다.
