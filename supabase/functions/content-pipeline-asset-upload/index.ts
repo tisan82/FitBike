@@ -17,7 +17,10 @@ Deno.serve(async (req: Request) => {
     let contentKey = "";
     let assetKey = "";
     let replaceExisting = false;
-    let bytes: Uint8Array;
+    let handoffId = "";
+    let bytes: Uint8Array | null = null;
+    let handoffExpectedSha = "";
+    let handoffExpectedBytes = 0;
 
     if (contentType.includes("application/json")) {
       const body = await req.json();
@@ -25,14 +28,19 @@ Deno.serve(async (req: Request) => {
       contentKey = String(body.contentKey ?? "");
       assetKey = String(body.assetKey ?? "");
       replaceExisting = body.replaceExisting === true;
+      handoffId = String(body.handoffId ?? "");
       const imageBase64 = String(body.imageBase64 ?? "");
-      if (!imageBase64 || imageBase64.length > Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 16) {
-        return json({ error: "VALIDATION_ERROR" }, 422);
-      }
-      try {
-        bytes = Uint8Array.from(atob(imageBase64), (c) => c.charCodeAt(0));
-      } catch {
-        return json({ error: "INVALID_BASE64" }, 422);
+      if (handoffId) {
+        // Resolved after the one-time upload ticket is validated.
+      } else {
+        if (!imageBase64 || imageBase64.length > Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 16) {
+          return json({ error: "VALIDATION_ERROR" }, 422);
+        }
+        try {
+          bytes = Uint8Array.from(atob(imageBase64), (ch) => ch.charCodeAt(0));
+        } catch {
+          return json({ error: "INVALID_BASE64" }, 422);
+        }
       }
     } else if (contentType.includes("multipart/form-data")) {
       const form = await req.formData();
@@ -51,11 +59,12 @@ Deno.serve(async (req: Request) => {
 
     if (
       !Number.isSafeInteger(pipelineId) || pipelineId <= 0 ||
-      !CONTENT_KEY.test(contentKey) || !ASSET_KEY.test(assetKey) ||
-      bytes.length < 1 || bytes.length > MAX_IMAGE_BYTES || !ticket
+      !CONTENT_KEY.test(contentKey) || !ASSET_KEY.test(assetKey) || !ticket
     ) return json({ error: "VALIDATION_ERROR" }, 422);
 
-    if (!isWebP(bytes)) return json({ error: "INVALID_WEBP_SIGNATURE" }, 422);
+    if (bytes && (bytes.length < 1 || bytes.length > MAX_IMAGE_BYTES || !isWebP(bytes))) {
+      return json({ error: "INVALID_WEBP" }, 422);
+    }
 
     const url = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -71,8 +80,32 @@ Deno.serve(async (req: Request) => {
     );
     if (ticketError || authorized !== true) return json({ error: "UPLOAD_TICKET_INVALID" }, 401);
 
+    if (handoffId) {
+      const { data: handoff, error: handoffError } = await supabase.rpc(
+        "content_pipeline_consume_generated_asset_handoff_v1",
+        { p_handoff_id: handoffId, p_pipeline_id: pipelineId, p_content_key: contentKey, p_asset_key: assetKey },
+      );
+      const row = Array.isArray(handoff) ? handoff[0] : null;
+      if (handoffError || !row?.image_base64) return json({ error: "GENERATED_HANDOFF_INVALID" }, 409);
+      try {
+        bytes = Uint8Array.from(atob(String(row.image_base64)), (ch) => ch.charCodeAt(0));
+      } catch {
+        return json({ error: "GENERATED_HANDOFF_INVALID_BASE64" }, 422);
+      }
+      handoffExpectedSha = String(row.expected_sha256 ?? "");
+      handoffExpectedBytes = Number(row.expected_bytes ?? 0);
+    }
+
+    if (!bytes || bytes.length < 1 || bytes.length > MAX_IMAGE_BYTES || !isWebP(bytes)) {
+      return json({ error: "INVALID_WEBP" }, 422);
+    }
+    const actualSha = await digest(bytes);
+    if (handoffId && (actualSha !== handoffExpectedSha || bytes.length !== handoffExpectedBytes)) {
+      return json({ error: "GENERATED_HANDOFF_INTEGRITY_MISMATCH" }, 422);
+    }
+
     const objectPath = `contents/${contentKey}/${assetKey}.webp`;
-    const sha256 = await digest(bytes);
+    const sha256 = actualSha;
 
     const { data: existing, error: downloadError } = await supabase.storage.from(BUCKET).download(objectPath);
     if (existing && !downloadError) {
