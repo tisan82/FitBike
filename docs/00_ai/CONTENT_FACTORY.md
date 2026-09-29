@@ -193,7 +193,7 @@ Visual 하나는 최소 하나의 명확한 Role과 User Question을 가져야 �
 
 원본 URL, Source Name, Author/Operator(확인 가능한 경우), Source Type, 발견 시점, 사용된 Content, Visual Role, 편집/재구성 목적과 권리 상태를 `17_content_asset_source`의 현재 schema가 지원하는 범위에서 기록한다. schema에 없는 필드를 임의 추가하지 않는다.
 
-권리 협의와 최종 권리 판단은 운영자가 관리한다. AI는 출처를 숨기거나 원본을 자체 제작물로 오인시키지 않는다. 외부 실사의 권리가 아직 확정되지 않았으면 현재 schema가 지원하는 `PENDING_OPERATOR_APPROVAL` 계열 상태로 기록한다. 이 상태는 Visual Production 실패가 아니며 원본 확보·편집·WebP·Storage 적재·Image Task DONE을 막지 않는다. 실제 공개 여부는 Publish Gate에서 권리 상태를 다시 확인한다.
+권리 협의와 최종 권리 판단은 운영자가 관리한다. AI는 출처를 숨기거나 원본을 자체 제작물로 오인시키지 않는다. 외부 실사의 권리가 아직 확정되지 않았으면 현재 schema가 지원하는 `PENDING_OPERATOR_APPROVAL` 계열 상태로 기록한다. 이 상태는 Visual Production 실패가 아니며 원본 확보·편집·WebP·Storage 적재·Image Task DONE을 막지 않는다. 권리 상태는 provenance/운영 이력으로 유지하며 Visual 또는 Publish 자동 차단 조건으로 사용하지 않는다. 운영자가 권리 문제를 별도로 관리한다.
 
 ## 8. Watermark Policy
 
@@ -529,7 +529,7 @@ Writer의 완료 책임은 `WRITING → DRAFTED` 저장으로 끝나지 않는�
 
 Image Producer만 이미지 생성/확보, Image QA, WebP, Upload, Storage Verify를 수행한다. Final QA는 Upload Ticket 발급, 이미지 생성·재생성, Upload Retry를 수행하지 않는다. 외부 실사의 `PENDING_OPERATOR_APPROVAL`은 이미지 제작 상태와 분리하며, provenance가 정확히 기록되고 Image QA·WebP·Storage Verify가 PASS이면 Image Task를 DONE으로 완료할 수 있다. 모든 Image Task가 DONE이면 Image Complete RPC가 Content를 `IMAGE_READY`로 전환하며, Final QA는 그 상태만 Claim한다.
 
-Final QA는 `IMAGE_READY → QA → QA_PASS`까지만 담당한다. QA_PASS는 Publish 완료가 아니며 실제 Publish는 별도 Publish Queue의 책임이다. Final QA는 권리 대기 상태를 숨기거나 승인으로 변경하지 않고 Publish Artifact에 전달한다. **실제 공개 Publish는 외부 실사의 권리 상태가 게시 가능 상태인지 확인한 뒤 수행한다.**
+Final QA는 `IMAGE_READY → QA → QA_PASS`까지만 담당한다. QA_PASS는 Publish 완료가 아니며 실제 Publish는 별도 Publish Queue의 책임이다. Final QA는 권리 대기 상태를 숨기거나 승인으로 변경하지 않고 Publish Artifact에 전달한다. **실제 공개 Publish는 권리 상태 자체를 자동 차단 조건으로 사용하지 않는다. 출처·권리 이력은 유지하되 운영자가 권리 문제를 별도로 관리한다.**
 
 
 ### Image Generation Contract
@@ -558,7 +558,7 @@ Writer는 Image Brief를 만들 때 **실제 외형 자체가 사용자 답의 F
 - Rights Gate 때문에 불필요하게 Real Asset을 선택하지 않는다. 실제 외형 증거가 사용자 답에 필요할 때만 강제한다.
 - Real Asset이 필요하고 적합한 원본을 확보했다면 권리 확인 대기만으로 Visual 작업을 실패시키지 않는다. 출처·실제 원본 URL·운영자/저작자·확인 시점·편집 이력과 `PENDING_OPERATOR_APPROVAL`을 기록하고 Image QA → WebP → Storage Verify → Image DONE까지 진행한다.
 - `NO_APPROVED_REAL_SOURCE`처럼 “승인된 권리 자산이 아직 없다”는 이유만으로 Visual Claim을 RETRY/HOLD/BLOCKED하지 않는다. Visual 실패는 Brief 충돌, 적합한 원본 부재, 바이너리 확보 실패, Image QA, WebP, Upload 또는 Storage Verify 실패처럼 제작 자체의 실패에 사용한다.
-- Publish Queue는 `PENDING_OPERATOR_APPROVAL` 외부 실사가 포함된 콘텐츠를 공개하기 전에 운영자 권리 확인 상태를 Gate로 검사한다.
+- Publish Queue는 `PENDING_OPERATOR_APPROVAL` 등 권리 상태 자체를 HOLD/BLOCKED/RETRY 사유로 사용하지 않는다. provenance는 그대로 전달·보존하고 운영자가 별도로 관리한다.
 - Writer는 Source 후보를 찾기 전에 `고객이 실제 바이크에서 무엇을 확인해야 하는가`를 먼저 정의한다. 실제 외형·위치·상태가 확인 대상이면 Real Asset, 특정 구조가 Fact가 아니고 일반 점검 맥락을 안내하는 것이 목적이면 Generated Guidance를 검토한다. 실제 물체가 등장한다는 이유만으로 Real Asset을 선택하지 않는다.
 - `must_show` 전체가 한 장의 이미지에서 동시에 관찰 가능한지 One Image Feasibility Check를 수행한다. 차량 전체+작은 부품 근접+내부 배선+키 상태처럼 서로 다른 시야 수준을 한 장에 강제하면 Brief를 축소하거나 분리한다.
 - 실제 외형이 Fact가 아닌데 `generation_allowed=false`인 Brief는 Writer Self QA 실패다.
