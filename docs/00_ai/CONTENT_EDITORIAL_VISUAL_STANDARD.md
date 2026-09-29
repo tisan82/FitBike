@@ -107,6 +107,30 @@ Generation Contract가 한 장면의 행동·상태 전달을 요구하고 별�
 - 생성 도구가 설명형 poster/infographic을 반환하면 장면의 주제가 맞더라도 `DASHBOARD_COMPOSITE_OUTPUT` 또는 `MULTI_BRIEF_IMAGE`로 FAIL하고 Storage에 올리지 않는다.
 - 재시도 instruction은 실패 결과의 시각 요소를 묘사해 상속하지 않고, 원래 Contract의 단일 장면과 negative constraint만으로 새로 구성한다.
 
+### Fresh Asset Selection Gate
+
+각 Image Claim은 **독립된 Source Selection 세션**으로 취급한다. 이전 Image Task에서 선택한 source page, source asset URL, Storage path, SHA, 생성 결과 또는 검색 후보를 현재 Task의 기본값으로 상속하지 않는다.
+
+- Claim 직후 source candidate 상태는 EMPTY에서 시작한다.
+- 현재 Claim의 `generationContractHash`, `visual_objective`, `must_show`, `must_not_show`, `user_question_supported`를 읽은 뒤에만 source 탐색을 시작한다.
+- `sourceAssetUrl`은 현재 Contract를 만족하는지 실제 asset을 확인한 뒤 현재 Task에 새로 결합한다.
+- 이전 Task의 sourceAssetUrl을 복사하거나 직전 성공 asset을 편의상 다음 assetKey로 다시 ingest하지 않는다.
+- 같은 source page에서 여러 사진을 사용할 수는 있지만 각 Image Task마다 **서로 다른 실제 asset**을 독립 선택하고 각각 Semantic QA한다.
+- 현재 Contract가 명시적으로 동일 자산 재사용을 요구하는 예외가 없다면 동일 Topic의 다른 DONE Image와 같은 sourceAssetUrl 또는 같은 SHA를 사용하지 않는다.
+- Source fetch가 실패하면 실패 URL을 반복하지 않고 다른 asset/source route로 전환하되, 이전 Image Task의 성공 자산으로 fallback하지 않는다.
+
+이 Gate의 목적은 이전 실행 결과가 다음 Claim의 입력으로 남는 **cross-task source carry-over**를 차단하는 것이다.
+
+### Same-Topic Duplicate Asset Gate
+
+Image Task DONE 직전에 같은 pipeline의 기존 DONE Image와 현재 후보를 비교한다.
+
+- 동일 SHA-256 → `DUPLICATE_VISUAL_ASSET`로 FAIL.
+- 동일 sourceAssetUrl → `DUPLICATE_SOURCE_ASSET`로 FAIL.
+- SHA가 달라도 crop/resize 등으로 실질적으로 같은 장면이며 서로 다른 Visual Contract를 해결하려는 경우 → Semantic QA FAIL.
+- 실패 시 현재 Image Task만 RETRY하고 기존 정상 DONE Image는 변경하지 않는다.
+- DB Complete RPC도 동일 SHA와 동일 sourceAssetUrl을 거부하여 Worker 판단 누락이 DONE으로 전파되지 않게 한다.
+
 ## 7. Human Presence and Representation
 
 이미지는 바이크, 부품, 점검 위치와 공구를 주 피사체로 삼고 사람은 기본적으로
