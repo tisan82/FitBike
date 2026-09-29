@@ -322,6 +322,104 @@ The final gate is therefore:
 
 The worker must never infer Semantic PASS solely from source metadata or technical verifier output.
 
+## 17. Thumbnail / Hero Production Gate
+
+Visual Image Producer는 Claim한 Image Contract의 `asset_role`을 확인하고 BODY뿐 아니라 대표 이미지 역할도 Production Asset과 Image Run metadata에 끝까지 보존한다.
+
+### 17.1 Asset Role Preservation
+
+허용 역할은 다음과 같다.
+
+- `THUMBNAIL`
+- `HERO`
+- `THUMBNAIL_HERO`
+- `BODY`
+
+- Claim/Generation Contract에 지정된 대표 이미지 역할을 임의로 `BODY`로 변경하지 않는다.
+- Writer & Visual Planner가 대표 이미지를 요구한 게시 대상 콘텐츠는 THUMBNAIL/HERO Production Asset이 준비되지 않은 상태를 Visual 완료로 간주하지 않는다.
+- `THUMBNAIL_HERO`는 하나의 Production Asset이 두 역할을 동시에 수행하는 명시적 역할이다.
+
+### 17.2 Representative Image QA
+
+THUMBNAIL/HERO 역할 자산은 일반 Semantic/Mobile/File QA에 더해 다음을 모두 검증한다.
+
+- 콘텐츠 전체 주제를 대표하는가.
+- 카드 크기로 축소해도 핵심 피사체가 식별되는가.
+- 모바일 390px에서도 의미가 유지되는가.
+- 카드 크롭에서 핵심 피사체가 잘리지 않는가.
+- Hero 영역 크롭에서도 의미가 유지되는가.
+- 지나친 근접 촬영 때문에 위치·상황을 이해하기 어려운 구도가 아닌가.
+- 워터마크, 깨진 이미지, 왜곡, 부적절한 텍스트가 없는가.
+- Target Visibility와 Location Context가 대표 이미지 용도에서도 균형을 유지하는가.
+
+Image Run metadata에는 역할과 함께 최소 다음 결과를 기록한다.
+
+- `assetRole`
+- `representativeImageQa: PASS|FAIL`
+- THUMBNAIL 포함 시 `cardCropQa: PASS|FAIL`
+- HERO 포함 시 `heroCropQa: PASS|FAIL`
+
+대표 이미지 후보가 일반 BODY QA를 통과해도 위 대표 이미지 QA 중 하나라도 실패하면 해당 대표 이미지 역할로 DONE 처리하지 않는다.
+
+### 17.3 Immutable Storage
+
+대표 이미지도 Content Factory immutable Storage 정책을 따른다.
+
+- THUMBNAIL: `contents/<content-key>/thumbnail-<sha12>.webp`
+- HERO: `contents/<content-key>/hero-<sha12>.webp`
+- BODY: `contents/<content-key>/body-<nn>-<sha12>.webp`
+
+`THUMBNAIL_HERO`가 동일한 실제 이미지 하나를 사용하는 경우 동일 immutable Storage Asset을 두 역할에서 참조할 수 있으며 동일 파일을 불필요하게 복제하지 않는다.
+
+### 17.4 Approved BODY Asset Reuse
+
+Writer & Visual Planner가 기존 BODY Production Asset을 `THUMBNAIL_HERO`로 명시 승인한 경우 다시 생성하거나 다시 다운로드하지 않는다.
+
+다음을 그대로 유지한다.
+
+- `storage_path`
+- `sha256`
+- Source provenance
+- rights status
+
+대신 대표 이미지 역할을 추가하고 card/hero Crop QA를 별도로 실행한다. 이 경우 metadata에 `reuseMode: REUSED`, 원본 `pipelineImageId` 및 원본 SHA를 기록한다.
+
+Writer의 명시적 승인 없이 Image Producer가 임의로 BODY 자산을 대표 이미지로 승격하지 않는다.
+
+### 17.5 Representative Image DONE Gate
+
+THUMBNAIL/HERO 역할 Image Task는 다음 조건을 모두 만족해야 DONE이다.
+
+- File PASS
+- Image QA PASS
+- Storage Upload PASS 또는 유효한 `REUSED`
+- Storage object 존재
+- SHA-256 일치
+- `representativeImageQa: PASS`
+- THUMBNAIL 역할이면 `cardCropQa: PASS`
+- HERO 역할이면 `heroCropQa: PASS`
+
+Source provenance가 없더라도 현재 운영 정책상 사용 가능한 자산이고 File/SHA/QA가 정상이라면 provenance 부재만으로 Image Task를 실패시키지 않는다. 확인 가능한 provenance는 계속 metadata에 보존한다.
+
+### 17.6 Duplicate / Cross-task Isolation
+
+- 대표 이미지도 동일 Topic의 기존 Image Task와 SHA 및 sourceAssetUrl 충돌을 검사한다.
+- 이전 Image Task 결과를 새 대표 이미지 Task의 기본값으로 승계하지 않는다.
+- 동일 Asset을 의도적으로 재사용하는 경우에만 `REUSED`로 기록하고 원본 Image Task와 SHA를 연결한다.
+- 의도하지 않은 동일 SHA/sourceAssetUrl 재사용은 기존 Fresh Asset Selection / Same-Topic Duplicate Asset Gate를 적용한다.
+
+### 17.7 Visual Completion Coverage Gate
+
+게시 대상 콘텐츠의 Visual 단계 완료 판정은 BODY 개수만으로 하지 않는다. 현재 Writer & Visual Planner의 Image Contract 전체에서 요구된 역할 coverage를 계산한다.
+
+- 필요한 BODY가 모두 DONE
+- THUMBNAIL 요구가 있으면 THUMBNAIL 역할을 충족하는 DONE/REUSED 자산 존재
+- HERO 요구가 있으면 HERO 역할을 충족하는 DONE/REUSED 자산 존재
+- `THUMBNAIL_HERO` 하나가 두 역할을 충족하는 것은 허용
+- 대표 이미지가 필요한 Contract인데 대표 이미지 coverage가 없으면 `IMAGE_READY`로 전환하지 않는다.
+
+즉 3단계 완료 조건은 단순 `readyImageCount == requiredImageCount`가 아니라 **Image Contract 역할 coverage까지 충족**해야 한다.
+
 ## 18. Image Producer E2E Completion Gate
 
 3단계는 개별 도구 성공이 아니라 아래 E2E 체인이 한 Image Task에서 끝나는 것을 완료 기준으로 한다.
