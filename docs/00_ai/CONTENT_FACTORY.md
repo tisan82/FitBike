@@ -560,4 +560,4 @@ Writer는 Image Brief를 만들 때 **실제 외형 자체가 사용자 답의 F
 - Publish Queue는 `PENDING_OPERATOR_APPROVAL` 외부 실사가 포함된 콘텐츠를 공개하기 전에 운영자 권리 확인 상태를 Gate로 검사한다.
 - 실제 외형이 Fact가 아닌데 `generation_allowed=false`인 Brief는 Writer Self QA 실패다.
 - Image Producer의 생성 요청 주변에는 다른 콘텐츠의 구체적인 Visual 예시를 넣지 않는다. 생성 도구가 대화 문맥을 참고할 수 있으므로 현재 `generationContract`의 subject/scene/objective/must-show/not-show만 생성 의도로 사용한다.
-- Real Asset의 서버측 Source Ingest는 검증된 WebP 변환 경로가 확보되기 전까지 Production Worker 계약으로 사용하지 않는다. 현재 Scheduled 환경에서 원본 바이너리를 확보할 수 없으면 `SOURCE_BINARY_UNAVAILABLE + REACQUIRE_SOURCE`로 RETRY하며 임의 생성으로 대체하지 않는다.
+- Real Asset은 Production `content-pipeline-source-ingest` Edge Function을 사용한다. 현재 PROCESSING Image Claim에 결합된 `content_pipeline_issue_source_ingest_ticket_v1` 1회용 Ticket으로 외부 HTTP(S) 원본을 서버에서 확보하고, MIME/용량 검증 → ImageMagick WASM decode → 최대 2000px 리사이즈 → WebP → SHA-256 → `content-assets/contents/<content-key>/<asset-key>.webp` 업로드 → Storage 재검증까지 수행한다. Ticket은 15분 만료·1회 소비이며 장기 secret을 Worker에 노출하지 않는다. 적합한 후보 하나의 ingest가 실패하면 같은 URL을 반복하지 말고 다음 독립 후보를 시도한다. 모든 독립 후보가 실패한 경우에만 `SOURCE_BINARY_UNAVAILABLE + REACQUIRE_SOURCE`로 RETRY한다.
