@@ -609,3 +609,18 @@ The final gate is therefore:
 `Semantic Render QA → Storage SHA → HTTP 200 → MIME → WebP Signature → Decode/Render → expected SHA → DONE`
 
 The worker must never infer Semantic PASS solely from source metadata or technical verifier output.
+
+
+## Generated Image Upload Transport — Mandatory
+
+Generated Production Asset 업로드는 Worker의 직접 HTTP/DNS 접근성에 의존하지 않는다.
+
+정식 경로는 다음 하나다.
+
+`Final WebP → content_pipeline_begin_generated_asset_handoff_v1 → append_generated_asset_chunk_v1 → content_pipeline_dispatch_generated_asset_upload_v1 → DB pg_net → content-pipeline-asset-upload Edge → Storage SHA verify → finalize_dispatched_upload_v1 → DONE`
+
+- Worker가 Supabase Edge Function URL에 직접 POST하는 방식은 정상 경로가 아니며 fallback으로 반복하지 않는다.
+- Worker outbound DNS/HTTP 실패는 이미지 재생성 사유가 아니다. Final WebP와 SHA를 유지하고 Upload 단계부터 재개한다.
+- Claim과 generated handoff의 기본 lease는 60분으로 운영한다. 긴 Visual QA/변환 때문에 20분 lease가 만료되어 정상 Asset을 재생성하는 문제를 방지한다.
+- Upload 단계에서 실패하면 동일 Final WebP/SHA를 재사용하며 Source/Generation 단계로 회귀하지 않는다.
+- dispatch 후에는 `upload_request_id`를 기준으로 서버 응답을 finalize하고, Edge가 반환한 Storage SHA가 Final WebP SHA와 일치해야 DONE 처리한다.
