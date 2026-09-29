@@ -580,3 +580,32 @@ Writer는 Image Brief를 만들 때 **실제 외형 자체가 사용자 답의 F
 - Generated Guidance 기본 계약은 `1 Scene + 1 User Question + 1 Check Point/Relationship + No Text`다.
 - Image Producer의 생성 요청 주변에는 다른 콘텐츠의 구체적인 Visual 예시를 넣지 않는다. 생성 도구가 대화 문맥을 참고할 수 있으므로 현재 `generationContract`의 subject/scene/objective/must-show/not-show만 생성 의도로 사용한다.
 - Real Asset은 Production `content-pipeline-source-ingest` Edge Function을 사용한다. 현재 PROCESSING Image Claim에 결합된 `content_pipeline_issue_source_ingest_ticket_v1` 1회용 Ticket으로 외부 HTTP(S) 원본을 서버에서 확보하고, MIME/용량 검증 → ImageMagick WASM decode → 최대 2000px 리사이즈 → WebP → SHA-256 → `content-assets/contents/<content-key>/<asset-key>.webp` 업로드 → Storage 재검증까지 수행한다. Ticket은 15분 만료·1회 소비이며 장기 secret을 Worker에 노출하지 않는다. 적합한 후보 하나의 ingest가 실패하면 같은 URL을 반복하지 말고 다음 독립 후보를 시도한다. 모든 독립 후보가 실패한 경우에만 `SOURCE_BINARY_UNAVAILABLE + REACQUIRE_SOURCE`로 RETRY한다.
+
+
+### Semantic Visual QA — Mandatory
+
+Technical file validation is necessary but not sufficient. Before an Image Task can become DONE, the worker must inspect the **actual final rendered image itself**, not only the source page text, filename, alt text, metadata, HTTP response, or generation prompt.
+
+PASS requires all of the following:
+
+1. **Actual Render Inspection** — inspect the final Production asset pixels after conversion/upload.
+2. **Visual Objective Match** — the visible scene directly supports `visual_objective`.
+3. **Must-show Evidence** — every `must_show` item is visibly identifiable in the image at the required mobile viewing size.
+4. **Must-not-show Absence** — no `must_not_show` item is visibly present.
+5. **User Question Test** — when shown without surrounding article text, the image must materially help answer `user_question_supported`. A merely related motorcycle/product/lifestyle photo is FAIL.
+6. **Information Density Test** — decorative scenery, brand splash/boot screens, generic parked-bike photos, or product beauty shots are FAIL when they do not expose the actual check point, state, location, relationship, or action the reader needs.
+7. **Source Asset Verification** — for REAL_ASSET_FIRST, verify the exact selected asset/frame. A relevant official source page does not make every image on that page relevant.
+8. **Mobile Test** — the intended check point must remain recognizable at approximately 390px viewport width.
+
+If Semantic Visual QA fails:
+- do not upload when failure is visible before upload;
+- if already uploaded, do not mark DONE;
+- if already DONE, reopen the Image Task for rework;
+- record the semantic mismatch reason;
+- do not weaken the Brief merely to make the existing asset pass.
+
+The final gate is therefore:
+
+`Semantic Render QA → Storage SHA → HTTP 200 → MIME → WebP Signature → Decode/Render → expected SHA → DONE`
+
+The worker must never infer Semantic PASS solely from source metadata or technical verifier output.
