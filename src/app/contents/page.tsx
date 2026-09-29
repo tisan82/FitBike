@@ -6,7 +6,7 @@ import { getPublishedContents } from "@/services/content.service";
 const title = "오토바이 정비·점검·DIY 가이드";
 const description = "오토바이 타이어·배터리·브레이크 점검, 교체 시기, DIY 방법과 모델별 부품 규격 정보를 찾아보세요.";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title,
