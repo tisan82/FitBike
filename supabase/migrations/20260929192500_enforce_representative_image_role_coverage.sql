@@ -22,3 +22,42 @@ $$;
 -- representativeImageQa/cardCropQa/heroCropQa are PASS and uses
 -- content_pipeline_image_role_coverage_ready_v1(pipeline_id) for IMAGE_READY.
 -- See CONTENT_EDITORIAL_VISUAL_STANDARD.md §17 for the normative gate.
+
+
+-- Patch the existing contract builder without changing its public signature.
+do $do$
+declare d text;
+begin
+ select pg_get_functiondef(p.oid) into d from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+ where n.nspname='public' and p.proname='content_pipeline_build_image_generation_contract_v1' limit 1;
+ d:=replace(d,'''contract_version'',1,','''contract_version'',2,');
+ d:=replace(d,'''role'',coalesce(inner_b->>''role'',b->>''role''),',
+ '''asset_role'',coalesce(inner_b->>''asset_role'',b->>''asset_role'',inner_b->>''role'',b->>''role'',''BODY''),
+    ''role'',coalesce(inner_b->>''visual_role'',inner_b->>''role'',b->>''role''),');
+ execute d;
+end $do$;
+
+-- Enforce representative-image QA and role coverage in the existing completion RPC.
+do $do$
+declare d text;
+begin
+ select pg_get_functiondef(p.oid) into d from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+ where n.nspname='public' and p.proname='content_pipeline_complete_image_v1' limit 1;
+ d:=replace(d,
+ 'if p_storage_bucket is null or p_storage_path is null or p_sha256 is null then
+   raise exception using errcode=''22023'',message=''CONTENT_PIPELINE_IMAGE_STORAGE_VERIFY_REQUIRED'';
+ end if;',
+ 'if p_storage_bucket is null or p_storage_path is null or p_sha256 is null then
+   raise exception using errcode=''22023'',message=''CONTENT_PIPELINE_IMAGE_STORAGE_VERIFY_REQUIRED'';
+ end if;
+ if upper(coalesce(i.image_brief->>''asset_role'',i.image_brief->''image_brief''->>''asset_role'',''BODY'')) in (''THUMBNAIL'',''HERO'',''THUMBNAIL_HERO'') then
+   if coalesce(p_metadata->>''representativeImageQa'',''FAIL'')<>''PASS'' then raise exception using errcode=''22023'',message=''CONTENT_PIPELINE_REPRESENTATIVE_IMAGE_QA_REQUIRED''; end if;
+   if upper(coalesce(i.image_brief->>''asset_role'',i.image_brief->''image_brief''->>''asset_role'')) in (''THUMBNAIL'',''THUMBNAIL_HERO'') and coalesce(p_metadata->>''cardCropQa'',''FAIL'')<>''PASS'' then raise exception using errcode=''22023'',message=''CONTENT_PIPELINE_CARD_CROP_QA_REQUIRED''; end if;
+   if upper(coalesce(i.image_brief->>''asset_role'',i.image_brief->''image_brief''->>''asset_role'')) in (''HERO'',''THUMBNAIL_HERO'') and coalesce(p_metadata->>''heroCropQa'',''FAIL'')<>''PASS'' then raise exception using errcode=''22023'',message=''CONTENT_PIPELINE_HERO_CROP_QA_REQUIRED''; end if;
+ end if;');
+ d:=replace(d,'stage=case when v_required>0 and v_done=v_required then ''IMAGE_READY'' else ''VISUAL'' end,',
+ 'stage=case when public.content_pipeline_image_role_coverage_ready_v1(i.pipeline_id) then ''IMAGE_READY'' else ''VISUAL'' end,');
+ d:=replace(d,'''contentStage'',case when v_required>0 and v_done=v_required then ''IMAGE_READY'' else ''VISUAL'' end',
+ '''contentStage'',case when public.content_pipeline_image_role_coverage_ready_v1(i.pipeline_id) then ''IMAGE_READY'' else ''VISUAL'' end');
+ execute d;
+end $do$;
