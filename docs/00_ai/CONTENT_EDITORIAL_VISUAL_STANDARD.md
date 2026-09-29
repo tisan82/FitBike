@@ -68,6 +68,33 @@ Production 사용을 차단한다.
 
 여러 콘텐츠, 여러 섹션, 여러 판단 단계를 한 번의 Production 이미지 생성 요청에 합치지 않는다.
 
+## 6.1 Generation Input Isolation Gate
+
+Image Producer는 실제 생성 호출 직전에 **현재 Claim의 Generation Contract만으로** 최종 Generation Instruction을 새로 구성한다. 이전 Image Task, 이전 생성 Prompt, 과거 대화의 이미지 설명, 다른 Topic의 Visual Brief 또는 생성 결과를 상속하거나 재사용하지 않는다.
+
+생성 직전 다음 값을 현재 Claim과 다시 대조한다.
+
+- `pipelineImageId`
+- `topicKey`
+- `imageId`
+- `assetKey`
+- `generationContractHash`
+- `visual_objective`
+- `must_show`
+- `must_not_show`
+- `user_question_supported`
+- `mobile_requirement`
+
+최종 Generation Instruction은 반드시 다음 순서로 현재 Contract에서 새로 만든다.
+
+`CURRENT TASK ONLY → visual_objective → must_show → must_not_show → mobile_requirement`
+
+- 최종 instruction의 장면, 대상, 행동, 부품, 배경 중 하나라도 현재 Contract에서 직접 유도되지 않으면 생성 호출을 중단하고 Contract를 다시 읽는다.
+- `generationContractHash`가 Claim 시점 값과 다르거나 확인할 수 없으면 이미지를 생성하지 않고 Claim/Contract 상태를 재검증한다.
+- 이미지 생성 도구가 이전 문맥을 참조할 가능성이 있더라도 현재 Contract 밖의 장면을 추가하지 않는다.
+- 생성 직후 실제 픽셀을 현재 Contract와 다시 비교하고 Semantic Visual QA를 통과하기 전에는 Storage에 업로드하지 않는다.
+- Contract와 다른 결과는 재사용·수정하여 억지로 통과시키지 않고 폐기한 뒤 현재 Contract에서 다시 독립 생성한다.
+
 ## 7. Human Presence and Representation
 
 이미지는 바이크, 부품, 점검 위치와 공구를 주 피사체로 삼고 사람은 기본적으로
