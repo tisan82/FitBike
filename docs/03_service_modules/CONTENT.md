@@ -202,11 +202,11 @@ Autonomous Batch의 부족한 Queue를 채우기 위해 FitBike DB의 모델별 
 ## Image Policy
 
 - Maintenance/DIY: 점검 위치, 작업 맥락, 상태 차이를 이해하는 Visual 우선
-- Parts Guide: 구조·표기·차이를 설명하는 Educational Visual 우선. 실제 제품 표현이 필요할 때만 승인 Brand Asset 사용
+- Parts Guide: 고객이 실제 바이크·부품에서 위치·표기·상태·차이를 확인할 수 있는 Guidance/Inspection Visual을 우선한다. 실제 외형·위치·구조가 확인 정보이면 Real Asset을 사용하고, 특정 실제 구조가 Fact가 아닌 일반 점검 맥락만 필요한 경우에만 독립 Guidance Visual을 생성한다.
 - Model Guide: **Bike Model Representation 우선**. 해당 모델 자체가 Hero/Thumbnail의 중심이어야 한다.
 - Model Guide에서 Tire/Battery/Brake Product Asset을 Hero/Thumbnail로 사용하지 않는다.
 - 이미지가 정보 전달에 도움이 되지 않으면 `NO_VISUAL`을 허용한다.
-- 생성 이미지는 실제 기술 구조, 규격, 제조사 사실처럼 오인되게 만들지 않는다.
+- 생성 Guidance Visual은 장식·교육자료가 아니라 실제 바이크 점검 맥락에서 고객이 무엇을 보고 어디를 확인할지 안내해야 한다. 실제 기술 구조, 규격, 제조사 사실처럼 오인되게 만들지 않는다.
 
 ## Existing Content Remediation
 
