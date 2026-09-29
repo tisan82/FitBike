@@ -19,6 +19,28 @@ H2/H3는 행동형 장문보다 **대상 + 목적**을 우선한다. 예: `타�
 ## 4. Real Image First
 실제 부품의 위치·형태·마모·누유·조작부를 알아야 하는 콘텐츠는 실사를 우선한다. 타이어 손상, 브레이크, 스로틀, 등화장치, 누유 위치, 포크 씰, 체인/벨트, 스탠드 등은 실제 구조가 식별되어야 한다. 적합한 실사가 없으면 무관한 기존 사진으로 채우지 않는다.
 
+## 4.0 Source Discovery Priority and Persistence Gate
+
+Image Producer의 Source 탐색 목표는 후보 N개를 시도하는 것이 아니라 **현재 Generation Contract를 만족하는 Production Asset 1개를 확보하는 것**이다.
+
+Source 우선순위는 다음과 같다.
+
+1. 제조사·공식 브랜드의 고해상도 실제 작업/부품 사진
+2. 제조사 공식 웹페이지·보도자료·기술 페이지의 고해상도 실사
+3. 공식 딜러·정비 기술자료의 실사
+4. 신뢰 가능한 전문 매체·정비 자료의 출처가 명확한 실사
+5. 기타 provenance가 명확하고 Contract를 직접 만족하는 실제 사진
+6. **공식 PDF/매뉴얼 페이지는 최하순위 fallback**
+
+- 403/404/timeout/download failure는 해당 후보 하나의 실패일 뿐 Source Discovery 전체 실패가 아니다. 같은 실패 URL을 반복하지 말고 즉시 다른 asset/source route로 전환한다.
+- 후보 1~2건 또는 임의의 소수 후보 실패만으로 RETRY/HOLD/BLOCKED/SOURCE_CANDIDATES_EXHAUSTED 처리하지 않는다.
+- 가능한 서로 다른 획득 전략을 충분히 탐색하고 Contract를 만족하는 자산 확보를 계속한다.
+- PDF는 공식 자료라는 이유만으로 웹 실사보다 우선하지 않는다. 실사 획득 경로를 충분히 탐색한 뒤 최후 fallback으로만 사용한다.
+- PDF를 사용하는 경우 **페이지 전체 단순 렌더를 Production Asset으로 채택하지 않는다.** 필요한 사진·도해 영역을 충분한 해상도로 추출/crop하여 390px 모바일에서 inspection target과 inspection point가 직접 식별될 때만 허용한다.
+- PDF page render에서 핵심 대상이 작거나 문서 여백·본문이 대부분을 차지하면 IMAGE_INFORMATION_VALUE_FAIL 또는 INSPECTION_TARGET_MISMATCH로 FAIL한다.
+- Source metadata, PDF 본문 설명 또는 기술적 변환 성공만으로 Semantic/Mobile QA를 PASS하지 않는다. 최종 WebP 픽셀을 실제로 확인한다.
+- SOURCE_CANDIDATES_EXHAUSTED는 공식 웹 실사, 다른 공식 페이지, 공식 딜러/기술자료, 신뢰 가능한 전문 실사, PDF fallback 등 **적용 가능한 서로 다른 탐색 전략을 소진한 사실과 실패 사유를 기록한 경우에만** 허용한다.
+
 ## 4.1 Approved Manufacturer Assets
 
 FitBike 운영자는 **현재 FitBike Production에 보유·서비스하는 모든 바이크 제조사**의 공식 사이트 차량·부품·기술 이미지 활용 권리를 확보·관리한다. 특정 브랜드 whitelist를 두지 않으며, 현재 서비스 브랜드의 제조사 공식 자산은 `OFFICIAL_APPROVED` 자산으로 우선 활용할 수 있다.
