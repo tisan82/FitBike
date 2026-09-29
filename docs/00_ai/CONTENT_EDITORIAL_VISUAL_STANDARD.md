@@ -479,10 +479,47 @@ Image Contract의 목적이 사용자가 실제 바이크에서 점검 대상 �
 
 하나라도 실패하면 DONE 처리하지 않는다.
 
-### 19.2 Image SEO Preservation
+### 19.2 Image SEO
 
-Writer의 ALT/ALT Draft와 최종 Production Asset의 의미 일치를 확인한다. ALT에는 반복 키워드, 이미지에 없는 상태, 확인되지 않은 원인, 제작 방법, AI/생성형 표현, 파일명/Asset ID를 넣지 않는다. Location Guidance 편집 후 ALT가 실제 이미지와 다르면 DONE 처리하지 않는다.
+Visual Image Producer는 Writer & Visual Planner가 확정한 Image Contract와 `seo_contract`를 기준으로 이미지의 검색·접근성 정보를 보존한다. Image Producer는 SEO 전략을 새로 만들지 않으며 SEO Title, Meta Description, Primary Query, Heading 등을 임의로 변경하지 않는다.
 
-THUMBNAIL/HERO/THUMBNAIL_HERO는 기존 `representativeImageQa`, `cardCropQa`, `heroCropQa`를 유지한다. BODY는 해당 Section 및 실제 점검 위치와 의미상 연결되어야 한다. SEO를 위해 관련 없는 이미지를 추가하지 않는다.
+#### ALT와 Production Image 일치 확인
 
-Production 결과에는 가능한 경우 `asset_role`, `storage_path`, `sha256`, `alt`, `caption`, `section_context`와 대표 이미지 QA 결과를 유지한다. Image Producer는 SEO Title, Meta Description, Heading, 검색 키워드를 변경하지 않는다.
+Writer가 지정한 ALT 또는 `alt_draft`가 실제 Production Image와 의미적으로 일치하는지 확인한다. 실제 확보·편집된 이미지가 Writer의 예상과 달라 기존 ALT가 실제 이미지를 설명하지 못하면 그대로 DONE 처리하지 않는다. ALT 수정 필요 상태와 실제 이미지에 맞는 수정안을 기록한다.
+
+ALT에는 반복 SEO 키워드, 이미지에 존재하지 않는 이상 상태, 확인되지 않은 고장 원인, 이미지 제작 방법, 생성형/AI 이미지 표현, 불필요한 파일명·Asset ID, 실제 이미지에 없는 수치나 부품 상태를 넣지 않는다.
+
+#### 대표 이미지 SEO
+
+`THUMBNAIL`, `HERO`, `THUMBNAIL_HERO`는 콘텐츠의 대표 검색/공유 이미지다. 콘텐츠 전체 주제와 Primary Search Intent에 의미적으로 연결되고, 모바일 카드와 Hero Crop에서 핵심 의미가 유지되어야 한다. 무관한 장식 이미지, 실제로 없는 고장·손상 암시, 과도한 텍스트는 허용하지 않는다.
+
+기존 `representativeImageQa`, `cardCropQa`, `heroCropQa`를 그대로 수행한다. `THUMBNAIL_HERO` 하나가 두 역할을 수행하면 Card와 Hero 각각 Crop QA를 수행한다.
+
+#### 모바일 가독성
+
+약 390px에서 핵심 대상과 필요한 위치 안내가 식별되어야 한다. Image Contract가 Arrow, Circle, Zoom Inset, Short Label을 요구하면 Location Guidance 정책을 따른다. SEO를 이유로 검색 키워드나 긴 설명을 이미지에 삽입하지 않고, 텍스트/위치 표시는 모바일에서 읽을 수 있는 최소 정보만 사용한다.
+
+#### BODY Image SEO
+
+BODY Image는 해당 Section의 실제 정보와 연결되어야 한다. 이미지 수 또는 SEO 목적의 무관한 이미지를 추가하지 않는다. Section Context, 사용자 이해 기여도, 실제 점검 대상/위치, Caption, ALT와 최종 이미지의 일치 여부를 확인한다.
+
+#### Production 결과 SEO 정보 보존
+
+가능한 경우 `asset_role`, `storage_path`, `sha256`, `alt`, `caption`, `section_context`, `representativeImageQa`, `cardCropQa`, `heroCropQa`를 보존한다. Writer의 ALT가 그대로 사용 가능하면 유지한다. 최종 Production Image 때문에 수정이 필요하면 기존 값을 조용히 덮어쓰지 말고 변경 이유와 수정안을 기록한다.
+
+#### Image SEO DONE Gate
+
+DONE 전에 다음을 모두 확인한다.
+
+- 실제 Production Image와 ALT 의미 일치
+- Caption과 실제 이미지 일치
+- Section Context와 이미지 일치
+- 대표 이미지라면 Representative Image QA PASS
+- 대표 이미지라면 Card Crop QA PASS
+- 대표 이미지라면 Hero Crop QA PASS
+- 모바일 식별성 PASS
+- 위치 안내가 필요한 이미지라면 Location Guidance QA PASS
+- SEO 목적의 불필요한 텍스트 없음
+- 실제 이미지에 없는 상태를 ALT가 주장하지 않음
+
+기존 File PASS, SHA 검증, Storage Upload, Source/Provenance, Rights, Collision QA 등의 Production Gate는 그대로 유지한다. Image SEO는 기존 Image Production Gate를 대체하지 않고 추가 검증 항목으로 적용한다.
