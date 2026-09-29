@@ -129,3 +129,15 @@ Rules:
 - The legacy `<assetKey>.webp` path may remain for compatibility, but Pipeline manifest, QA, and Publish use the immutable path recorded on the Image Task.
 - Final Render Gate requires public HTTP 200, `image/webp`, RIFF/WEBP signature, successful decode, non-zero dimensions, and exact expected SHA-256.
 - A Source Ingest response is not sufficient proof of completion. Only the independent Final Render Gate may authorize Image DONE.
+
+## Generated Asset Upload Transport
+
+예약 Image Producer의 생성 자산 업로드는 Worker의 외부 HTTP/DNS 연결에 의존하지 않는다.
+
+1. Worker는 QA PASS WebP를 `content_pipeline_begin_generated_asset_handoff_v1` + chunk RPC로 DB handoff에 적재한다.
+2. `content_pipeline_dispatch_generated_asset_upload_v1`가 Postgres `pg_net`으로 `content-pipeline-asset-upload` Edge Function을 호출한다.
+3. Edge Function은 WebP/SHA를 검증하고 `contents/{contentKey}/{assetKey}-{sha12}.webp` immutable 경로에 저장한다.
+4. `content_pipeline_finalize_dispatched_upload_v1`가 HTTP 응답의 bucket/path/SHA를 확인한 뒤 Image Task를 DONE 처리한다.
+5. Worker가 직접 Supabase Function URL로 curl/fetch하는 경로는 fallback으로도 사용하지 않는다.
+
+이 경로의 목적은 ChatGPT/예약 실행 환경별 outbound network 차이로 인한 `UPLOAD_RUNTIME_NETWORK_BLOCKED` 반복을 제거하는 것이다.
