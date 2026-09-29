@@ -109,3 +109,23 @@ ChatGPT Work 또는 예약 Image Producer의 생성 파일이 로컬 런타임�
 - HTTP 200 + `image/webp`라도 decode가 실패하면 `BROKEN_IMAGE_RESPONSE`로 보고 DONE/PASS 처리하지 않는다.
 - Source Ingest, Generated Asset Upload, DB Handoff, 재작업 교체 모두 동일 Gate를 적용한다.
 - 재작업은 cache-busted Public URL 검증 후 새 SHA와 decode 결과를 Image Run metadata에 기록한다.
+
+
+## Immutable WebP Storage and Binary Safety
+
+Source Ingest must not trust a remote `Content-Type` header or filename extension as proof of the image binary format.
+
+Required path:
+
+`remote bytes → actual decode → WebP encode → copy encoded bytes out of WASM-owned memory → RIFF/WEBP signature → WebP decode → SHA-256 → immutable Storage object → public Final Render Gate`
+
+Rules:
+
+- `magick-wasm` callback output must be copied (for example `Uint8Array.from(data)`) before the callback returns. Never retain a view into WASM-owned memory.
+- Every accepted JPEG/PNG/WebP source is decoded and normalized; remote `image/webp` is not pass-through merely because the server claims that MIME.
+- Before Storage upload, require RIFF/WEBP signature and a successful decode with non-zero dimensions.
+- Store new/reworked assets at `contents/<contentKey>/<assetKey>-<sha12>.webp`. The SHA suffix must equal the first 12 hex characters of the full stored SHA-256.
+- Do not use same-path overwrite as the primary Production path. Supabase CDN propagation can temporarily serve stale bytes after overwrite.
+- The legacy `<assetKey>.webp` path may remain for compatibility, but Pipeline manifest, QA, and Publish use the immutable path recorded on the Image Task.
+- Final Render Gate requires public HTTP 200, `image/webp`, RIFF/WEBP signature, successful decode, non-zero dimensions, and exact expected SHA-256.
+- A Source Ingest response is not sufficient proof of completion. Only the independent Final Render Gate may authorize Image DONE.
