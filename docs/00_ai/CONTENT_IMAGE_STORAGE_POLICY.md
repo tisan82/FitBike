@@ -41,7 +41,11 @@ Dealer, marketplace, press, blog, community, workshop, or other third-party imag
 
 ## Required flow
 
-`source/reference asset → content-specific review → optimize when appropriate → content-assets Storage → verify object → DB path replacement → Production QA`
+웹 실사 Real Asset은 `content_pipeline_issue_source_ingest_ticket_v1` → `content-pipeline-source-ingest`를 사용한다. Source Ingest는 현재 Image Claim에 결합된 15분/1회 Ticket을 소비하고, 외부 HTTP(S) 원본의 MIME·용량을 검증한 뒤 ImageMagick WASM으로 WebP를 만들고 SHA-256과 Storage 객체를 재검증한다. `PENDING_OPERATOR_APPROVAL`은 이 기술적 ingest를 막지 않는다.
+
+생성 이미지나 Worker가 이미 보유한 WebP는 기존 `content_pipeline_issue_asset_upload_ticket_v1` → `content-pipeline-asset-upload` 경로를 유지한다.
+
+`source/reference asset → content-specific review → source ingest or asset upload → content-assets Storage → verify object → DB path replacement → Production QA`
 
 ## QA gates
 
