@@ -95,6 +95,18 @@ Image Producer는 실제 생성 호출 직전에 **현재 Claim의 Generation Co
 - 생성 직후 실제 픽셀을 현재 Contract와 다시 비교하고 Semantic Visual QA를 통과하기 전에는 Storage에 업로드하지 않는다.
 - Contract와 다른 결과는 재사용·수정하여 억지로 통과시키지 않고 폐기한 뒤 현재 Contract에서 다시 독립 생성한다.
 
+### Single-Scene Generation Gate
+
+Generation Contract가 한 장면의 행동·상태 전달을 요구하고 별도 annotation/text 요구가 없으면 **기본 출력은 단일 실사형 장면**으로 고정한다.
+
+- 기본 생성 형식: `ONE REALISTIC SCENE / NO TEXT / NO PANELS / NO INSETS / NO INFOGRAPHIC / NO STEP NUMBERS`.
+- Contract가 직접 요구하지 않은 제목, 설명문, 체크리스트, 단계 번호, 카드 UI, 분할 화면, 확대 inset, 아이콘 범례를 생성하지 않는다.
+- Contract가 직접 요구하지 않은 계기판·경고등·부품 확대, 진단 결과, 고장 원인, 점검 순서를 추가하지 않는다.
+- `must_not_show`에 계기판 합성·복잡한 인포그래픽 등이 있으면 이를 최종 생성 instruction의 명시적 negative constraint로 다시 작성한다.
+- 위치 표시가 필요한 경우에도 `Mobile Text Inside Images` 정책에 따라 Writer의 Image Brief/Contract가 요구한 최소 annotation만 허용한다. 요구가 없으면 annotation을 추가하지 않는다.
+- 생성 도구가 설명형 poster/infographic을 반환하면 장면의 주제가 맞더라도 `DASHBOARD_COMPOSITE_OUTPUT` 또는 `MULTI_BRIEF_IMAGE`로 FAIL하고 Storage에 올리지 않는다.
+- 재시도 instruction은 실패 결과의 시각 요소를 묘사해 상속하지 않고, 원래 Contract의 단일 장면과 negative constraint만으로 새로 구성한다.
+
 ## 7. Human Presence and Representation
 
 이미지는 바이크, 부품, 점검 위치와 공구를 주 피사체로 삼고 사람은 기본적으로
