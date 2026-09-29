@@ -502,7 +502,7 @@ Scheduled Visual 작업의 동시성 Source of Truth는 Content 단위 `18_conte
 - `23_content_pipeline_image_run`: 각 Image 처리 시도의 이력
 - `content_pipeline_sync_images_v1`: Writer의 `image_briefs`(구형 Artifact는 `image_manifest`)를 활성 Image Task로 동기화하며 제외된 기존 Task는 `CANCELLED`로 이력과 함께 보존
 - `content_pipeline_claim_image_v1`: 처리 가능한 Image 1건을 원자적으로 Claim한다. `PROCESSING` Claim은 20분 TTL이며 만료된 Claim은 다시 회수할 수 있다.
-- `content_pipeline_complete_image_v1`: Generation, Image QA, WebP, Upload, Storage Verify가 모두 통과한 Image만 `DONE` 처리한다.
+- `content_pipeline_complete_image_v1`: Generation, Image QA, WebP, Upload, Storage Verify와 Final Render Gate(`Storage SHA → HTTP 200 → image/webp MIME → RIFF/WEBP signature → actual decode`)가 모두 통과한 Image만 `DONE` 처리한다. HTTP 200/MIME만으로는 완료하지 않으며 Production `content-pipeline-image-verify`의 `decode=PASS`와 width/height를 Image Run metadata에 기록한다.
 - `content_pipeline_fail_image_v1`: 실패 단계를 Image 단위로 `RETRY/HOLD/BLOCKED`에 기록하고 Content 전체를 불필요하게 HOLD하지 않는다.
 - 각 Producer는 실행당 Image Task 최대 1건을 Claim한다. Complete/Fail RPC로 Claim을 닫으면 성공·실패와 관계없이 종료하며 두 번째 Image를 Claim하지 않는다.
 - `SOURCE_BINARY_LOST`처럼 재생성 가능한 실행환경 문제는 `RETRY + REGENERATE`로 기록한다.
