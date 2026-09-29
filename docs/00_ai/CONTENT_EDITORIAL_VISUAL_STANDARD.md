@@ -1,6 +1,6 @@
 # FitBike Content Editorial & Visual Standard
 
-**Version:** v1.2
+**Version:** v1.3
 **Status:** Mandatory AI production rule  
 **Scope:** Content Factory의 Writing / Visual Planning / Image QA
 
@@ -156,7 +156,17 @@ Reference Asset을 활용할 때는:
 - responsive sizes를 제공해 모바일 과다운로드 방지
 
 ## 13. Mobile Text Inside Images
-390px 화면에서 일반 설명 약 16px CSS-equivalent, 보조 정보 약 14px 이상을 목표로 한다. 1200px 원본 기준 일반 설명 약 49px+, 핵심 라벨 55px+, 제목 68px+를 기본 시작점으로 한다. 글이 많으면 글자를 줄이지 말고 이미지를 분리하거나 HTML로 이동한다.
+이미지 내부 텍스트·Arrow·Circle·Label·Zoom Inset 같은 Annotation은 **항상 넣는 요소가 아니다**. 실사만으로 inspection target과 inspection point가 충분히 식별되면 추가하지 않는다. 고객이 실제 바이크에서 위치를 찾기 어렵거나 작은 단자·볼트·밸브·체결부를 오인할 가능성이 있을 때만 정보 전달을 위해 사용한다.
+
+- 위치 안내가 필요하면 검증된 실제 위치에 `ARROW`, `CIRCLE/MARKER`, `SHORT_LABEL`, `ZOOM_INSET` 등을 최소한으로 적용할 수 있다.
+- `ZOOM_INSET`은 동일한 inspection target의 **Context + Detail**을 보여줄 때만 허용한다. 서로 다른 Image Brief를 한 장에 합치는 용도로 사용하지 않는다.
+- Annotation은 실제 Source에서 확인된 사실만 강조한다. 확인되지 않은 단자 극성, 부품명, 체결부, 커버 개방 방향, 손상·누유·마모·균열, 수치·규격을 새로 만들어 표시하지 않는다.
+- 텍스트가 필요하지 않으면 넣지 않는다. 텍스트를 넣는 경우에는 짧은 부품명·확인 지점 중심으로 작성하고 긴 설명은 HTML 본문 또는 caption으로 이동한다.
+- **이미지 내부 텍스트는 최종 서비스의 모바일 390px 화면에서 실제로 읽을 수 있는 크기여야 한다.** 원본 이미지에서 크게 보이는 것만으로 통과시키지 않고 실제 모바일 표시 크기를 기준으로 QA한다.
+- 390px 화면에서 일반 설명 약 16px CSS-equivalent, 보조 정보 약 14px 이상을 목표로 한다. 1200px 원본 기준 일반 설명 약 49px+, 핵심 라벨 55px+, 제목 68px+를 기본 시작점으로 한다.
+- 글이 많으면 글자를 줄여 억지로 넣지 말고, 필요 시 이미지를 분리하거나 HTML로 이동한다.
+- Arrow/Marker/Label은 inspection target을 가리거나 실제 구조를 가리지 않아야 하며, 390px에서도 대상과 표시의 연결 관계가 명확해야 한다.
+- 모바일에서 텍스트나 위치 표시를 판독할 수 없으면 `MOBILE_TEXT_UNREADABLE` 또는 정보 목적에 따라 `IMAGE_INFORMATION_VALUE_FAIL`로 처리한다.
 
 ## 14. Production Image QA Gate
 ### Editorial / Information
