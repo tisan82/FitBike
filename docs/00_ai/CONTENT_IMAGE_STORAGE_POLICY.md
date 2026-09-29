@@ -28,6 +28,17 @@ The operator has confirmed FitBike usage rights for official Honda, Yamaha, and 
 
 Approval does not extend to dealer, marketplace, press re-upload, or unrelated third-party images merely depicting those brands.
 
+## Pending external-source rights
+
+Dealer, marketplace, press, blog, community, workshop, or other third-party images may be technically suitable even when operator rights confirmation is still pending.
+
+- record the original page URL, actual asset URL, source owner/author when known, checked time, edit history, and the schema-supported pending rights state
+- `PENDING_OPERATOR_APPROVAL` does not block source acquisition, content-specific editing, WebP conversion, upload to `content-assets`, Storage verification, or Image Task DONE
+- Storage presence is an internal Production Asset state and does **not** itself authorize public publication
+- never relabel a pending third-party source as `OFFICIAL_APPROVED`, `OPERATOR_APPROVED`, or FitBike-created
+- the Publish Gate must verify that any pending external-source asset has moved to a publication-allowed rights state before the content becomes publicly active
+- rights-pending alone is not a Visual failure code; Visual failures remain technical/information failures such as source mismatch, binary acquisition failure, Image QA failure, WebP failure, upload failure, or Storage verification failure
+
 ## Required flow
 
 `source/reference asset → content-specific review → optimize when appropriate → content-assets Storage → verify object → DB path replacement → Production QA`
