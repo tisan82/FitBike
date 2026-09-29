@@ -76,3 +76,21 @@ Production image QA fails when any active content contains:
 - `BROKEN_IMAGE_RESPONSE`
 
 Completion requires all active content Hero/Thumbnail/Body image references to resolve to managed Storage objects, with zero external hotlinks and zero local public image references.
+
+
+## Generated Asset DB Handoff
+
+ChatGPT Work 또는 예약 Image Producer의 생성 파일이 로컬 런타임에만 존재하고 외부 HTTP multipart 전송을 사용할 수 없는 경우, 생성 파일을 로컬 경로에 남긴 채 RETRY하지 않는다.
+
+정식 경로:
+
+`Generated WebP → content_pipeline_begin_generated_asset_handoff_v1 → chunk append → one-time Upload Ticket → content-pipeline-asset-upload(handoffId) → content-assets → SHA 재검증 → public HTTP QA → Image DONE`
+
+- Handoff는 현재 PROCESSING Image Claim token과 결합한다.
+- 최대 4MB이며 예상 SHA-256, byte 수, chunk 수를 시작 시 고정한다.
+- chunk staging 테이블은 service_role 전용이며 anon/authenticated 접근을 허용하지 않는다.
+- Asset Upload는 모든 chunk가 존재할 때만 handoff를 한 번 소비한다.
+- 조립된 binary의 byte 수 또는 SHA가 다르면 `GENERATED_HANDOFF_INTEGRITY_MISMATCH`로 Storage 반영을 거부한다.
+- 성공/실패와 관계없이 소비된 chunk binary는 즉시 삭제한다.
+- 재작업에서 기존 object를 바꿀 때만 `replaceExisting=true`를 사용한다.
+- 최종 DONE 전에 Storage 재다운로드 SHA 검증과 public URL HTTP 200 + `image/webp`를 확인한다.
