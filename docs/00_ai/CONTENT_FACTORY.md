@@ -36,6 +36,7 @@ Content Factory는 콘텐츠 한 건을 하나의 Orchestration Context로 처�
 - 예약 게시는 기존 Work용 `content_factory_publish_v1`을 변경하거나 호출하지 않고 예약 전용 `content_pipeline_publish_v1`을 사용한다. 최종 서비스 원장(`12_content`, 관계 테이블, `17_content_asset_source`)은 동일하게 사용한다.
 - `COMPLETE`는 DB insert만으로 기록하지 않고 실제 Production URL과 공개 Content 상태를 확인한 뒤 기록한다.
 - Pipeline/Run 테이블과 예약 RPC는 내부 자동화용이며 `service_role` 전용이다. 공개 클라이언트에서 직접 접근하지 않는다.
+- 예약 Planning Worker의 신규 Topic 진입점은 `content_pipeline_planning_next_v2()`를 사용한다. 이 함수는 기존 `content_pipeline_claim_planning_v1()`의 `FOR UPDATE SKIP LOCKED` 원자적 Claim을 그대로 위임하는 `service_role` 전용 wrapper다. v1은 호환성을 위해 유지하며, 예약/Work Prompt가 임의 `INSERT/UPDATE`로 Claim을 우회하지 않는다.
 - 예약 Worker는 단계별 실행 시각을 서로 기다리지 않고 자신의 Ready Queue를 독립적으로 소비한다. Planning+Research는 RESEARCHED, Writer는 DRAFTED/Image Brief, Image Producer는 이미지 단위 준비 상태, Final QA는 모든 필수 이미지 준비 상태를 기준으로 Claim한다.
 - Writer가 확정하는 이미지 수는 콘텐츠마다 가변이다. Image Producer는 콘텐츠 전체가 아니라 미완료 Image Brief를 처리하며 한 실행에서 최대 1건만 Claim하고 처리한다. 이미 성공한 Generation/Image QA/WebP 결과는 후속 실패 때문에 재생성하지 않는다.
 - 예약 Image Producer는 `fitbike.co.kr` HTTP API를 경유하지 않는다. `content_pipeline_issue_asset_upload_ticket_v1`로 해당 Pipeline/Image에만 유효한 짧은 수명의 1회 Upload Ticket을 발급받은 뒤 Supabase Edge Function `content-pipeline-asset-upload`로 WebP를 직접 전송한다. Edge Function은 Ticket의 Pipeline, Content Key, Asset Key, 만료와 1회 사용 여부를 검증하고 Supabase 내부 `service_role`로 `content-assets`에 저장한 뒤 SHA-256을 재검증한다. 장기 `CONTENT_FACTORY_PUBLISH_TOKEN` 또는 `service_role`은 Prompt/Artifact/Worker에 노출하지 않는다. 일반 `anon`/`authenticated` Storage 쓰기 정책도 열지 않는다.
