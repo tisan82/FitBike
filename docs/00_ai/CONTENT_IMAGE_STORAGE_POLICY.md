@@ -181,3 +181,9 @@ Source-stage capability probes are private `content-pipeline-staging/probes/<job
 - Chat 및 관리자 화면의 공식 조회는 `content_pipeline_image_handoff_status_v1`을 사용한다. 반환되는 `imageQa`, `mobileQa`, `imageSeoQa`는 위 승인 QA에서만 파생하며 `qaSource=staging_asset.qa`로 명시한다. 누락된 승인 값을 status/DONE 또는 후보 값으로 추정하지 않는다.
 - `27_content_pipeline_source_stage_job.result`의 QA 값은 후보 제작 시점의 미승인 상태다. STAGED 후보의 PENDING을 승인 QA로 사용하지 않으며, 승인해도 후보 이력은 덮어쓰지 않는다.
 - 승인 저장 RPC는 `staging_asset` 최상위의 중복 후보 QA 키를 제거한다. 기존 Run metadata는 실행 당시의 감사 이력이며 현재 승인 조회를 대신하지 않는다.
+
+## Public HTTPS Source Stage acquisition
+
+Source Stage는 제조사/사진 사이트 도메인 allowlist를 사용하지 않는다. 공개 HTTPS 이미지/PDF의 URL·DNS/IP·리다이렉트 안전성, 허용 MIME/실제 signature, 용량·시간 제한으로 취득 여부를 결정한다. `sourcePageUrl`, `sourceOwner`, 원본/최종 asset URL, source SHA와 권리 상태를 기록한다. 권리 확인 전에는 `PENDING_OPERATOR_APPROVAL`을 보존하고 운영자가 승인 여부를 관리한다. 권리 미승인만으로 3-A 취득/변환/Staging을 차단하지 않는다. 이 취득은 권리 승인이나 게시 승인을 뜻하지 않는다.
+
+실패로 Claim이 종료되면 PRODUCING/STAGING/UPLOADING/VERIFYING은 현재 작업 단계가 아니므로 `handoff_phase=null`로 정리한다. 재개 지점은 상태·failure_stage·보존된 staging_asset/staging_input/후보 Job에서 판독한다. 명시적인 RETURN_TO_IMAGE_PRODUCTION 라우팅은 유지한다.

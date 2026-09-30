@@ -6,20 +6,8 @@ import {
   transformSource,
   validateTransform,
 } from "./transform.ts";
+import { downloadSource, sourceUrl } from "./source.ts";
 const BUCKET = "content-pipeline-staging";
-// Exact public hosts only; redirects, credentials, custom ports and arbitrary hosts are denied.
-const HOSTS = new Set([
-  "farjyjcvduthawpdjuqe.supabase.co",
-  "global.honda",
-  "powersports.honda.com",
-  "www.honda.co.jp",
-  "cdn.powersports.honda.com",
-  "www2.yamaha-motor.co.jp",
-  "www.yamaha-motor.eu",
-  "cdn2.yamaha-motor.eu",
-  "www.yamaha-motor.co.jp",
-  "www.ktm.com",
-]);
 Deno.serve(async (req) => {
   if (req.method !== "POST") return out({ error: "METHOD_NOT_ALLOWED" }, 405);
   const sb = createClient(
@@ -45,50 +33,19 @@ Deno.serve(async (req) => {
       return out({ error: "SOURCE_STAGE_TICKET_INVALID" }, 401);
     }
     authorized = true;
-    const s = j.spec, u = new URL(String(s.sourceAssetUrl));
+    const s = j.spec;
+    const u = sourceUrl(s.sourceAssetUrl);
+    sourceUrl(s.sourcePageUrl);
+    if (typeof s.sourceOwner !== "string" || !s.sourceOwner.trim()) {
+      throw Error("SOURCE_PROVENANCE_REQUIRED");
+    }
     if (
-      u.protocol !== "https:" || u.username || u.password || u.port ||
-      !HOSTS.has(u.hostname)
-    ) throw Error("SOURCE_HOST_NOT_APPROVED");
+      s.rightsStatus != null &&
+      (typeof s.rightsStatus !== "string" || !s.rightsStatus.trim())
+    ) throw Error("SOURCE_PROVENANCE_REQUIRED");
     const transform = validateTransform(s.transform);
-    const res = await fetch(u, {
-      redirect: "error",
-      signal: AbortSignal.timeout(20000),
-      headers: {
-        "user-agent": "FitBike-Source-Stage/1.0",
-        "accept": "image/png,image/jpeg,image/webp,application/pdf",
-      },
-    });
-    if (!res.ok) throw Error(`SOURCE_HTTP_${res.status}`);
-    const mime = (res.headers.get("content-type") ?? "").split(";")[0]
-      .toLowerCase();
-    if (
-      !["image/png", "image/jpeg", "image/webp", "application/pdf"].includes(
-        mime,
-      )
-    ) throw Error("SOURCE_MIME_INVALID");
-    const max = mime === "application/pdf" ? 25165824 : 8388608,
-      reader = res.body?.getReader();
-    if (!reader) throw Error("SOURCE_EMPTY");
-    let size = 0;
-    const parts: Uint8Array[] = [];
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.length;
-      if (size > max) {
-        await reader.cancel();
-        throw Error("SOURCE_TOO_LARGE");
-      }
-      parts.push(value);
-    }
-    if (!size) throw Error("SOURCE_EMPTY");
-    const source = new Uint8Array(size);
-    let pos = 0;
-    for (const part of parts) {
-      source.set(part, pos);
-      pos += part.length;
-    }
+    const downloaded = await downloadSource(u.href);
+    const source = downloaded.bytes, mime = downloaded.mime;
     const final = await transformSource(
         source,
         mime,
@@ -135,6 +92,9 @@ Deno.serve(async (req) => {
       previewExpiresAt: new Date(Date.now() + 3600000).toISOString(),
       provenance: {
         sourceAssetUrl: u.href,
+        finalSourceAssetUrl: downloaded.finalUrl,
+        sourceRedirects: downloaded.redirects,
+        sourceCheckedAt: new Date().toISOString(),
         sourcePageUrl: s.sourcePageUrl ?? null,
         sourceOwner: s.sourceOwner ?? null,
         rightsStatus: s.rightsStatus ?? "PENDING_OPERATOR_APPROVAL",
