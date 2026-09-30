@@ -102,7 +102,7 @@ export function OperationsAdmin() {
       <div className="mt-4 space-y-3">{overview?.images?.map((image) => <article key={image.pipelineImageId} className="rounded-xl border border-border p-4">
         <p className="break-all font-semibold">{image.contentKey} · {image.imageId} <span className="text-sm text-foreground-secondary">#{image.pipelineImageId}</span></p>
         <p className="mt-2 text-sm">상태: {image.status} · 진행: {image.handoffPhase ?? "기존 경로"} · 콘텐츠: {image.contentStage}</p>
-        <p className="mt-1 text-sm">이미지 QA: {image.imageQa ?? "미확인"} · 모바일 QA: {image.mobileQa ?? "미확인"}</p>
+        <p className="mt-1 text-sm">이미지 QA: {image.imageQa ?? "미확인"} · 모바일 QA: {image.mobileQa ?? "미확인"} · 이미지 SEO QA: {image.imageSeoQa ?? "미확인"}</p>
         {image.productionPath ? <a className="mt-2 block break-all text-sm text-primary" href={getStoragePublicUrl(image.productionPath, "content-assets") ?? undefined} target="_blank" rel="noreferrer">등록 이미지 확인</a> : null}
         <p className="mt-1 break-all text-xs text-foreground-secondary">Staging SHA: {image.stagingSha ?? "없음"} · Production SHA: {image.productionSha ?? "없음"}</p>
         {image.failureCode ? <p className="mt-2 break-all text-sm text-red-700">{image.failureCode}: {image.lastError}</p> : null}

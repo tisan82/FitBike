@@ -174,3 +174,10 @@ Rules:
 Chat 생성 결과의 binary를 읽고 전송할 수 없는 환경은 이 Storage 구현으로 자동 해결되지 않는다. Binary transport를 Claim 전에 시험하고, 파일명·이미지 설명·추측한 Base64·다른 파일을 업로드하지 않는다. 지원되는 파일 업로드 도구가 없으면 실제 개발 잔여 항목으로 보고한다.
 
 Source-stage capability probes are private `content-pipeline-staging/probes/<jobId>/<sha>.webp` objects. They cannot enter Production/DONE. Real source-stage candidates use `<pipelineId>/<pipelineImageId>/<sha>.webp`, and become canonical only after explicit 3-A QA approval. One-hour signed previews are for worker pixel review; do not publish them. Job receipts store provenance/transform/technical proof without binary DB storage. Preserve failed/unapproved candidates for diagnosis; automatic cleanup remains disabled during stabilization.
+
+## Canonical approved visual QA
+
+- 승인된 3-A QA의 유일한 공식 저장 위치는 `21_content_pipeline_image.staging_asset.qa`이다. `imageQa`, `mobileQa`, `imageSeoQa` 및 승인 근거를 여기서 읽는다.
+- Chat 및 관리자 화면의 공식 조회는 `content_pipeline_image_handoff_status_v1`을 사용한다. 반환되는 `imageQa`, `mobileQa`, `imageSeoQa`는 위 승인 QA에서만 파생하며 `qaSource=staging_asset.qa`로 명시한다. 누락된 승인 값을 status/DONE 또는 후보 값으로 추정하지 않는다.
+- `27_content_pipeline_source_stage_job.result`의 QA 값은 후보 제작 시점의 미승인 상태다. STAGED 후보의 PENDING을 승인 QA로 사용하지 않으며, 승인해도 후보 이력은 덮어쓰지 않는다.
+- 승인 저장 RPC는 `staging_asset` 최상위의 중복 후보 QA 키를 제거한다. 기존 Run metadata는 실행 당시의 감사 이력이며 현재 승인 조회를 대신하지 않는다.

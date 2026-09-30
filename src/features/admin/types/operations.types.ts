@@ -30,7 +30,7 @@ export type OperationsOverview = {
   images?: {
     pipelineId: number; pipelineImageId: number; contentKey: string; imageId: string; assetKey: string;
     status: string; handoffPhase: string | null; stagingSha: string | null; productionSha: string | null;
-    productionPath: string | null; mobileQa: string | null; imageQa: string | null;
+    productionPath: string | null; mobileQa: string | null; imageQa: string | null; imageSeoQa: string | null;
     failureCode: string | null; lastError: string | null; contentStage: string;
   }[];
 };
