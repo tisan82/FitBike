@@ -187,3 +187,21 @@ Source-stage capability probes are private `content-pipeline-staging/probes/<job
 Source Stage는 제조사/사진 사이트 도메인 allowlist를 사용하지 않는다. 공개 HTTPS 이미지/PDF의 URL·DNS/IP·리다이렉트 안전성, 허용 MIME/실제 signature, 용량·시간 제한으로 취득 여부를 결정한다. `sourcePageUrl`, `sourceOwner`, 원본/최종 asset URL, source SHA와 권리 상태를 기록한다. 권리 확인 전에는 `PENDING_OPERATOR_APPROVAL`을 보존하고 운영자가 승인 여부를 관리한다. 권리 미승인만으로 3-A 취득/변환/Staging을 차단하지 않는다. 이 취득은 권리 승인이나 게시 승인을 뜻하지 않는다.
 
 실패로 Claim이 종료되면 PRODUCING/STAGING/UPLOADING/VERIFYING은 현재 작업 단계가 아니므로 `handoff_phase=null`로 정리한다. 재개 지점은 상태·failure_stage·보존된 staging_asset/staging_input/후보 Job에서 판독한다. 명시적인 RETURN_TO_IMAGE_PRODUCTION 라우팅은 유지한다.
+
+
+## Source Stage Pixel Inspection Bridge — Mandatory
+
+Source Stage의 기술적 `STAGED` 성공은 Semantic/Mobile Image QA PASS가 아니다. 3-A는 승인 전에 **Storage에 실제 저장된 동일 WebP binary**를 시각 검사해야 한다.
+
+정식 경로:
+
+`Source Stage verified WebP → service-role inspection chunks → runtime materialization → SHA-256 재검증 → actual pixel inspection → Image/Mobile/Image SEO QA → approve_source_stage`
+
+- `content-pipeline-source-stage`는 Storage readback 검증을 통과한 **동일 WebP bytes**를 `28_content_pipeline_source_stage_inspection_chunk`에 service-role 전용 Base64 chunk로 materialize한다.
+- 3-A는 `content_pipeline_source_stage_inspection_chunk_v1(jobId, seq)`로 모든 chunk를 순서대로 가져와 하나의 WebP로 조립한다.
+- 조립 후 byte 수와 SHA-256이 Source Stage result의 `bytes`, `sha256`과 정확히 일치해야 한다. 불일치하면 `STAGING_IDENTITY_MISMATCH`로 승인하지 않는다.
+- SHA 일치 binary를 실제 이미지 decoder/vision path로 열어 Contract의 `must_show`, `must_not_show`, `inspection_target`, `mobile_requirement`을 검사한다.
+- signed `previewUrl`은 편의용이며 QA의 유일한 transport가 아니다. 실행 환경에서 외부 Storage URL 접근이 막혀도 DB inspection bridge를 사용한다.
+- HTTP/MIME/decode metadata만으로 Semantic QA를 PASS 처리하지 않는다.
+- 승인 성공 시 해당 Job의 inspection chunk는 즉시 삭제한다.
+- inspection table/RPC는 `service_role` 전용이며 `public`, `anon`, `authenticated`에는 권한을 부여하지 않는다.
