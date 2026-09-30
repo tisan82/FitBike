@@ -78,6 +78,21 @@ Deno.serve(async (req) => {
     const { data: preview, error: previewError } = await sb.storage.from(BUCKET)
       .createSignedUrl(path, 3600);
     if (previewError || !preview) throw Error("PREVIEW_URL_FAILED");
+    // Materialize the exact verified staged binary for independent pixel QA.
+    // The bridge is service-role-only and chunked to keep each DB payload bounded.
+    await sb.from("28_content_pipeline_source_stage_inspection_chunk")
+      .delete().eq("job_id", jobId);
+    const inspectChunkBytes = 36000;
+    for (let seq = 0, offset = 0; offset < final.webp.length; seq++, offset += inspectChunkBytes) {
+      const part = final.webp.subarray(offset, Math.min(offset + inspectChunkBytes, final.webp.length));
+      let binary = "";
+      for (let i = 0; i < part.length; i++) binary += String.fromCharCode(part[i]);
+      const { error: chunkError } = await sb.from(
+        "28_content_pipeline_source_stage_inspection_chunk",
+      ).insert({ job_id: jobId, seq, chunk_base64: btoa(binary) });
+      if (chunkError) throw Error("INSPECTION_BRIDGE_WRITE_FAILED");
+    }
+
     const result = {
       ...verified,
       bucket: BUCKET,
