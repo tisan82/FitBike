@@ -172,3 +172,5 @@ Rules:
 - DONE 전 Staging 삭제 금지. 검증된 DONE Asset도 현재는 보존한다. 자동 Cleanup은 아직 활성화하지 않으며 실제 Chat E2E 안정화 후 retention/orphan 범위를 확정해 적용한다. 즉시 삭제는 디버깅/복구 기간에 사용하지 않는다.
 
 Chat 생성 결과의 binary를 읽고 전송할 수 없는 환경은 이 Storage 구현으로 자동 해결되지 않는다. Binary transport를 Claim 전에 시험하고, 파일명·이미지 설명·추측한 Base64·다른 파일을 업로드하지 않는다. 지원되는 파일 업로드 도구가 없으면 실제 개발 잔여 항목으로 보고한다.
+
+Source-stage capability probes are private `content-pipeline-staging/probes/<jobId>/<sha>.webp` objects. They cannot enter Production/DONE. Real source-stage candidates use `<pipelineId>/<pipelineImageId>/<sha>.webp`, and become canonical only after explicit 3-A QA approval. One-hour signed previews are for worker pixel review; do not publish them. Job receipts store provenance/transform/technical proof without binary DB storage. Preserve failed/unapproved candidates for diagnosis; automatic cleanup remains disabled during stabilization.

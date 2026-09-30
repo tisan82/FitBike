@@ -348,3 +348,18 @@ public,21_content_pipeline_image,32,upload_dispatched_at,timestamp with time zon
 public,21_content_pipeline_image,33,staging_asset,jsonb,jsonb,null,null,null,YES,null
 public,21_content_pipeline_image,34,staging_input,jsonb,jsonb,null,null,null,YES,null
 public,21_content_pipeline_image,35,handoff_phase,text,text,null,null,null,YES,null
+public,27_content_pipeline_source_stage_job,1,job_id,uuid,uuid,null,null,null,NO,gen_random_uuid()
+public,27_content_pipeline_source_stage_job,2,pipeline_image_id,bigint,int8,null,64,0,YES,null
+public,27_content_pipeline_source_stage_job,3,claim_token,uuid,uuid,null,null,null,YES,null
+public,27_content_pipeline_source_stage_job,4,contract_hash,text,text,null,null,null,YES,null
+public,27_content_pipeline_source_stage_job,5,spec,jsonb,jsonb,null,null,null,NO,null
+public,27_content_pipeline_source_stage_job,6,status,text,text,null,null,null,NO,'PENDING'::text
+public,27_content_pipeline_source_stage_job,7,token_hash,bytea,bytea,null,null,null,NO,null
+public,27_content_pipeline_source_stage_job,8,ticket_expires_at,timestamp with time zone,timestamptz,null,null,null,NO,(now() + '00:05:00'::interval)
+public,27_content_pipeline_source_stage_job,9,consumed_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,27_content_pipeline_source_stage_job,10,request_id,bigint,int8,null,64,0,YES,null
+public,27_content_pipeline_source_stage_job,11,result,jsonb,jsonb,null,null,null,YES,null
+public,27_content_pipeline_source_stage_job,12,failure_code,text,text,null,null,null,YES,null
+public,27_content_pipeline_source_stage_job,13,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,27_content_pipeline_source_stage_job,14,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,27_content_pipeline_source_stage_job,15,approved_at,timestamp with time zone,timestamptz,null,null,null,YES,null

@@ -19,3 +19,4 @@ public,17_content_asset_source,BASE TABLE
 public,20_service_shop,BASE TABLE
 public,21_service_shop_service,BASE TABLE
 public,22_service_shop_discovery_checkpoint,BASE TABLE
+public,27_content_pipeline_source_stage_job,BASE TABLE

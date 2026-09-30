@@ -117,3 +117,18 @@ constraint, index, FK, check, trigger export를 다시 동기화했다. 운영 �
 ## Scheduled Content Pipeline Asset Boundary
 
 예약 Content Pipeline은 CONTENT_FACTORY.md/CONTENT_IMAGE_STORAGE_POLICY.md의 Claim-bound RPC → pg_net → Edge Function 서버 전송 경계를 사용한다. 위 legacy Content Factory REST `/assets`는 별도 Producer API 경계다. 신규 3-A/3-B는 `content-pipeline-staging` Edge Function을 일회용 Upload Ticket으로 호출하며 서버 credential을 Worker에 전달하지 않는다. 일반 Chat이 Edge URL로 장기 secret을 직접 전송하는 경로는 만들지 않는다.
+
+### Content Factory Source Stage RPCs
+
+- `content_pipeline_dispatch_source_stage_v1(p_spec jsonb, p_pipeline_image_id bigint DEFAULT NULL, p_claim_token uuid DEFAULT NULL)` → `{jobId,requestId,status:DISPATCHED,probeOnly}`. Both optional values NULL: isolated transport probe; otherwise live 3-A PRODUCING Claim required. Spec is stored server-side and pg_net invokes `content-pipeline-source-stage` with a hashed, expiring, one-use Job Ticket. No Chat binary/Base64 or long credential is needed.
+- `content_pipeline_source_stage_status_v1(p_job_id uuid)` → status PENDING/RUNNING/STAGED/FAILED, result, failureCode, timedOut. Bounded two-minute polling; DISPATCHED is not PASS. STAGED is not READY_FOR_UPLOAD.
+- `content_pipeline_approve_source_stage_v1(p_job_id uuid,p_claim_token uuid,p_expected_sha text,p_qa jsonb)` → existing record-staging receipt, after explicit pixel/Mobile/SEO and representative gates. Probe approval, publisher Claim approval and double approval denied.
+- Internal `content_pipeline_consume_source_stage_ticket_v1` authenticates exactly one job. All four RPCs and `27_content_pipeline_source_stage_job` are service-role only, RLS enabled with no public policy. No public write or arbitrary URL proxy.
+
+Spec example:
+```json
+{"sourceAssetUrl":"https://approved-host/path/image.png","sourcePageUrl":"https://approved-host/page","sourceOwner":"Manufacturer","rightsStatus":"OPERATOR_VERIFIED","sourcePdfPage":1,"transform":{"maxWidth":780,"crop":{"x":0.05,"y":0.05,"width":0.9,"height":0.9},"annotations":[{"type":"circle","x":0.5,"y":0.5,"radius":0.12},{"type":"arrow","x1":0.2,"y1":0.2,"x2":0.45,"y2":0.45}]}}
+```
+PDF page is 1-based and only required for PDF. Crop coordinates are fractions of the decoded original/rendered PDF page. Annotation coordinates are fractions of the cropped/resized final image; circle radius is a fraction of the shorter side. maxWidth 390–1600, height capped at 2000; no upscaling. At most six circle/arrow shapes; no arbitrary SVG, text/label, Zoom Inset or AI edits. Exact HTTPS host allowlist is maintained in the Edge code; redirects/credentials/custom ports disallowed. Image source capped at 8 MiB, PDF 24 MiB, final WebP 4 MiB. Header MIME/format and 24MP check precede full image decode. PDF viewport/operator processing can still fail due to Edge runtime limits; report failure and choose another verified source, never infer semantic QA from technical decode.
+
+Result includes actual WebP SHA/bytes/MIME/signature/decode/dimensions, source SHA/provenance, transform recipe, read-back PASS, signed preview/expiry and semantic QA PENDING. Preview URL is temporary/private, never a customer service URL. Native AI capabilities remain unverified by this endpoint.

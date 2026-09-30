@@ -46,3 +46,4 @@ table_name,constraint_name,constraint_definition
 """21_content_pipeline_image""",21_content_pipeline_image_ordinal_check,CHECK ((ordinal >= 0))
 """21_content_pipeline_image""",21_content_pipeline_image_status_check,"CHECK ((status = ANY (ARRAY['PENDING'::text, 'PROCESSING'::text, 'READY_FOR_UPLOAD'::text, 'RETRY'::text, 'HOLD'::text, 'BLOCKED'::text, 'DONE'::text, 'CANCELLED'::text])))"
 """21_content_pipeline_image""",image_handoff_phase_check,"CHECK (((handoff_phase IS NULL) OR (handoff_phase = ANY (ARRAY['PRODUCING'::text, 'STAGING'::text, 'READY_FOR_UPLOAD'::text, 'UPLOADING'::text, 'VERIFYING'::text, 'DONE'::text, 'RETURN_TO_IMAGE_PRODUCTION'::text]))))"
+"""27_content_pipeline_source_stage_job""",27_content_pipeline_source_stage_job_status_check,"CHECK ((status = ANY (ARRAY['PENDING'::text, 'RUNNING'::text, 'STAGED'::text, 'FAILED'::text])))"
