@@ -86,7 +86,20 @@ Production 사용을 차단한다.
 - `production_output`: 최종 한 장이 전달해야 하는 장면
 - `human_presence`: NONE | HANDS_ONLY | PERSON_REQUIRED
 
-**절대 규칙: `1 Image Brief = 1 Generation/Acquisition = 1 Production Asset`.**
+**절대 규칙: `1 Image Brief = 1 Generation/Acquisition = 1 Production Asset`.**\n\n### 6.1 Model-Independent Location Contract Gate
+
+Visual Planner는 **모델 비종속 콘텐츠에서 제조사·모델·연식에 따라 달라지는 위치를 사실 조건으로 고정하지 않는다.** Writer 본문이 특정 모델을 다루지 않는다면 Image Contract도 임의의 특정 모델 위치를 일반화하지 않는다.
+
+- 특정 모델에서만 성립하는 부품 위치, 경고등 위치, 단자 위치, 커넥터 위치, 퓨즈박스 위치, 에어클리너 접근 위치 등을 `must_show`의 필수 사실로 요구하지 않는다.
+- 먼저 `정확한 위치 안내`와 `점검 대상/상태 확인 안내`를 구분한다. 모델 비종속 콘텐츠의 기본값은 사용자가 **무엇을 확인해야 하는지**를 보여주는 점검 대상/상태 안내다.
+- 특정 위치 자체가 콘텐츠의 필수 정보라면 Contract에 `brand`, `model`, `model_year` 또는 동일 수준의 검증 가능한 `target_vehicle_id`를 반드시 포함한다. 이 식별자가 없으면 특정 모델 위치를 `must_show`, `inspection_point`, annotation 좌표의 사실 조건으로 요구하지 않는다.
+- `model_dependency=HIGH` 표기만으로 특정 모델 위치 요구가 정당화되지 않는다. 대상 식별자가 없으면 Contract를 모델 비종속 표현으로 다시 작성한다.
+- 계기판 경고는 특정 아이콘의 위치를 요구하는 대신 **실제 계기판에서 경고 표시 유무·메시지를 확인한다는 행동**을 보여줄 수 있다. 특정 아이콘/위치를 강조하려면 대상 모델 식별과 공식 근거가 필요하다.
+- 배터리·퓨즈·커넥터·에어클리너처럼 위치가 모델별로 다른 항목은 대상 식별자가 없을 때 부품 자체, 접근 전 확인 행동, 매뉴얼 확인 필요성, 상태 확인 포인트를 시각화한다. 임의 바이크의 위치를 전체 바이크 공통 위치처럼 표시하지 않는다.
+- Visual Planner Self QA에서 `model_specific_location_required=true`인데 검증 가능한 대상 식별자가 비어 있으면 Writer 완료 및 Image Sync를 차단하고 Contract를 재작성한다.
+
+이 Gate는 Writer 본문을 특정 모델 기준으로 바꾸라는 규칙이 아니다. **Visual Planner / Image Contract 생성 책임**에서 모델 비종속 본문을 모델 종속 시각 사실로 과도하게 구체화하지 않도록 막는 규칙이다.
+
 
 여러 콘텐츠, 여러 섹션, 여러 판단 단계를 한 번의 Production 이미지 생성 요청에 합치지 않는다.
 
