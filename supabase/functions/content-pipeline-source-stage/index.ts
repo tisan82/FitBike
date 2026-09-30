@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     // The bridge is service-role-only and chunked to keep each DB payload bounded.
     await sb.from("28_content_pipeline_source_stage_inspection_chunk")
       .delete().eq("job_id", jobId);
-    const inspectChunkBytes = 36000;
+    const inspectChunkBytes = 4500;
     for (let seq = 0, offset = 0; offset < final.webp.length; seq++, offset += inspectChunkBytes) {
       const part = final.webp.subarray(offset, Math.min(offset + inspectChunkBytes, final.webp.length));
       let binary = "";
