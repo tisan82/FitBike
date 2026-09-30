@@ -4,7 +4,12 @@ import { parseHTML } from "npm:linkedom@0.18.12";
 import pdfjsImport from "npm:pdfjs-dist@3.11.174/legacy/build/pdf.js";
 import { initWasm as initResvg, Resvg } from "npm:@resvg/resvg-wasm@2.6.2";
 
-const pdfjs:any=(pdfjsImport as any)?.default??pdfjsImport;
+type PdfJs = {
+  getDocument(options: { data: Uint8Array; disableWorker: boolean }): { promise: Promise<{ numPages: number; getPage(page: number): Promise<{ getViewport(options: { scale: number }): { width: number }; getOperatorList(): Promise<unknown>; commonObjs: unknown; objs: unknown }> }> };
+  SVGGraphics: new (commonObjs: unknown, objs: unknown, embedFonts: boolean) => { getSVG(ops: unknown, viewport: { width: number }): Promise<{ outerHTML?: string }> };
+};
+const pdfjsModule = pdfjsImport as unknown as PdfJs & { default?: PdfJs };
+const pdfjs: PdfJs = pdfjsModule.default ?? pdfjsModule;
 const {document,window}=parseHTML("<html><body></body></html>");
 Object.assign(globalThis,{document,window,DOMParser:window.DOMParser,navigator:{userAgent:"FitBike PDF Renderer"}});
 
@@ -43,7 +48,7 @@ Deno.serve(async(req)=>{
       if(pageNo>pdf.numPages)return out({error:"PDF_PAGE_OUT_OF_RANGE",page:pageNo,numPages:pdf.numPages},422);
       const page=await pdf.getPage(pageNo),viewport=page.getViewport({scale:2}),ops=await page.getOperatorList();
       const gfx=new pdfjs.SVGGraphics(page.commonObjs,page.objs,true),svg=await gfx.getSVG(ops,viewport);
-      let svgText=((svg as any).outerHTML||String(svg)).replaceAll("svg:","");
+      let svgText=(svg.outerHTML||String(svg)).replaceAll("svg:","");
       if(!svgText.includes("xmlns="))svgText=svgText.replace("<svg ","<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" ");
       await ensureResvg();
       const targetWidth=Math.min(1600,Math.max(640,Math.round(viewport.width)));

@@ -24,7 +24,7 @@ test("every internal admin route requires server authorization", () => {
 test("operations repository only calls scoped content operations RPCs", () => {
   assert.deepEqual(
     [...repository.matchAll(/\.rpc\("([^"]+)"/g)].map((match) => match[1]).sort(),
-    ["admin_operations_overview_v1", "content_factory_update_topic_v1"],
+    ["admin_operations_overview_v1", "content_factory_update_topic_v1", "content_pipeline_image_handoff_status_v1"],
   );
   assert.doesNotMatch(repository, /auth\.|profile|member|fitment|0[1-9]_bike|07_bike/i);
 });

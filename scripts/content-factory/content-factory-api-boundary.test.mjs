@@ -25,7 +25,15 @@ test("repository is limited to fixed content RPCs and content-assets", () => {
 });
 
 test("every Content Factory route fails closed behind shared bearer auth", () => {
-  for (const route of routes) assert.match(route, /contentFactoryAuthError\(request\)/);
+  for (const [index, route] of routes.entries()) {
+    if (route.includes("verifyScheduledAssetUploadTicket")) {
+      assert.match(route, /authorizeContentFactory\(request\)/);
+      assert.match(route, /if \(!legacyAuth.ok\)/);
+      assert.match(route, /if \(!ticketOk\)/);
+      assert.ok(route.indexOf("if (!ticketOk)") < route.indexOf("await storeContentFactoryAsset"));
+      assert.match(route, /return errorResponse\("UNAUTHORIZED"/);
+    } else assert.match(route, /contentFactoryAuthError\(request\)/, `route ${index}`);
+  }
 });
 
 test("RPC execution is denied to public roles and only granted to service_role", () => {

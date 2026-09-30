@@ -465,7 +465,7 @@ Image Contract의 목적이 사용자가 실제 바이크에서 점검 대상 �
 - 한 이미지에는 가능한 한 하나의 핵심 점검 대상을 표시한다. 다중 카드/대시보드/콜라주는 금지한다.
 - 실제 존재하지 않는 경고등·부품·손상·누유·수치·고장 상태를 추가하지 않는다.
 - 위치 안내 생성이 필요한 Contract는 `generation_allowed: true`, `guidance_mode: LOCATION_GUIDANCE`, `inspection_target`, `inspection_point`, `label_text`, `marker_allowed: true`를 명시한다.
-- Image Producer는 `generation_allowed: false`를 임의로 무시하지 않는다. Location Guidance가 필요한데 false이면 Contract 수정 대상으로 반환한다.
+- 레거시 `generation_allowed: false`는 Full Generation 금지로 해석한다. 검증된 실사를 보존하는 편집·위치 표시는 `ai_edit_allowed`와 `marker_allowed`를 따른다. Full Generation 허용으로 임의 변경하지 않는다.
 
 ### 19.1 Mobile Guidance QA
 
@@ -523,3 +523,16 @@ DONE 전에 다음을 모두 확인한다.
 - 실제 이미지에 없는 상태를 ALT가 주장하지 않음
 
 기존 File PASS, SHA 검증, Storage Upload, Source/Provenance, Rights, Collision QA 등의 Production Gate는 그대로 유지한다. Image SEO는 기존 Image Production Gate를 대체하지 않고 추가 검증 항목으로 적용한다.
+
+
+## 20. 3-A Visual Production Policy
+
+실제 자료 기반 AI Editing → 충분히 명확한 Real Source Direct → 공식 PDF의 필요한 영역 → 허용된 Concept의 Full Generation 순으로 판단한다. 사용 가능한 실사를 고객 이해에 필요한 만큼만 편집한다. Contract v3는 real_source_required/ai_edit_allowed/full_generation_allowed/source_priority를 구분한다. 레거시 generation_allowed=false는 full_generation_allowed=never로 보수적으로 변환하고 실사 기반 editing은 별도 판단한다. 실사 필수 이미지에서 fallback_only를 실제 구조 추측 허용으로 해석하지 않는다.
+
+실제 부품 위치, 단자 방향, 계기판/경고 구조, 제품 코드, 손상 상태를 변경하지 않는다. 실사 기반 AI Edit도 최종 픽셀을 원본과 비교하고 사실 왜곡이면 FAIL한다. 공식 PDF에서 Crop한 이미지 역시 Source/page/모델 맥락을 보존하며 빈 Label·전체 페이지 축소·식별 불가능한 도식은 PASS하지 않는다.
+
+Arrow/Circle/Short Label/Zoom Inset은 위치 식별에 필요한 경우만 적용한다. 원본이 명확하면 강제하지 않는다. BODY는 실제 Final WebP를 390px로 보고 Target Visibility/Location Context/Label Legibility를 검증한다. 대표 이미지는 역할에 맞는 Card/Hero Crop도 실제로 검증한다. 긴 문장·장식 텍스트·키워드 삽입은 금지한다. 실제 구조 보존이 필요한 Arrow/Label은 검증 가능한 위치에 배치한다.
+
+사람 표현은 Contract NONE/HANDS_ONLY/PERSON_REQUIRED를 따르고 불필요한 인물 노출을 줄인다. 사람이 필요한 경우 기존 동양인 기준을 유지한다. ALT/Caption은 Final 픽셀에 맞게 최소 조정하고 이유·이전 값·최종 값을 QA metadata에 보존한다. Primary Query/Title/Heading 전략은 바꾸지 않으며 생성형/AI 이미지 표현은 고객 ALT/Caption에 넣지 않는다.
+
+3-A의 정상 종료는 Staging read-back 검증과 READY_FOR_UPLOAD다. 3-B는 동일 WebP를 등록·검증하며 이미지 제작을 수행하지 않는다. 의미 오류는 3-A로 반환한다. 실행 도구 성공, metadata 또는 HTTP 200만으로 Semantic QA를 PASS하지 않는다.

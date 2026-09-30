@@ -313,3 +313,38 @@ public,22_service_shop_discovery_checkpoint,10,last_updated,integer,int4,null,32
 public,22_service_shop_discovery_checkpoint,11,last_failed,integer,int4,null,32,0,NO,0
 public,22_service_shop_discovery_checkpoint,12,last_error,text,text,null,null,null,YES,null
 public,22_service_shop_discovery_checkpoint,13,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,21_content_pipeline_image,1,pipeline_image_id,bigint,int8,null,64,0,NO,null
+public,21_content_pipeline_image,2,pipeline_id,bigint,int8,null,64,0,NO,null
+public,21_content_pipeline_image,3,image_id,text,text,null,null,null,NO,null
+public,21_content_pipeline_image,4,asset_key,text,text,null,null,null,NO,null
+public,21_content_pipeline_image,5,ordinal,integer,int4,null,32,0,NO,null
+public,21_content_pipeline_image,6,image_brief,jsonb,jsonb,null,null,null,NO,'{}'::jsonb
+public,21_content_pipeline_image,7,status,text,text,null,null,null,NO,'PENDING'::text
+public,21_content_pipeline_image,8,retry_action,text,text,null,null,null,YES,null
+public,21_content_pipeline_image,9,claimed_by,text,text,null,null,null,YES,null
+public,21_content_pipeline_image,10,claim_token,uuid,uuid,null,null,null,YES,null
+public,21_content_pipeline_image,11,claimed_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,21_content_pipeline_image,12,claim_expires_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,21_content_pipeline_image,13,attempt_count,integer,int4,null,32,0,NO,0
+public,21_content_pipeline_image,14,generation_status,text,text,null,null,null,NO,'PENDING'::text
+public,21_content_pipeline_image,15,qa_status,text,text,null,null,null,NO,'PENDING'::text
+public,21_content_pipeline_image,16,file_status,text,text,null,null,null,NO,'PENDING'::text
+public,21_content_pipeline_image,17,upload_status,text,text,null,null,null,NO,'PENDING'::text
+public,21_content_pipeline_image,18,storage_bucket,text,text,null,null,null,YES,null
+public,21_content_pipeline_image,19,storage_path,text,text,null,null,null,YES,null
+public,21_content_pipeline_image,20,sha256,text,text,null,null,null,YES,null
+public,21_content_pipeline_image,21,failure_stage,text,text,null,null,null,YES,null
+public,21_content_pipeline_image,22,failure_code,text,text,null,null,null,YES,null
+public,21_content_pipeline_image,23,last_error,text,text,null,null,null,YES,null
+public,21_content_pipeline_image,24,completed_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,21_content_pipeline_image,25,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,21_content_pipeline_image,26,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
+public,21_content_pipeline_image,27,generation_contract,jsonb,jsonb,null,null,null,YES,null
+public,21_content_pipeline_image,28,generation_contract_hash,text,text,null,null,null,YES,null
+public,21_content_pipeline_image,29,brief_mismatch_count,integer,int4,null,32,0,NO,0
+public,21_content_pipeline_image,30,next_eligible_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,21_content_pipeline_image,31,upload_request_id,bigint,int8,null,64,0,YES,null
+public,21_content_pipeline_image,32,upload_dispatched_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,21_content_pipeline_image,33,staging_asset,jsonb,jsonb,null,null,null,YES,null
+public,21_content_pipeline_image,34,staging_input,jsonb,jsonb,null,null,null,YES,null
+public,21_content_pipeline_image,35,handoff_phase,text,text,null,null,null,YES,null

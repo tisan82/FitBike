@@ -17,3 +17,9 @@ export async function updateAdminOperationsTopic(topicKey: string, update: Queue
   if (error) throw new Error(`ADMIN_TOPIC_UPDATE_FAILED:${error.message}`);
   return data;
 }
+
+export async function findAdminImageHandoffs() {
+  const { data, error } = await createContentFactorySupabaseClient().rpc("content_pipeline_image_handoff_status_v1");
+  if (error) throw new Error(`ADMIN_IMAGE_HANDOFF_READ_FAILED:${error.message}`);
+  return data;
+}

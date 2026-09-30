@@ -153,3 +153,22 @@ Rules:
 - 저장 후 Storage 재다운로드 및 SHA-256 일치 검증을 반드시 수행한다.
 - PDF 페이지가 기술적으로 정상 렌더됐다는 사실은 Semantic QA PASS를 의미하지 않는다. 현재 Image Contract의 `must_show`, `must_not_show`, user question, mobile requirement를 별도로 검사한다.
 - PDF 전체를 임의로 이미지화하지 않는다. Writer/Research가 page를 특정할 수 있으면 Contract에 page를 전달하고, 특정하지 못한 경우 3단계가 공식 문서에서 관련 page를 먼저 확인한다.
+
+
+## Private Persistent Staging — 3-A / 3-B
+
+신규 분리 실행은 `CONTENT_FACTORY.md`의 3-A/3-B RPC 경로를 사용한다. 기존 Production 직접 Source Ingest/Generated Handoff 경로는 호환 경로로 유지하되 3-A 완료 경로로 사용하지 않는다.
+
+- Private bucket: `content-pipeline-staging`, 최대 4MiB, image/webp. 일반 사용자 Storage policy를 부여하지 않는다.
+- Immutable staging path: `<pipeline_id>/<pipeline_image_id>/<full_sha256>.webp`.
+- Production path: `content-assets/contents/<contentKey>/<assetKey>-<sha12>.webp`.
+- 3-A Final = Staging = Production Storage = 공개 원본 URL의 SHA/bytes/dimensions가 같아야 한다.
+- 공개 원본 URL의 identity와 Next.js 최적화 렌더 이미지의 visual QA는 별도 검사다. 최적화 응답의 binary SHA는 재인코딩으로 달라질 수 있다.
+- Staging은 public content, OG, sitemap, 고객 DB 이미지 경로에 넣지 않는다.
+- 서버는 stage read-back을 decode한 뒤 READY_FOR_UPLOAD를 기록하고, publisher는 공개 원본 URL decode/identity 후에만 DONE을 기록한다.
+- Ticket·Claim은 각 단계에 결합한다. 긴 service credential을 Chat artifact나 보고에 노출하지 않는다.
+- `25/26` generated handoff/chunks는 binary 전달을 위한 임시 adapter로 재사용한다. 영속적인 단계 간 원본은 Storage이며 DB에 binary를 장기 보관하지 않는다. Staging 기록 전 chunks를 소비/삭제하지 않는다.
+- 실패한 Handoff는 같은 Contract에서 인계해 재시도한다. READY_FOR_UPLOAD의 Staging은 Claim과 무관하게 지속된다.
+- DONE 전 Staging 삭제 금지. 검증된 DONE Asset도 현재는 보존한다. 자동 Cleanup은 아직 활성화하지 않으며 실제 Chat E2E 안정화 후 retention/orphan 범위를 확정해 적용한다. 즉시 삭제는 디버깅/복구 기간에 사용하지 않는다.
+
+Chat 생성 결과의 binary를 읽고 전송할 수 없는 환경은 이 Storage 구현으로 자동 해결되지 않는다. Binary transport를 Claim 전에 시험하고, 파일명·이미지 설명·추측한 Base64·다른 파일을 업로드하지 않는다. 지원되는 파일 업로드 도구가 없으면 실제 개발 잔여 항목으로 보고한다.

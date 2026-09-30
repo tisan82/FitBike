@@ -112,3 +112,8 @@ constraint, index, FK, check, trigger export를 다시 동기화했다. 운영 �
 
 운영 Admin API는 회원 목록이나 Fitment 원본을 반환하지 않는다. 브라우저는 service-role
 또는 Content Factory token을 보유하지 않으며 모든 운영 요청은 서버 인증을 다시 거친다.
+
+
+## Scheduled Content Pipeline Asset Boundary
+
+예약 Content Pipeline은 CONTENT_FACTORY.md/CONTENT_IMAGE_STORAGE_POLICY.md의 Claim-bound RPC → pg_net → Edge Function 서버 전송 경계를 사용한다. 위 legacy Content Factory REST `/assets`는 별도 Producer API 경계다. 신규 3-A/3-B는 `content-pipeline-staging` Edge Function을 일회용 Upload Ticket으로 호출하며 서버 credential을 Worker에 전달하지 않는다. 일반 Chat이 Edge URL로 장기 secret을 직접 전송하는 경로는 만들지 않는다.

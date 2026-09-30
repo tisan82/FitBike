@@ -453,9 +453,9 @@ Production mutation/deploy는 `AGENTS.md`의 승인 규칙과 현재 실행 환�
 
 ### Official production mode
 
-FitBike 콘텐츠의 공식 제작 방식은 ChatGPT Work가 수행하는 단일 Orchestration이다. 외부 OpenAI API 자동 생성, 무인 생성 Schedule, API Key 또는 Model Variable은 Production 콘텐츠 제작의 필수 조건이 아니다. 저장소의 Provider·자동 실행 코드는 호환성과 실험 목적으로 남을 수 있지만, 정책과 완료 판정을 대신하지 않는다.
+FitBike 콘텐츠는 일반 Chat 또는 예약 Chat에서 단계별로 실행할 수 있으며, Work는 개발·복구에 사용한다. 각 실행 환경의 도구와 binary transport를 실제 preflight로 검증한다. 외부 OpenAI API 자동 생성, 무인 생성 Schedule, API Key 또는 Model Variable은 Production 콘텐츠 제작의 필수 조건이 아니다. 저장소의 Provider·자동 실행 코드는 호환성과 실험 목적으로 남을 수 있지만, 정책과 완료 판정을 대신하지 않는다.
 
-Work는 현재 Topic, 기존 Content, 공식 근거, 이미지 Brief, QA 결과와 게시 영수증을 하나의 작업 맥락에서 이어서 사용한다. 게시 완료는 제한 API를 통한 DB·Storage 반영과 공개 URL 검증까지 포함한다.
+현재 Topic, 기존 Content, 공식 근거, Image Contract, QA 결과와 게시 영수증은 DB Artifact로 이어받으며 다른 Chat의 로컬 파일이나 대화 기억에 의존하지 않는다. 게시 완료는 제한 API를 통한 DB·Storage 반영과 공개 URL 검증까지 포함한다.
 
 ### Problem-driven policy improvement
 
@@ -538,7 +538,7 @@ Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Ta
 
 - Contract는 pipeline/content/image/asset 식별자, subject, visual objective, source strategy, generation allowed, must show/not show, fact/safety dependency, text/mobile 요구를 포함한다.
 - 이전 Content, 이전 Image, 이전 생성 결과 또는 대화 컨텍스트의 Visual Prompt를 현재 작업에 상속하지 않는다.
-- `generation_allowed=false`이면 생성 모델 호출을 금지하고 실제/공식 Asset 전략만 사용한다.
+- `generation_allowed=false`는 레거시 계약에서 Full Generation을 금지한다. 실제 구조를 보존하는 AI Editing 허용 여부는 `ai_edit_allowed`로 별도 판단한다.
 - Contract와 다른 주제의 결과는 `BRIEF_MISMATCH`이며 업로드하지 않는다.
 - Queue는 PENDING을 RETRY보다 우선할 수 있다. 반복 `BRIEF_MISMATCH` 2회 이상은 해당 Image에 60분 cooldown을 적용해 다른 Image Task가 진행될 수 있게 한다.
 - `next_eligible_at` 이전 Task는 Claim 대상이 아니다.
@@ -555,7 +555,7 @@ Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Ta
 
 - Topic 선택은 `16_content_topic.priority ASC → content_topic_id ASC → pipeline_id ASC`를 따른다.
 - 선택된 최우선 미완료 Topic에 DONE이 아닌 Image가 하나라도 있으면 다른 Topic Image를 Claim하지 않는다.
-- 같은 Topic 안에서는 `ordinal ASC`를 따른다. 앞 ordinal이 DONE이 아니면 뒤 ordinal을 먼저 Claim하지 않는다.
+- 같은 Topic 안에서는 `ordinal ASC`를 따른다. 앞 ordinal이 DONE이 아니면 뒤 ordinal을 먼저 Claim하지 않는다. 3-A에서는 앞 ordinal의 READY_FOR_UPLOAD를 제작 완료 경계로 인정하여 같은 Topic의 다음 Image를 제작할 수 있다. 3-B 등록과 콘텐츠 IMAGE_READY 판정은 여전히 DONE 기준이다.
 - 앞 Image가 `RETRY`이고 `next_eligible_at`을 기다리는 중이어도 다음 Topic으로 넘어가지 않는다. 해당 실행은 Claim 없이 종료하고 다음 실행에서 같은 Topic을 다시 확인한다.
 - 앞 Image가 유효한 `PROCESSING` Claim을 보유하고 있어도 다른 Topic으로 넘어가지 않는다.
 - Claim 만료 시 같은 Image를 reclaim하고, 그 Image가 DONE된 뒤에만 다음 ordinal로 이동한다.
@@ -624,3 +624,29 @@ Generated Production Asset 업로드는 Worker의 직접 HTTP/DNS 접근성에 �
 - Claim과 generated handoff의 기본 lease는 60분으로 운영한다. 긴 Visual QA/변환 때문에 20분 lease가 만료되어 정상 Asset을 재생성하는 문제를 방지한다.
 - Upload 단계에서 실패하면 동일 Final WebP/SHA를 재사용하며 Source/Generation 단계로 회귀하지 않는다.
 - dispatch 후에는 `upload_request_id`를 기준으로 서버 응답을 finalize하고, Edge가 반환한 Storage SHA가 Final WebP SHA와 일치해야 DONE 처리한다.
+
+
+## 3-A / 3-B Persistent Visual Handoff (2026-09-30)
+
+일반 Chat·예약 Chat을 콘텐츠 실행 환경으로 허용한다. Work는 코드/DB/배포 개발 및 복구에 사용한다. Chat이라고 도구나 파일 전달 기능이 자동으로 제공되지는 않는다. 실행 전 실제 연결된 GitHub/Supabase 도구, 이미지 픽셀 접근, WebP 변환/SHA 계산, **그 파일 binary를 RPC에 전달하는 기능**을 확인한다. 공개 링크, sandbox 파일명, 이미지 생성 완료 메시지, 문서상 지원만으로 binary transport PASS를 추정하지 않는다. 지원되지 않으면 Claim 전에 `CHAT_ASSET_BRIDGE_UNAVAILABLE`로 차단하고 이미지를 생성하지 않는다. 예약은 일반 Chat의 실제 E2E 검증 후에 등록한다.
+
+| 담당 | 시작 RPC | 정상 종료 | 실패 복구 |
+| --- | --- | --- | --- |
+| 3-A Visual Image Producer | `content_pipeline_claim_visual_producer_v1(worker_key, optional_image_id)` | READY_FOR_UPLOAD | preservedStagingInput의 handoffId/qa를 재사용하여 Staging부터 재개 |
+| 3-B Asset Publisher | `content_pipeline_claim_asset_publisher_v1(worker_key, optional_image_id)` | DONE | 동일 Private Staging Asset에서 Upload/Verify만 재개 |
+
+Image Task status에는 READY_FOR_UPLOAD를 추가한다. PRODUCING/STAGING/UPLOADING/VERIFYING/RETURN_TO_IMAGE_PRODUCTION은 `handoff_phase`이며 별도의 Content stage나 중복 status enum이 아니다. 기존 PROCESSING/RETRY/HOLD/DONE/CANCELLED를 유지한다. Content는 두 단계 동안 VISUAL이며 전체 활성 Image DONE + 대표 이미지 역할 coverage를 만족할 때만 IMAGE_READY다.
+
+3-A의 종료 체인: Claim → 현재 Contract → Source/Editing → 실제 Final 픽셀·390px·SEO QA → Final WebP → SHA → generated handoff begin/append/verify → `content_pipeline_dispatch_staging_v1` → 서버 Private Storage upload/read-back/decode → `content_pipeline_record_staging_v1` → READY_FOR_UPLOAD 재조회. 기존 atomic stage-and-dispatch-generated RPC는 **Production 단일 단계용 legacy 경로**이며 3-A에 사용하지 않는다.
+
+3-B의 종료 체인: Claim → persisted staging metadata → `content_pipeline_dispatch_asset_publisher_v1` → 서버 Staging download/SHA/decode → content-assets upload/read-back → 공개 원본 URL HTTP/MIME/signature/decode/SHA → 기존 Complete RPC → DONE 재조회. 서버는 binary를 편집·재인코딩하지 않는다. 실제 콘텐츠 Publish/SSR SEO QA는 4단계다. Next.js image optimizer 응답은 변환될 수 있어 원본 binary SHA 비교 대상으로 사용하지 않는다.
+
+`staging_asset`에는 bucket/path/SHA/bytes/mime/dimensions/contractHash와 QA·provenance·ALT·Caption·annotation/editing 여부를 저장한다. 3-A QA 입력은 imageQa/mobileQa/imageSeoQa/contractHash가 필수이며 대표 이미지에는 representativeImageQa 및 역할에 맞는 cardCropQa/heroCropQa가 필수다. PASS 값은 실제 픽셀 확인 결과만 입력한다. 서버의 WebP decoder는 의미·경고 위치·모바일 텍스트를 판정하지 않는다.
+
+Claim token/lease는 단계별로 분리하고 60분 유지한다. Staging 실패 시 chunks를 지우지 않는다. `staging_input`으로 canonical handoff와 QA를 보존하고 다음 3-A Claim에서 동일 Contract hash에 한해 새 lease에 인계한다. 이미 READY_FOR_UPLOAD인 이미지는 3-A가 Claim하지 않는다. 전체 이미지가 Staging에 있더라도 현재 Topic이 아직 DONE이 아니면 다음 Topic으로 넘어가지 않는다. 기존 HOLD/cooldown/유효 Claim에 대한 순차 Queue 정책은 유지한다.
+
+업로드 후 완료 DB 트랜잭션 이전 실패는 새 자산 생성 사유가 아니다. 동일 immutable object를 검증하여 재사용한다. Source/이미지 내용 오류는 publisher가 `content_pipeline_return_image_production_v1`로 반환하고 staging identity를 Run 이력에 보존한다. 상태 문자열만 직접 UPDATE하여 Gate를 우회하지 않는다.
+
+상태 조회: `content_pipeline_image_handoff_status_v1(optional_pipeline_id)`와 `/admin`의 이미지 제작·등록 현황. 조회 RPC는 service_role 전용이고 Admin API는 기존 관리자 인증 경계를 사용한다. 상태와 public Production 자산만 운영 화면에 표시하며 Private signed URL/token은 표시하지 않는다.
+
+서버 전송 테스트 PASS는 일반 Chat 이미지 생성→원본 접근→WebP→Staging 성공을 증명하지 않는다. 두 결과를 분리 보고한다. 일반 Chat 시험에서는 첫 대상으로 지정한 1건의 실제 콘텐츠 이미지로 3-A와 별도 Chat의 3-B를 각각 확인한다. 내부 fixture는 게시하지 않는다.

@@ -35,3 +35,7 @@ prose 문서보다 우선한다.
 `11_tire_model`은 RLS가 활성화되어 있다. 공개 SELECT policy는
 `Public can read active tire models`이며 `anon`, `authenticated` role에
 `is_active = true` 조건으로 적용된다.
+
+## 2026-09-30 Visual staging delta
+
+21_content_pipeline_image의 현재 column/check/index metadata를 Production에서 다시 조회해 동기화했다. staging_asset/staging_input/handoff_phase와 READY_FOR_UPLOAD가 추가됐다. 다른 테이블의 기존 export는 이번 변경으로 최신 전체 export임을 보장하지 않는다. RPC/Storage DDL의 정확한 정의는 이번 네 개 migration을 함께 확인한다.
