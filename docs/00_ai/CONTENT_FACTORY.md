@@ -527,7 +527,7 @@ Planning과 Research를 한 예약에서 연속 수행할 때 범용 Stage Claim
 
 Writer의 완료 책임은 `WRITING → DRAFTED` 저장으로 끝나지 않는다. Writer Artifact의 `image_briefs`를 `21_content_pipeline_image`로 동기화하고, 동기화된 Task 수가 `required_image_count`와 일치하는지 확인해야 한다. Image Queue의 실행 상태 Source of Truth는 `21_content_pipeline_image`, 시도 이력은 `23_content_pipeline_image_run`이다.
 
-Image Producer만 이미지 생성/확보, Image QA, WebP, Upload, Storage Verify를 수행한다. Final QA는 Upload Ticket 발급, 이미지 생성·재생성, Upload Retry를 수행하지 않는다. 외부 실사의 `PENDING_OPERATOR_APPROVAL`은 이미지 제작 상태와 분리하며, provenance가 정확히 기록되고 Image QA·WebP·Storage Verify가 PASS이면 Image Task를 DONE으로 완료할 수 있다. 모든 Image Task가 DONE이면 Image Complete RPC가 Content를 `IMAGE_READY`로 전환하며, Final QA는 그 상태만 Claim한다.
+Image Producer만 이미지 생성/확보, Image QA, WebP, Upload, Storage Verify를 수행한다. Final QA는 Upload Ticket 발급, 이미지 생성·재생성, Upload Retry를 수행하지 않는다. 외부 실사는 권리 상태를 새로 기록하지 않으며, 출처가 정확히 기록되고 Image QA·WebP·Storage Verify가 PASS이면 Image Task를 DONE으로 완료할 수 있다. 모든 Image Task가 DONE이면 Image Complete RPC가 Content를 `IMAGE_READY`로 전환하며, Final QA는 그 상태만 Claim한다.
 
 Final QA는 `IMAGE_READY → QA → QA_PASS`까지만 담당한다. QA_PASS는 Publish 완료가 아니며 실제 Publish는 별도 Publish Queue의 책임이다. Final QA/Publish는 출처와 이미지 품질·무결성을 검증하며 라이선스/권리 상태를 기록하거나 Gate로 사용하지 않는다.
 
