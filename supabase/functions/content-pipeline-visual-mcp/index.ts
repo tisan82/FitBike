@@ -160,7 +160,21 @@ const tools = [
         requestId: { type: "string", format: "uuid" },
         jobId: { type: "string", format: "uuid" },
         expectedSha: { type: "string", pattern: "^[0-9a-f]{64}$" },
-        qa: { type: "object" },
+        qa: {
+          type: "object",
+          description: "Use exact flat field names. Inspect actual pixels before reporting PASS. THUMBNAIL requires representativeImageQa/cardCropQa; HERO requires representativeImageQa/heroCropQa; THUMBNAIL_HERO requires all three. A 390px preview alone does not prove card/hero crop suitability. Extra evidence fields are preserved.",
+          properties: {
+            contractHash: { type: "string", description: "Current claim generationContractHash, unchanged." },
+            imageQa: { type: "string", enum: ["PASS"] },
+            mobileQa: { type: "string", enum: ["PASS"] },
+            imageSeoQa: { type: "string", enum: ["PASS"] },
+            representativeImageQa: { type: "string", enum: ["PASS"], description: "Required for THUMBNAIL, HERO and THUMBNAIL_HERO after representative suitability inspection." },
+            cardCropQa: { type: "string", enum: ["PASS"], description: "Required for THUMBNAIL and THUMBNAIL_HERO after actual card crop inspection." },
+            heroCropQa: { type: "string", enum: ["PASS"], description: "Required for HERO and THUMBNAIL_HERO after actual hero crop inspection." },
+          },
+          required: ["contractHash", "imageQa", "mobileQa", "imageSeoQa"],
+          additionalProperties: true,
+        },
       },
       required: ["requestId", "jobId", "expectedSha", "qa"],
       additionalProperties: false,
@@ -367,7 +381,7 @@ Deno.serve(async (req) => {
             ? protocol
             : "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "fitbike-visual-operations", version: "1.1.0" },
+        serverInfo: { name: "fitbike-visual-operations", version: "1.1.1" },
       },
     });
   }
@@ -575,12 +589,18 @@ Deno.serve(async (req) => {
                 throw Error("ACTIVE_VISUAL_CLAIM_REQUIRED");
               }
               const qa = a.qa;
-              if (
-                qa.contractHash !== current.claim.generationContractHash ||
-                !["imageQa", "mobileQa", "imageSeoQa"].every((k) =>
-                  qa[k] === "PASS"
-                )
-              ) throw Error("EXPLICIT_QA_PASS_REQUIRED");
+              if (qa.contractHash !== current.claim.generationContractHash) {
+                throw Error("QA_CONTRACT_HASH_MISMATCH: use current claim generationContractHash");
+              }
+              const role = String(current.claim.generationContract?.asset_role ?? "BODY").toUpperCase();
+              const requiredQa = ["imageQa", "mobileQa", "imageSeoQa"];
+              if (["THUMBNAIL", "HERO", "THUMBNAIL_HERO"].includes(role)) requiredQa.push("representativeImageQa");
+              if (["THUMBNAIL", "THUMBNAIL_HERO"].includes(role)) requiredQa.push("cardCropQa");
+              if (["HERO", "THUMBNAIL_HERO"].includes(role)) requiredQa.push("heroCropQa");
+              const missingQa = requiredQa.filter((k) => qa[k] !== "PASS");
+              if (missingQa.length) {
+                throw Error(`EXPLICIT_QA_PASS_REQUIRED: assetRole=${role}; missingOrNonPass=${missingQa.join(",")}; use exact flat qa fields after actual inspection`);
+              }
               await rpc("content_pipeline_approve_source_stage_v1", {
                 p_job_id: a.jobId,
                 p_claim_token: current.claim.claimToken,
