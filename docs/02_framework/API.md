@@ -136,3 +136,17 @@ Result includes actual WebP SHA/bytes/MIME/signature/decode/dimensions, source S
 ### Approved visual QA read contract
 
 `content_pipeline_image_handoff_status_v1(p_pipeline_id bigint DEFAULT NULL)` is the canonical Chat/admin read API for approved visual QA. `imageQa`, `mobileQa`, and `imageSeoQa` read only `staging_asset.qa`; `qaSource` is `staging_asset.qa`. Missing approval returns null, never an inferred PASS from DONE or candidate technical verification. Candidate job QA remains separate. Existing output fields and service-role permissions are preserved.
+
+
+## Authenticated 3-A MCP claim transport (2026-10-01)
+
+Endpoint: `https://farjyjcvduthawpdjuqe.supabase.co/functions/v1/content-pipeline-visual-mcp`.
+Tools: `get_visual_queue_status`, `claim_visual_image`, `get_visual_claim_result`, `fail_visual_image`. No arbitrary SQL, asset generation, publication or DONE tool.
+
+Each execution intent supplies a UUID requestId; reuse it after response interruption. The service-only receipt `29_content_pipeline_visual_claim_request` serializes by worker and stores the original result. Same request/changed target is rejected. A new request resumes this user's active PRODUCING/STAGING claim; it cannot add a second image. Closed/expired result never returns a usable Claim Token. Existing producer ordering, cooldown and expired-claim recovery remain authoritative.
+
+The Edge validates Supabase access tokens via getUser(), confirmed email and server-only `CONTENT_FACTORY_MCP_OPERATOR_EMAILS`. Missing configuration returns 503; other users get 403. No user_metadata authorization, no public RPC grants. Worker identity is derived server-side as mcp-3a-<userId>; clients cannot impersonate another worker.
+
+OAuth protected-resource metadata is public at endpoint + `/oauth-protected-resource`; unauthenticated MCP returns 401 with WWW-Authenticate. Chat connection additionally requires Supabase OAuth Server/dynamic registration, a sign-in/consent frontend, the operator allowlist and user installation. These are NOT proven/configured by deploying the MCP function. Existing SQL calls are not automatically replaced. Deployment does not guarantee platform approval.
+
+Source Stage/pixel/approval/3-B still use their existing transports; this release scopes only Claim, request recovery, queue reads and failure close.

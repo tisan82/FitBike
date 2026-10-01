@@ -47,3 +47,8 @@ prose 문서보다 우선한다.
 ## 2026-10-01 Provenance-only image operations
 
 `17_content_asset_source.rights_status` is nullable with no default. Historical values/check constraints remain; new Publish rows store NULL for rights/license/permission metadata. Source Stage ignores legacy rights/license/permission input and writes provenance only. Existing Claim, image QA, SHA/decode, RLS and ticket guards are unchanged. Migration: `20261001015258_source_provenance_only.sql`.
+
+
+## 2026-10-01 Visual Claim request receipt
+
+`29_content_pipeline_visual_claim_request` is a service-role-only idempotency receipt keyed by worker_key/request_id. RLS is enabled without public policies; PUBLIC/anon/authenticated have no table or RPC access. It references image_id and retains original Claim metadata for transport recovery, not a new image status machine. Runtime definition is preserved in the two visual_claim migrations. Existing table exports were not comprehensively refreshed by this change.
