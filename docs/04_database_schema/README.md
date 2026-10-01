@@ -43,3 +43,7 @@ prose 문서보다 우선한다.
 ## 2026-09-30 Source-stage job delta
 
 `27_content_pipeline_source_stage_job` is an additive, service-role-only transport receipt for URL/PDF capability probes and optional real 3-A candidates. Columns/checks/indexes were fetched from Production after the two source-stage migrations. It is not a replacement Content Pipeline or image status table. RLS has no public policy by design. Existing unrelated exports remain unchanged and are not asserted current.
+
+## 2026-10-01 Provenance-only image operations
+
+`17_content_asset_source.rights_status` is nullable with no default. Historical values/check constraints remain; new Publish rows store NULL for rights/license/permission metadata. Source Stage ignores legacy rights/license/permission input and writes provenance only. Existing Claim, image QA, SHA/decode, RLS and ticket guards are unchanged. Migration: `20261001015258_source_provenance_only.sql`.

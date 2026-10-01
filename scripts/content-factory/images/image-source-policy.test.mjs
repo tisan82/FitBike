@@ -11,9 +11,14 @@ test("generic battery product thumbnail is blocked when POWEROAD exists", () => 
 test("licensed web real-world asset is accepted for editorial editing", () => {
   const result = selectImageSource({ partType: "BATTERY", role: "body", imageRole: "ACCESS_POINT", brandAssetAvailable: false, webAsset: { sourceUrl: "https://example.com/photo.jpg", creator: "Example Creator", rightsStatus: "CC_BY", rightsEvidence: "https://example.com/license", editPlan: "crop, exposure correction, and a non-obscuring callout" } });
   assert.equal(result.status, "PASS");
-  assert.equal(result.sourceType, "LICENSED_WEB_REAL_ASSET_EDIT");
+  assert.equal(result.sourceType, "WEB_REAL_ASSET_EDIT");
 });
-test("unlicensed blog image is blocked even when publicly viewable", () => {
-  const result = selectImageSource({ partType: "BATTERY", role: "body", imageRole: "PROCEDURE", brandAssetAvailable: false, webAsset: { sourceUrl: "https://blog.example/photo.jpg", creator: "Unknown", rightsStatus: "UNKNOWN", rightsEvidence: null, editPlan: "crop" } });
-  assert.equal(result.status, "FAIL");
+test("web source without license metadata is accepted with provenance", () => {
+  const result = selectImageSource({ partType: "BATTERY", role: "body", imageRole: "PROCEDURE", brandAssetAvailable: false, webAsset: { sourceUrl: "https://blog.example/photo.jpg", creator: "Blog Owner", editPlan: "crop" } });
+  assert.equal(result.status, "PASS");
+  assert.equal(Object.hasOwn(result, "rightsStatus"), false);
+});
+
+test("web source without provenance is rejected", () => {
+  assert.equal(selectImageSource({webAsset:{sourceUrl:"https://example.com/image.jpg"}}).status,"FAIL");
 });

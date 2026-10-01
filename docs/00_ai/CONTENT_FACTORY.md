@@ -40,7 +40,7 @@ Content Factory는 콘텐츠 한 건을 하나의 Orchestration Context로 처�
 - 예약 Worker는 단계별 실행 시각을 서로 기다리지 않고 자신의 Ready Queue를 독립적으로 소비한다. Planning+Research는 RESEARCHED, Writer는 DRAFTED/Image Brief, Image Producer는 이미지 단위 준비 상태, Final QA는 모든 필수 이미지 준비 상태를 기준으로 Claim한다.
 - Writer가 확정하는 이미지 수는 콘텐츠마다 가변이다. Image Producer는 콘텐츠 전체가 아니라 미완료 Image Brief를 처리하며 한 실행에서 최대 1건만 Claim하고 처리한다. 이미 성공한 Generation/Image QA/WebP 결과는 후속 실패 때문에 재생성하지 않는다.
 - 예약 Image Producer는 `fitbike.co.kr` HTTP API를 경유하지 않는다. `content_pipeline_issue_asset_upload_ticket_v1`로 해당 Pipeline/Image에만 유효한 짧은 수명의 1회 Upload Ticket을 발급받은 뒤 Supabase Edge Function `content-pipeline-asset-upload`로 WebP를 직접 전송한다. Edge Function은 Ticket의 Pipeline, Content Key, Asset Key, 만료와 1회 사용 여부를 검증하고 Supabase 내부 `service_role`로 `content-assets`에 저장한 뒤 SHA-256을 재검증한다. 장기 `CONTENT_FACTORY_PUBLISH_TOKEN` 또는 `service_role`은 Prompt/Artifact/Worker에 노출하지 않는다. 일반 `anon`/`authenticated` Storage 쓰기 정책도 열지 않는다.
-- 생성 이미지에는 제3자 Web Asset 권리 Gate를 적용하지 않는다. 현재 Schema가 허용하는 `sourceType=GENERATED`, `rightsStatus=NOT_REQUIRED` 등 검증된 값을 사용하고, 외부/공식 실사 재사용에만 별도 권리 확인을 적용한다.
+- 생성/외부/공식 이미지 모두 신규 권리 상태를 생성하지 않는다. 출처 기록 정책은 `CONTENT.md`를 따른다.
 
 
 기본 흐름:
@@ -191,9 +191,9 @@ Visual 하나는 최소 하나의 명확한 Role과 User Question을 가져야 �
 
 공식/블로그/웹 이미지는 단순 복사하여 FitBike 최종 자산으로 취급하지 않는다. 원본은 Research/Editorial Source로 기록하고, 서비스 목적에 맞는 정보 구조를 먼저 정의한 뒤 허용된 편집 또는 독립적인 FitBike 교육용 Visual 생성에 사용한다.
 
-원본 URL, Source Name, Author/Operator(확인 가능한 경우), Source Type, 발견 시점, 사용된 Content, Visual Role, 편집/재구성 목적과 권리 상태를 `17_content_asset_source`의 현재 schema가 지원하는 범위에서 기록한다. schema에 없는 필드를 임의 추가하지 않는다.
+원본 페이지/자산 URL, Source Name, Author/Operator, Source Type, 확인 시점, Content/Visual Role과 편집 이력을 기록한다. 라이선스·권리 상태·허락 근거는 제작 필수값이 아니다.
 
-권리 협의와 최종 권리 판단은 운영자가 관리한다. AI는 출처를 숨기거나 원본을 자체 제작물로 오인시키지 않는다. 외부 실사의 권리가 아직 확정되지 않았으면 현재 schema가 지원하는 `PENDING_OPERATOR_APPROVAL` 계열 상태로 기록한다. 이 상태는 Visual Production 실패가 아니며 원본 확보·편집·WebP·Storage 적재·Image Task DONE을 막지 않는다. 권리 상태는 provenance/운영 이력으로 유지하며 Visual 또는 Publish 자동 차단 조건으로 사용하지 않는다. 운영자가 권리 문제를 별도로 관리한다.
+권리 협의·판단 및 문제 이미지의 제외·삭제·수정은 운영자가 담당한다. AI는 출처만 기록하며 권리 대기/승인 상태를 만들지 않는다.
 
 ## 8. Watermark Policy
 
@@ -378,7 +378,7 @@ Image Generator/Editor는 Brief의 `must_show`, `prohibited`, `fact_dependencies
 - Reality/Image Fact FAIL
 - 지원되지 않는 모델 고유 Fact
 
-이미지 권리 상태 자체의 운영 판단은 `17_content_asset_source`에서 추적하며 운영자가 관리한다. AI는 출처 누락을 허용하지 않는다.
+이미지 출처는 `17_content_asset_source`에서 추적한다. 신규 rights_status는 NULL이며 이전 이력은 보존한다.
 
 ## 15. Machine QA vs AI QA
 
@@ -529,7 +529,7 @@ Writer의 완료 책임은 `WRITING → DRAFTED` 저장으로 끝나지 않는�
 
 Image Producer만 이미지 생성/확보, Image QA, WebP, Upload, Storage Verify를 수행한다. Final QA는 Upload Ticket 발급, 이미지 생성·재생성, Upload Retry를 수행하지 않는다. 외부 실사의 `PENDING_OPERATOR_APPROVAL`은 이미지 제작 상태와 분리하며, provenance가 정확히 기록되고 Image QA·WebP·Storage Verify가 PASS이면 Image Task를 DONE으로 완료할 수 있다. 모든 Image Task가 DONE이면 Image Complete RPC가 Content를 `IMAGE_READY`로 전환하며, Final QA는 그 상태만 Claim한다.
 
-Final QA는 `IMAGE_READY → QA → QA_PASS`까지만 담당한다. QA_PASS는 Publish 완료가 아니며 실제 Publish는 별도 Publish Queue의 책임이다. Final QA는 권리 대기 상태를 숨기거나 승인으로 변경하지 않고 Publish Artifact에 전달한다. **실제 공개 Publish는 권리 상태 자체를 자동 차단 조건으로 사용하지 않는다. 출처·권리 이력은 유지하되 운영자가 권리 문제를 별도로 관리한다.**
+Final QA는 `IMAGE_READY → QA → QA_PASS`까지만 담당한다. QA_PASS는 Publish 완료가 아니며 실제 Publish는 별도 Publish Queue의 책임이다. Final QA/Publish는 출처와 이미지 품질·무결성을 검증하며 라이선스/권리 상태를 기록하거나 Gate로 사용하지 않는다.
 
 
 ### Image Generation Contract
@@ -570,10 +570,10 @@ Writer는 Image Brief를 만들 때 **실제 외형 자체가 사용자 답의 F
 
 - 고객이 실제 바이크에서 찾아야 하는 위치, 실제 부품 형상, UI, 포트, 라벨, 각인, 배선, 마모/손상, 체결·장착 상태처럼 실제 외형 자체가 확인 정보이면 `REAL_ASSET_FIRST` / `generation_allowed=false`를 사용한다.
 - 특정 모델·제품의 정확한 구조가 확인 정보는 아니지만 실제 바이크를 다루는 고객에게 점검 위치·대상·행동·관계를 보여줄 필요가 있으면 `GENERATED_GUIDANCE_VISUAL` / `generation_allowed=true`를 사용할 수 있다. 생성 결과도 실제 바이크 점검 맥락이어야 하며 추상 교육자료·대시보드·카드·보고서·장식 이미지로 만들지 않는다.
-- Rights Gate 때문에 불필요하게 Real Asset을 선택하지 않는다. 실제 외형 증거가 사용자 답에 필요할 때만 강제한다.
-- Real Asset이 필요하고 적합한 원본을 확보했다면 권리 확인 대기만으로 Visual 작업을 실패시키지 않는다. 출처·실제 원본 URL·운영자/저작자·확인 시점·편집 이력과 `PENDING_OPERATOR_APPROVAL`을 기록하고 Image QA → WebP → Storage Verify → Image DONE까지 진행한다.
+- 실제 외형 증거가 사용자 답에 필요할 때 Real Asset을 사용한다. 권리 검사를 제작 선택 조건으로 사용하지 않는다.
+- 적합한 Real Asset은 출처·원본 URL·운영자/저작자·확인 시점·편집 이력을 기록하고 Image QA → WebP → Storage Verify까지 진행한다. 3-A/3-B 완료 경계를 유지한다.
 - `NO_APPROVED_REAL_SOURCE`처럼 “승인된 권리 자산이 아직 없다”는 이유만으로 Visual Claim을 RETRY/HOLD/BLOCKED하지 않는다. Visual 실패는 Brief 충돌, 적합한 원본 부재, 바이너리 확보 실패, Image QA, WebP, Upload 또는 Storage Verify 실패처럼 제작 자체의 실패에 사용한다.
-- Publish Queue는 `PENDING_OPERATOR_APPROVAL` 등 권리 상태 자체를 HOLD/BLOCKED/RETRY 사유로 사용하지 않는다. provenance는 그대로 전달·보존하고 운영자가 별도로 관리한다.
+- Publish Queue는 출처 이력을 보존하며 권리 상태를 요구하거나 기록하지 않는다.
 - Writer는 Source 후보를 찾기 전에 `고객이 실제 바이크에서 무엇을 확인해야 하는가`를 먼저 정의한다. 실제 외형·위치·상태가 확인 대상이면 Real Asset, 특정 구조가 Fact가 아니고 일반 점검 맥락을 안내하는 것이 목적이면 Generated Guidance를 검토한다. 실제 물체가 등장한다는 이유만으로 Real Asset을 선택하지 않는다.
 - `must_show` 전체가 한 장의 이미지에서 동시에 관찰 가능한지 One Image Feasibility Check를 수행한다. 차량 전체+작은 부품 근접+내부 배선+키 상태처럼 서로 다른 시야 수준을 한 장에 강제하면 Brief를 축소하거나 분리한다.
 - 실제 외형이 Fact가 아닌데 `generation_allowed=false`인 Brief는 Writer Self QA 실패다.
@@ -657,4 +657,4 @@ Native Chat generated-file binary access and server URL/PDF ingestion are indepe
 
 A capability probe calls this RPC with both image ID and claim token NULL. It creates only a source-stage job and a private `probes/<jobId>/<sha>.webp`; it never claims/changes a content image, creates a production asset, or makes READY_FOR_UPLOAD. Job STAGED means technical verification only; image/mobile/SEO QA remain PENDING. Use an internal fixture for coordinates, not a real task's unverified inspection arrows.
 
-For a real 3-A Claim, the same RPC takes the current image ID/token and stores a candidate at its canonical staging path. Open the returned signed preview (one-hour expiry), inspect actual pixels at 390px, and verify must_show/structural accuracy/rights metadata/ALT before `content_pipeline_approve_source_stage_v1`. Approval requires the expected SHA, current PRODUCING Claim, matching Contract, explicit Image/Mobile/SEO PASS, required representative crop gates, no existing canonical staging, and a single-use approval receipt. Only approval makes READY_FOR_UPLOAD. Same-contract candidates can be reused by a fresh PRODUCING Claim after failure; never substitute a probe or regenerate solely for upload retry. Detailed spec/coordinates and public HTTPS safety checks are in API.md and the Edge implementation. There is no source-domain allowlist. Pending operator rights approval does not block acquisition; record provenance and actual approval state without inventing approval. Label/Zoom Inset/AI Edit/Full Generation are not supported by this deterministic transport.
+For a real 3-A Claim, the same RPC takes the current image ID/token and stores a candidate at its canonical staging path. Open the returned signed preview (one-hour expiry), inspect actual pixels at 390px, and verify must_show/structural accuracy/provenance/ALT before `content_pipeline_approve_source_stage_v1`. Approval requires the expected SHA, current PRODUCING Claim, matching Contract, explicit Image/Mobile/SEO PASS, required representative crop gates, no existing canonical staging, and a single-use approval receipt. Only approval makes READY_FOR_UPLOAD. Same-contract candidates can be reused by a fresh PRODUCING Claim after failure; never substitute a probe or regenerate solely for upload retry. Detailed spec/coordinates and public HTTPS safety checks are in API.md and the Edge implementation. There is no source-domain allowlist. Record source provenance only; license/rights/permission fields are not production inputs or approval gates. Label/Zoom Inset/AI Edit/Full Generation are not supported by this deterministic transport.

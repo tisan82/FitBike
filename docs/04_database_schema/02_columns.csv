@@ -250,7 +250,7 @@ public,17_content_asset_source,9,source_asset_url,text,text,null,null,null,YES,n
 public,17_content_asset_source,10,source_owner,text,text,null,null,null,YES,null
 public,17_content_asset_source,11,license_name,text,text,null,null,null,YES,null
 public,17_content_asset_source,12,license_url,text,text,null,null,null,YES,null
-public,17_content_asset_source,13,rights_status,text,text,null,null,null,NO,'PENDING_REVIEW'::text
+public,17_content_asset_source,13,rights_status,text,text,null,null,null,YES,null
 public,17_content_asset_source,14,permission_contact,text,text,null,null,null,YES,null
 public,17_content_asset_source,15,permission_note,text,text,null,null,null,YES,null
 public,17_content_asset_source,16,edited,boolean,bool,null,null,null,NO,false

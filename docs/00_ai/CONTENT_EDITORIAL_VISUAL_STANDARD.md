@@ -43,16 +43,16 @@ Source 우선순위는 다음과 같다.
 
 ## 4.1 Approved Manufacturer Assets
 
-FitBike 운영자는 **현재 FitBike Production에 보유·서비스하는 모든 바이크 제조사**의 공식 사이트 차량·부품·기술 이미지 활용 권리를 확보·관리한다. 특정 브랜드 whitelist를 두지 않으며, 현재 서비스 브랜드의 제조사 공식 자산은 `OFFICIAL_APPROVED` 자산으로 우선 활용할 수 있다.
+제조사 공식 자산을 우선 탐색하며 특정 브랜드 whitelist를 두지 않는다. 사용 권리의 협의·판단은 운영자가 담당한다. 신규 권리 상태는 기록하지 않으며 출처 기록 정책은 `CONTENT.md`를 따른다.
 
 - 특정 모델 외형·부품 위치·차량 크기 예시는 생성 이미지보다 해당 제조사의 공식 실사를 우선한다.
 - 원본 페이지 URL, 원본 이미지 URL, 제조사, 확인 일자, 편집 내용과 사용 콘텐츠를 Asset Source에 기록한다.
-- 공식 자산의 브랜드 표식은 권리 승인 범위 안에서 허용한다. 제3자 워터마크나 판매처 표식은 허용하지 않는다.
+- 공식 자산의 실제 브랜드 표식은 보존한다. 제3자 워터마크를 제거하지 않는다.
 - 외부 hotlink는 금지하며 콘텐츠별 WebP로 변환해 FitBike Storage에서 제공한다.
 - 공식 이미지라도 다른 연식·트림을 현재 예시인 것처럼 표시하지 않는다.
-- 현재 FitBike 서비스 브랜드의 제조사 공식 자산은 특정 브랜드명에 관계없이 동일한 승인 정책을 적용한다. 제3자 자산도 출처와 권리 상태를 정확히 기록하되, 권리 상태는 제작 제한 조건으로 사용하지 않는다.
-- `PENDING_OPERATOR_APPROVAL` 자산도 Image QA를 통과하면 콘텐츠별 WebP로 `content-assets`에 내재화할 수 있다. 이는 공개 게시 승인을 의미하지 않는다.
-- 권리 상태는 provenance/운영 이력으로 유지하며 Visual 또는 Publish 자동 차단 조건으로 사용하지 않는다. 운영자가 권리 문제를 별도 관리한다.
+- 제조사 및 제3자 자산 모두 출처 페이지·원본 자산 URL·운영자/저작자·확인 시점·편집 이력을 기록한다.
+- QA를 통과한 자산은 3-A Staging → 3-B Production 경로로 처리한다.
+- 라이선스·권리·사용/편집 허락은 자동 제작/QA/Publish의 필수값이나 Gate가 아니다. 운영자가 별도로 관리한다.
 
 ## 5. Image Must Teach
 각 이미지는 고객이 실제 바이크를 다룰 때 다음 중 최소 하나를 명확하게 확인할 수 있게 해야 한다: `어디를 볼 것인가`, `무엇을 확인할 것인가`, `어떤 상태가 문제인가`. 모바일 390px에서 핵심 대상이 식별되지 않거나 사진만 보고 확인 목적을 설명할 수 없으면 `IMAGE_INFORMATION_VALUE_FAIL`이다.
@@ -298,13 +298,11 @@ Reference Asset을 활용할 때는:
 
 ### Rights state vs Visual QA
 
-이미지의 권리 상태와 이미지 제작 품질 상태는 별도 축이다.
+이미지 제작은 출처·품질·무결성을 검증하며 신규 권리 상태를 만들지 않는다.
 
-- `PENDING_OPERATOR_APPROVAL`은 Image QA Blocking Fail Code가 아니다.
-- 권리 대기 상태만으로 Visual Task를 RETRY/HOLD/BLOCKED하지 않는다.
-- 출처·원본 URL·운영자/저작자·편집 이력·권리 상태가 기록되고 이미지 자체가 QA를 통과하면 WebP/Storage 적재와 Image DONE까지 진행할 수 있다.
+- 출처·원본 URL·운영자/저작자·편집 이력을 기록하고 이미지 QA를 통과하면 3-A/3-B 경로로 진행한다.
 - Image DONE은 “Production Asset 제작 완료”를 의미하며 “공개 게시 권리 승인 완료”를 의미하지 않는다.
-- 외부 실사의 권리 상태는 provenance/운영 이력으로 유지하며, 권리 상태 자체를 Visual 또는 Publish 자동 차단 조건으로 사용하지 않는다. 운영자가 별도로 관리한다.
+- 라이선스·권리·사용/편집 허락은 자동 제작/QA/Publish의 필수값이나 Gate가 아니다. 운영자가 별도로 관리한다.
 
 
 ### Semantic Visual QA — Mandatory
@@ -393,7 +391,6 @@ Writer & Visual Planner가 기존 BODY Production Asset을 `THUMBNAIL_HERO`로 �
 - `storage_path`
 - `sha256`
 - Source provenance
-- rights status
 
 대신 대표 이미지 역할을 추가하고 card/hero Crop QA를 별도로 실행한다. 이 경우 metadata에 `reuseMode: REUSED`, 원본 `pipelineImageId` 및 원본 SHA를 기록한다.
 

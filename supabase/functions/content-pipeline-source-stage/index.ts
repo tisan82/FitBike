@@ -39,10 +39,6 @@ Deno.serve(async (req) => {
     if (typeof s.sourceOwner !== "string" || !s.sourceOwner.trim()) {
       throw Error("SOURCE_PROVENANCE_REQUIRED");
     }
-    if (
-      s.rightsStatus != null &&
-      (typeof s.rightsStatus !== "string" || !s.rightsStatus.trim())
-    ) throw Error("SOURCE_PROVENANCE_REQUIRED");
     const transform = validateTransform(s.transform);
     const downloaded = await downloadSource(u.href);
     const source = downloaded.bytes, mime = downloaded.mime;
@@ -112,7 +108,6 @@ Deno.serve(async (req) => {
         sourceCheckedAt: new Date().toISOString(),
         sourcePageUrl: s.sourcePageUrl ?? null,
         sourceOwner: s.sourceOwner ?? null,
-        rightsStatus: s.rightsStatus ?? "PENDING_OPERATOR_APPROVAL",
         sourceMime: mime,
         sourceSha256: await sha256(source),
         sourcePdfPage: s.sourcePdfPage ?? null,

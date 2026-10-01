@@ -36,7 +36,7 @@ FitBike Content는 사람들이 실제로 검색하고 궁금해하는 오토바
 - `14_content_bike_model_year`: optional content-to-model-year relation
 - `15_content_part_link`: optional content-to-part relation
 - `16_content_topic`: Content Factory queue and publication state
-- `17_content_asset_source`: image/source provenance and reuse-rights ledger
+- `17_content_asset_source`: image/source provenance ledger
 
 Relations are metadata for relevance and contextual discovery. They do not mean that every article must render a bike or part CTA.
 
@@ -46,7 +46,7 @@ Bearer 인증과 서버 전용 Supabase 자격정보 뒤에 격리된 Internal C
 다루며 회원·인증·Fitment 원본 데이터 API를 제공하지 않는다. DB 게시는 검토된 제한
 RPC로 원자 처리하고 임의 수정·삭제는 허용하지 않는다.
 
-Admin의 `운영 어드민`은 Content Factory Queue, 게시 현황, 보류·오류, Source 권리 검토
+Admin의 `운영 어드민`은 Content Factory Queue, 게시 현황, 보류·오류, Source 출처 검토
 상태를 보여주는 관제 화면이다. 운영자가 Queue 상태를 바꿀 수 있지만 실제 Content 게시는
 동일한 Factory Gate와 원자 게시 RPC를 우회하지 않는다.
 
@@ -112,19 +112,17 @@ Topic 선정 순서는 `User Need → Purpose/Intent → Topic → Content Type 
 구체적인 문장 작성과 QA 방법은 `docs/00_ai/CONTENT_FACTORY.md`, 이미지 표현과
 alt/caption 기준은 `docs/00_ai/CONTENT_EDITORIAL_VISUAL_STANDARD.md`가 담당한다.
 
-실차 이미지는 `차량 전체 → 접근 위치 → 커버 개방 → 부품 노출 → 핵심 작업 → 복구·완료`의 역할을 기준으로 계획한다. 모델별 실제 구조를 보여주는 사진은 모델·연식·출처·재사용 권리가 확인되어야 하며, 확인되지 않은 생성 이미지를 실제 작업 사진처럼 사용하지 않는다.
+실차 이미지는 `차량 전체 → 접근 위치 → 커버 개방 → 부품 노출 → 핵심 작업 → 복구·완료`의 역할을 기준으로 계획한다. 모델별 실제 구조를 보여주는 사진은 모델·연식·출처가 확인되어야 하며, 확인되지 않은 생성 이미지를 실제 작업 사진처럼 사용하지 않는다.
 
 ### Web Real Asset Editorial Policy
 
-FitBike는 모든 장면을 직접 촬영할 수 없으므로 웹에서 발견한 실제 작업·부품 사진을 Editorial Source로 활용할 수 있다. 이미지 선택은 정보 적합성·사실성·원본 확보 가능성을 우선하고, 출처와 권리 상태는 별도 provenance로 추적한다.
+FitBike는 웹에서 발견한 실제 작업·부품 사진을 Editorial Source로 활용할 수 있다. 이미지 선택은 정보 적합성·사실성·원본 확보 가능성을 우선한다.
 
-Visual Production과 Publication Approval은 분리한다. 원본 URL, 실제 이미지 URL, 원저작자/운영자, 확인 가능한 라이선스·사용 승인 근거, 편집 계획과 권리 상태를 기록한다. 권리가 아직 운영자에게 최종 확인되지 않은 외부 실사는 `PENDING_OPERATOR_APPROVAL` 등 현재 schema가 지원하는 대기 상태로 기록하며, **권리 확인 대기만을 이유로 이미지 확보·편집·WebP 변환·`content-assets` Storage 적재 또는 Image Task DONE을 막지 않는다.** 운영자는 게시 전에 별도로 권리를 확인한다.
-
-따라서 `PENDING_OPERATOR_APPROVAL`은 Visual 제작 실패, `RETRY`, `HOLD`, `BLOCKED` 사유가 아니다. 다만 출처를 숨기거나 미확인 권리를 승인된 것으로 표시해서는 안 된다. 실제 공개 게시 시점의 권리 Gate는 Publish 단계가 담당한다.
+이미지 제작·QA·업로드·게시 자동화는 출처만 기록한다. 원본 페이지 URL, 실제 이미지/PDF URL, 저작자 또는 운영자, 모델·연식·PDF 페이지(해당 시), 확인 시점과 편집 이력을 보존한다. 라이선스 조건·권리 상태·사용/편집 허락은 필수 입력, QA 항목 또는 진행 Gate로 사용하지 않으며 신규 권리 상태를 생성하거나 승인값을 추정하지 않는다. 권리 협의와 판단은 운영자가 별도로 담당하며, 문제 자산은 운영자가 서비스 제외·삭제·수정한다. 이 운영 절차가 법적 사용 권한을 부여하는 것은 아니다.
 
 허용되는 편집은 모바일 중심 크롭, 회전·원근 보정, 밝기·화이트밸런스 개선, 실제 부품을 바꾸지 않는 배경 정리, 핵심 위치를 가리지 않는 화살표·윤곽·짧은 라벨, 개인정보 마스킹이다. 차종·제품 코드·단자 방향·실제 손상·분해 상태를 바꾸거나 여러 사진을 하나의 실제 장면처럼 오인시키는 편집은 금지한다.
 
-원본과 편집본은 별도 이력으로 관리한다. 이미지 편집은 정보 가독성을 높이기 위한 것이며 원본의 저작권이나 라이선스 조건을 대체하지 않는다. 공개 화면의 출처/권리 표시는 실제 라이선스·운영 정책과 Publish Gate가 결정한다.
+원본과 편집본은 별도 이력으로 관리한다. 출처 기록과 실제 구조·사실성·모바일 가독성 검증은 유지하며, 권리 검증을 자동 제작 절차에 추가하지 않는다.
 
 ## Detail UX
 

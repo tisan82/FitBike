@@ -4,12 +4,11 @@ function selectImageSource({ partType, role, imageRole, brandAssetAvailable, bra
   const brand = brandByPart[partType] ?? null;
   const brandRequired = brand && (role === "thumbnail" || imageRole === "PRODUCT_REPRESENTATION");
   if (webAsset) {
-    const rightsVerified = ["PUBLIC_DOMAIN", "CC0", "CC_BY", "CC_BY_SA", "OWNER_APPROVED", "OFFICIAL_APPROVED"].includes(webAsset.rightsStatus);
-    const provenanceComplete = Boolean(webAsset.sourceUrl && webAsset.creator && webAsset.rightsEvidence && webAsset.editPlan);
-    if (!rightsVerified || !provenanceComplete) {
-      return { status: "FAIL", sourceType: "NONE", brand: null, sourceAsset: webAsset.sourceUrl ?? null, rightsStatus: webAsset.rightsStatus ?? "UNKNOWN", fallbackReason: "Web real-world assets require verified reuse rights, creator, rights evidence, and a non-deceptive edit plan." };
+    const provenanceComplete = Boolean(webAsset.sourceUrl && webAsset.creator);
+    if (!provenanceComplete) {
+      return { status: "FAIL", sourceType: "NONE", brand: null, sourceAsset: webAsset.sourceUrl ?? null, fallbackReason: "Web real-world assets require a source URL and creator/source owner." };
     }
-    return { status: "PASS", sourceType: "LICENSED_WEB_REAL_ASSET_EDIT", brand: null, sourceAsset: webAsset.sourceUrl, rightsStatus: webAsset.rightsStatus, creator: webAsset.creator, rightsEvidence: webAsset.rightsEvidence, editPlan: webAsset.editPlan, fallbackReason: null };
+    return { status: "PASS", sourceType: "WEB_REAL_ASSET_EDIT", brand: null, sourceAsset: webAsset.sourceUrl, creator: webAsset.creator, editPlan: webAsset.editPlan, fallbackReason: null };
   }
   if (imageRole === "EDUCATIONAL_DIAGRAM") {
     return { status: "PASS", sourceType: "GENERATED_EDUCATIONAL", brand: null, sourceAsset: null, brandAssetChecked: Boolean(brand), brandAssetResult: brandAssetAvailable ? "NOT_SUITABLE" : "UNAVAILABLE", fallbackReason: fallbackReason ?? "Educational explanation requires a purpose-built visual." };
