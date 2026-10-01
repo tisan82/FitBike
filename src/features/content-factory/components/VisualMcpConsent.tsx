@@ -17,7 +17,8 @@ export function VisualMcpConsent({ authorizationId }: { authorizationId: string 
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const validId = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(authorizationId);
+  // OAuth authorization IDs are opaque; Supabase validates their identity and expiry.
+  const validId = authorizationId.length > 0 && authorizationId.length <= 2048 && !/[\s\x00-\x1f\x7f]/.test(authorizationId);
   useEffect(() => {
     let cancelled = false;
     async function load() {
