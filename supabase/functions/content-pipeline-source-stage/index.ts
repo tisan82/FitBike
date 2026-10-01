@@ -71,24 +71,6 @@ Deno.serve(async (req) => {
       verified.sha256 !== proof.sha256 || verified.bytes !== proof.bytes ||
       verified.width !== proof.width || verified.height !== proof.height
     ) throw Error("STAGING_IDENTITY_MISMATCH");
-    const { data: preview, error: previewError } = await sb.storage.from(BUCKET)
-      .createSignedUrl(path, 3600);
-    if (previewError || !preview) throw Error("PREVIEW_URL_FAILED");
-    // Materialize the exact verified staged binary for independent pixel QA.
-    // The bridge is service-role-only and chunked to keep each DB payload bounded.
-    await sb.from("28_content_pipeline_source_stage_inspection_chunk")
-      .delete().eq("job_id", jobId);
-    const inspectChunkBytes = 4500;
-    for (let seq = 0, offset = 0; offset < final.webp.length; seq++, offset += inspectChunkBytes) {
-      const part = final.webp.subarray(offset, Math.min(offset + inspectChunkBytes, final.webp.length));
-      let binary = "";
-      for (let i = 0; i < part.length; i++) binary += String.fromCharCode(part[i]);
-      const { error: chunkError } = await sb.from(
-        "28_content_pipeline_source_stage_inspection_chunk",
-      ).insert({ job_id: jobId, seq, chunk_base64: btoa(binary) });
-      if (chunkError) throw Error("INSPECTION_BRIDGE_WRITE_FAILED");
-    }
-
     const result = {
       ...verified,
       bucket: BUCKET,
@@ -99,8 +81,6 @@ Deno.serve(async (req) => {
       imageQa: "PENDING",
       mobileQa: "PENDING",
       imageSeoQa: "PENDING",
-      previewUrl: preview.signedUrl,
-      previewExpiresAt: new Date(Date.now() + 3600000).toISOString(),
       provenance: {
         sourceAssetUrl: u.href,
         finalSourceAssetUrl: downloaded.finalUrl,
@@ -118,11 +98,43 @@ Deno.serve(async (req) => {
       stagedAt: new Date().toISOString(),
       probeOnly: !j.pipelineImageId,
     };
-    const { error: saveError } = await sb.from(
+    // Preserve the verified candidate before the optional legacy inspection bridge.
+    // A checkpoint is technical evidence only, never an approval or STAGED receipt.
+    const { data: checkpoint, error: checkpointError } = await sb.from(
+      "27_content_pipeline_source_stage_job",
+    ).update({ result: { ...result, checkpoint: "STORAGE_VERIFIED" }, updated_at: new Date().toISOString() })
+      .eq("job_id", jobId).eq("status", "RUNNING").select("job_id").maybeSingle();
+    if (checkpointError || !checkpoint) throw Error("JOB_CHECKPOINT_SAVE_FAILED");
+
+    const { data: preview, error: previewError } = await sb.storage.from(BUCKET)
+      .createSignedUrl(path, 3600);
+    if (previewError || !preview) throw Error("PREVIEW_URL_FAILED");
+    Object.assign(result, { previewUrl: preview.signedUrl, previewExpiresAt: new Date(Date.now() + 3600000).toISOString() });
+
+    // Materialize the exact verified staged binary for independent pixel QA.
+    // The bridge is service-role-only and chunked to keep each DB payload bounded.
+    const { error: deleteError } = await sb.from("28_content_pipeline_source_stage_inspection_chunk")
+      .delete().eq("job_id", jobId);
+    if (deleteError) throw Error("INSPECTION_BRIDGE_WRITE_FAILED");
+    const rows: Array<{ job_id: string; seq: number; chunk_base64: string }> = [];
+    const inspectChunkBytes = 4500;
+    for (let seq = 0, offset = 0; offset < final.webp.length; seq++, offset += inspectChunkBytes) {
+      const part = final.webp.subarray(offset, Math.min(offset + inspectChunkBytes, final.webp.length));
+      let binary = "";
+      for (let i = 0; i < part.length; i++) binary += String.fromCharCode(part[i]);
+      rows.push({ job_id: jobId, seq, chunk_base64: btoa(binary) });
+    }
+
+    for (let offset = 0; offset < rows.length; offset += 100) {
+      const { error: chunkError } = await sb.from("28_content_pipeline_source_stage_inspection_chunk")
+        .insert(rows.slice(offset, offset + 100));
+      if (chunkError) throw Error("INSPECTION_BRIDGE_WRITE_FAILED");
+    }
+    const { data: saved, error: saveError } = await sb.from(
       "27_content_pipeline_source_stage_job",
     ).update({ status: "STAGED", result, updated_at: new Date().toISOString() })
-      .eq("job_id", jobId).eq("status", "RUNNING");
-    if (saveError) throw Error("JOB_RECEIPT_SAVE_FAILED");
+      .eq("job_id", jobId).eq("status", "RUNNING").select("job_id").maybeSingle();
+    if (!saved || saveError) throw Error("JOB_RECEIPT_SAVE_FAILED");
     return out({ jobId, status: "STAGED", result }, 200);
   } catch (e) {
     const code = e instanceof Error ? e.message : String(e);

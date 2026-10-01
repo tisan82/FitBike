@@ -419,7 +419,7 @@ Deno.serve(async (req) => {
             ? protocol
             : "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "fitbike-visual-operations", version: "1.2.0" },
+        serverInfo: { name: "fitbike-visual-operations", version: "1.2.1" },
       },
     });
   }
@@ -566,7 +566,8 @@ Deno.serve(async (req) => {
             });
           } else if (name === "inspect_visual_source") {
             if (job.status !== "STAGED" || !job.result) {
-              throw Error("SOURCE_NOT_STAGED");
+              const status = await rpc("content_pipeline_source_stage_status_v1", { p_job_id: a.jobId });
+              throw Error(`SOURCE_INSPECTION_NOT_READY: status=${status?.status ?? "UNKNOWN"}; failureCode=${status?.failureCode ?? "NONE"}; nextAction=${status?.nextAction ?? "POLL_SAME_JOB"}; inspect only after STAGED`);
             }
             const r = job.result;
             const expectedPath =

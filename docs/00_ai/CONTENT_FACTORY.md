@@ -670,3 +670,8 @@ After the connection is available, use dispatch_visual_source with one operation
 ### 3-A Source reuse preflight
 
 Before editing a source in ordinary Chat, use the dedicated MCP `check_visual_source_usage` according to `docs/02_framework/API.md` (Authenticated 3-A MCP operations). Keep one Image Task claimed while switching unsuitable/404/duplicate sources; a failed candidate alone is not a task termination condition. Preserve candidate job/source/failure evidence and resume the last successful stage. Never bypass final source/SHA uniqueness guards.
+
+
+### Source Stage async execution and failure diagnosis
+
+Dispatch is not completion: poll the same Job using the returned pollAfterSeconds until STAGED or a confirmed terminal failure. Invoke pixel inspection only after STAGED. timedOut=true is an elapsed-time warning; use actual failureCode/transport evidence instead of inventing STALLED/TIMEOUT. Runtime546 resource failures are reconciled by the service status API documented in API.md. RETRY eligibility uses nextEligibleAt (ordinary failure cooldown5 minutes); Claim SKIP during cooldown is not a recovery defect. Never end normally at RUNNING, duplicate dispatch, infer QA PASS from a checkpoint, or change Task state directly to skip cooldown.
