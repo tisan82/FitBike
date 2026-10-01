@@ -10,7 +10,7 @@ Production origin은 `https://fitbike.co.kr`이며 공통 site config에서 관�
 
 ## Index / Noindex Policy
 
-실제 공개 정보와 고유 URL이 있는 Main, Bike Selector, 활성 Model + Year Detail은 index/follow 대상이다. Admin/Login/API와 query 기반 임시 결과 화면은 index 대상이 아니다. 비활성 또는 존재하지 않는 entity는 404로 응답한다.
+실제 공개 정보와 고유 URL이 있는 Main, Bike Selector, 활성 Model + Year Detail은 index/follow 대상이다. Admin/Login/API/OAuth consent와 query 기반 임시 결과 화면은 index 대상이 아니다. 비활성 또는 존재하지 않는 entity는 404로 응답한다.
 
 ## Metadata Standard
 

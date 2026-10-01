@@ -52,3 +52,7 @@ prose 문서보다 우선한다.
 ## 2026-10-01 Visual Claim request receipt
 
 `29_content_pipeline_visual_claim_request` is a service-role-only idempotency receipt keyed by worker_key/request_id. RLS is enabled without public policies; PUBLIC/anon/authenticated have no table or RPC access. It references image_id and retains original Claim metadata for transport recovery, not a new image status machine. Runtime definition is preserved in the two visual_claim migrations. Existing table exports were not comprehensively refreshed by this change.
+
+## 2026-10-01 Visual Source request transport
+
+Migration `20261001040232_visual_source_request_transport.sql` adds service-only content_pipeline_dispatch_visual_source_request_v1; no new image status or table. It serializes the operator/operation intent and stores its internal receipt in 27.spec.visualMcpOperation. Existing source/ticket/network/claim/Contract guards remain authoritative. Public/anon/authenticated EXECUTE is revoked.

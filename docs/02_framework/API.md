@@ -138,10 +138,10 @@ Result includes actual WebP SHA/bytes/MIME/signature/decode/dimensions, source S
 `content_pipeline_image_handoff_status_v1(p_pipeline_id bigint DEFAULT NULL)` is the canonical Chat/admin read API for approved visual QA. `imageQa`, `mobileQa`, and `imageSeoQa` read only `staging_asset.qa`; `qaSource` is `staging_asset.qa`. Missing approval returns null, never an inferred PASS from DONE or candidate technical verification. Candidate job QA remains separate. Existing output fields and service-role permissions are preserved.
 
 
-## Authenticated 3-A MCP claim transport (2026-10-01)
+## Authenticated 3-A MCP operations (2026-10-01)
 
 Endpoint: `https://farjyjcvduthawpdjuqe.supabase.co/functions/v1/content-pipeline-visual-mcp`.
-Tools: `get_visual_queue_status`, `claim_visual_image`, `get_visual_claim_result`, `fail_visual_image`. No arbitrary SQL, asset generation, publication or DONE tool.
+Tools: `get_visual_queue_status`, `claim_visual_image`, `get_visual_claim_result`, `dispatch_visual_source`, `get_visual_dispatch_result`, `get_visual_source_status`, `inspect_visual_source`, `approve_visual_source`, `fail_visual_image`. No arbitrary SQL, Full Generation, AI Editing, production publication or DONE tool.
 
 Each execution intent supplies a UUID requestId; reuse it after response interruption. The service-only receipt `29_content_pipeline_visual_claim_request` serializes by worker and stores the original result. Same request/changed target is rejected. A new request resumes this user's active PRODUCING/STAGING claim; it cannot add a second image. Closed/expired result never returns a usable Claim Token. Existing producer ordering, cooldown and expired-claim recovery remain authoritative.
 
@@ -149,4 +149,10 @@ The Edge validates Supabase access tokens via getUser(), confirmed email and ser
 
 OAuth protected-resource metadata is public at endpoint + `/oauth-protected-resource`; unauthenticated MCP returns 401 with WWW-Authenticate. Chat connection additionally requires Supabase OAuth Server/dynamic registration, a sign-in/consent frontend, the operator allowlist and user installation. These are NOT proven/configured by deploying the MCP function. Existing SQL calls are not automatically replaced. Deployment does not guarantee platform approval.
 
-Source Stage/pixel/approval/3-B still use their existing transports; this release scopes only Claim, request recovery, queue reads and failure close.
+Dispatch delegates to existing Source Stage through service-only `content_pipeline_dispatch_visual_source_request_v1`. Each source/edit intent has a UUID operationId; repeat it after a lost response and read `get_visual_dispatch_result`. Same operator/operationId returns the existing candidate, including FAILED candidates; changed image, Contract or spec is rejected. Use a new operationId only for a new source/edit intent. Only the operator’s current PRODUCING claim may create a candidate. Provenance only; crop/maxWidth/annotations[] circle/arrow supported. Full Generation/AI Editing are not capabilities of this transport.
+
+Candidate status/inspection/approval first check that job image/Contract match the operator’s original claim receipt. Inspection obtains the private canonical WebP directly, checks SHA/bytes/MIME/RIFF/WEBP/actual decode/dimensions, and returns native MCP ImageContent plus a derived PNG at 390px. Preview height is capped at4000; invalid narrow crops are rejected before resize. Derived previews never replace the canonical asset. Technical verification is not semantic approval. Image-return rendering in ordinary Chat still requires an authenticated end-to-end test.
+
+Approval delegates existing Contract/claim/SHA/explicit QA guards, then re-reads READY_FOR_UPLOAD and canonical SHA. A lost-response replay returns only the same already-approved canonical asset. Failure close delegates original fail RPC and re-reads the closed receipt. Neither tool publishes assets. 3-B retains its existing transport.
+
+Frontend: `https://fitbike.co.kr/oauth/consent` (noindex, robots excluded). It preserves authorization_id, authenticates existing Supabase users, checks server operator access through MCP ping, shows client/scopes/redirect and requests explicit consent. SDK approve/deny handles registered redirect URLs; query parameters are never arbitrary redirect destinations. Setup: Auth Site URL=https://fitbike.co.kr, OAuth authorization path=/oauth/consent, OAuth Server enabled, dynamic registration enabled (or a pre-registered supported client), server secret CONTENT_FACTORY_MCP_OPERATOR_EMAILS=<verified operator email>. Final account settings and Chat connection require the account holder/session; do not paste service keys or access tokens into Chat.
