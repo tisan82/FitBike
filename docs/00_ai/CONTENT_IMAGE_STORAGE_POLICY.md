@@ -156,11 +156,11 @@ Rules:
 - Ticket·Claim은 각 단계에 결합한다. 긴 service credential을 Chat artifact나 보고에 노출하지 않는다.
 - `25/26` generated handoff/chunks는 binary 전달을 위한 임시 adapter로 재사용한다. 영속적인 단계 간 원본은 Storage이며 DB에 binary를 장기 보관하지 않는다. Staging 기록 전 chunks를 소비/삭제하지 않는다.
 - 실패한 Handoff는 같은 Contract에서 인계해 재시도한다. READY_FOR_UPLOAD의 Staging은 Claim과 무관하게 지속된다.
-- DONE 전 Staging 삭제 금지. 검증된 DONE Asset도 현재는 보존한다. 자동 Cleanup은 아직 활성화하지 않으며 실제 Chat E2E 안정화 후 retention/orphan 범위를 확정해 적용한다. 즉시 삭제는 디버깅/복구 기간에 사용하지 않는다.
+- DONE 전 canonical Staging 삭제 금지. 자동 정리는 아래 Daily Staging Maintenance 규칙을 따른다.
 
 Chat 생성 결과의 binary를 읽고 전송할 수 없는 환경은 이 Storage 구현으로 자동 해결되지 않는다. Binary transport를 Claim 전에 시험하고, 파일명·이미지 설명·추측한 Base64·다른 파일을 업로드하지 않는다. 지원되는 파일 업로드 도구가 없으면 실제 개발 잔여 항목으로 보고한다.
 
-Source-stage capability probes are private `content-pipeline-staging/probes/<jobId>/<sha>.webp` objects. They cannot enter Production/DONE. Real source-stage candidates use `<pipelineId>/<pipelineImageId>/<sha>.webp`, and become canonical only after explicit 3-A QA approval. One-hour signed previews are for worker pixel review; do not publish them. Job receipts store provenance/transform/technical proof without binary DB storage. Preserve failed/unapproved candidates for diagnosis; automatic cleanup remains disabled during stabilization.
+Source-stage capability probes are private `content-pipeline-staging/probes/<jobId>/<sha>.webp` objects. They cannot enter Production/DONE. Real source-stage candidates use `<pipelineId>/<pipelineImageId>/<sha>.webp`, and become canonical only after explicit 3-A QA approval. One-hour signed previews are for worker pixel review; do not publish them. Job receipts store provenance/transform/technical proof without binary DB storage. Preserve candidates required by incomplete images for recovery; terminal probes and obsolete completed-image candidates follow Daily Staging Maintenance.
 
 ## Canonical approved visual QA
 
@@ -192,3 +192,13 @@ Source Stage의 기술적 `STAGED` 성공은 Semantic/Mobile Image QA PASS가 �
 - HTTP/MIME/decode metadata만으로 Semantic QA를 PASS 처리하지 않는다.
 - 승인 성공 시 해당 Job의 inspection chunk는 즉시 삭제한다.
 - inspection table/RPC는 `service_role` 전용이며 `public`, `anon`, `authenticated`에는 권한을 부여하지 않는다.
+
+## Daily Staging Maintenance
+
+- Production `content-assets` is never a deletion target. Daily pg_cron at 01:10 Asia/Seoul invokes `content-pipeline-staging-maintenance` with a short-lived one-time DB ticket, not a long-lived credential.
+- Retention is at least 24 elapsed hours, not midnight-based; a daily run normally removes eligible files 24–48 hours later, subject to the 100-object/85-second batch bound. Backlog continues on subsequent runs.
+- Completed canonical Staging is eligible only after DONE has been stable for 24 hours, no Claim, Staging proof/SHA match, and Production object exists. The worker downloads Production and Staging and requires both bytes/SHA to equal the canonical receipt, then atomically reserves deletion under the same path lock used by Image activation/approval. A 5-minute lease prevents concurrent reuse; remote requests are bounded to 15 seconds and a 115-second worker deadline. Successful deletion releases its lease; ambiguous failures retain the lease until expiry. Identity failure preserves the object.
+- Terminal standalone probes and obsolete STAGED/FAILED candidates attached to DONE/CANCELLED images may expire after 24 hours. Unknown objects, active Jobs, and every candidate/canonical/input linked to an incomplete image (including RETRY/HOLD/READY_FOR_UPLOAD/PROCESSING) remain protected. “Old failed candidate” does not override recovery protection.
+- Delete only through the Storage API; verify absence afterwards. Remove inspection chunks only for terminal eligible jobs whose Storage object no longer exists. Retain Image, Job, SHA, QA, provenance and maintenance audit receipts.
+- Partial failures are recorded and retried by the next run. No automatic Claim/QA/status/publish action is performed by cleanup.
+- `get_visual_maintenance_status` is the operator's read-only MCP entry point for usage and latest runs. Storage metadata inventory and database physical size are measured; monthly egress/function billing usage is not available from these counts and must be checked in the Supabase dashboard.

@@ -56,6 +56,7 @@ const transformSchema = {
   additionalProperties: false,
 };
 const tools = [
+  { name: "get_visual_maintenance_status", description: "Read Storage/database usage and latest daily staging cleanup results. Does not claim, clean, approve or publish.", inputSchema: {type: "object", properties: {}, required: [], additionalProperties: false}, annotations: {readOnlyHint: true, destructiveHint: false, openWorldHint: false} },
   {
     name: "check_visual_source_usage",
     description: "Check a verified source URL and optional source SHA against READY_FOR_UPLOAD/DONE images before editing. Requires this operator's claim receipt. URL-only clear is provisional, not permission or QA PASS. If duplicate, select another source within the same active claim; never alter URL/crop to bypass identity.",
@@ -419,7 +420,7 @@ Deno.serve(async (req) => {
             ? protocol
             : "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "fitbike-visual-operations", version: "1.2.1" },
+        serverInfo: { name: "fitbike-visual-operations", version: "1.3.0" },
       },
     });
   }
@@ -469,7 +470,9 @@ Deno.serve(async (req) => {
   try {
     let result;
     let images: Array<{ type: string; data: string; mimeType: string }> = [];
-    if (name === "get_visual_queue_status") {
+    if (name === "get_visual_maintenance_status") {
+      result = await rpc("content_pipeline_staging_maintenance_status_v1", {});
+    } else if (name === "get_visual_queue_status") {
       if (
         a.pipelineId !== undefined &&
         (!Number.isSafeInteger(a.pipelineId) || a.pipelineId < 1)

@@ -56,3 +56,7 @@ prose 문서보다 우선한다.
 ## 2026-10-01 Visual Source request transport
 
 Migration `20261001040232_visual_source_request_transport.sql` adds service-only content_pipeline_dispatch_visual_source_request_v1; no new image status or table. It serializes the operator/operation intent and stores its internal receipt in 27.spec.visualMcpOperation. Existing source/ticket/network/claim/Contract guards remain authoritative. Public/anon/authenticated EXECUTE is revoked.
+
+## 2026-10-01 Staging maintenance
+
+`content_pipeline_maintenance_run` stores service-only short-lived ticket hashes and bounded aggregate cleanup receipts. RLS enabled; no PUBLIC/anon/authenticated privileges. New usage/plan/ticket/dispatch/finish/chunk/status RPCs are service-only. The actual definition and daily pg_cron schedule are in `20261001095441_content_staging_maintenance.sql`; unrelated schema exports are unchanged. No Storage metadata is deleted through SQL.
