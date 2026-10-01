@@ -57,6 +57,21 @@ const transformSchema = {
 };
 const tools = [
   {
+    name: "check_visual_source_usage",
+    description: "Check a verified source URL and optional source SHA against READY_FOR_UPLOAD/DONE images before editing. Requires this operator's claim receipt. URL-only clear is provisional, not permission or QA PASS. If duplicate, select another source within the same active claim; never alter URL/crop to bypass identity.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        requestId: { type: "string", format: "uuid" },
+        sourceAssetUrl: { type: "string", format: "uri" },
+        sourceSha256: { type: "string", pattern: "^[0-9a-f]{64}$" },
+      },
+      required: ["requestId", "sourceAssetUrl"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
+  {
     name: "get_visual_dispatch_result",
     description:
       "Recover this operator’s source dispatch by operationId after an interrupted response. Read-only; never creates another candidate.",
@@ -273,6 +288,29 @@ function json(b: unknown, s = 200, h: Record<string, string> = {}) {
     },
   });
 }
+async function sourceUsage(imageId: number, sourceUrl: unknown, sourceSha?: unknown) {
+  if (typeof sourceUrl !== "string" || sourceUrl.length > 4096) throw Error("INVALID_SOURCE_URL");
+  const parsed = new URL(sourceUrl);
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password) throw Error("INVALID_SOURCE_URL");
+  if (sourceSha !== undefined && (typeof sourceSha !== "string" || !/^[a-f0-9]{64}$/.test(sourceSha))) throw Error("INVALID_SOURCE_SHA");
+  const matches: Record<string, unknown>[] = [];
+  for (const [field, value, matchedBy] of [
+    ["staging_asset->qa->>sourceAssetUrl", sourceUrl, "SOURCE_URL"],
+    ...(sourceSha ? [["staging_asset->qa->provenance->>sourceSha256", sourceSha, "SOURCE_SHA256"]] : []),
+  ]) {
+    const { data, error } = await sb.from("21_content_pipeline_image")
+      .select("pipeline_image_id,pipeline_id,image_id,asset_key,status")
+      .in("status", ["READY_FOR_UPLOAD", "DONE"]).neq("pipeline_image_id", imageId)
+      .eq(field, value).limit(5);
+    if (error) throw Error("SOURCE_USAGE_READ_FAILED");
+    for (const row of data ?? []) matches.push({ ...row, matchedBy });
+  }
+  return { result: matches.length ? "DUPLICATE" : "NO_KNOWN_DUPLICATE", matches,
+    identityScope: sourceSha ? "URL_AND_SOURCE_SHA256" : "EXACT_URL_ONLY",
+    nextAction: matches.length ? "SELECT_DIFFERENT_SOURCE_SAME_CLAIM" : "CONTINUE_SOURCE_VALIDATION",
+    finalApprovalGateRequired: true };
+}
+
 async function rpc(name: string, args: Record<string, unknown>) {
   const { data, error } = await sb.rpc(name, args);
   if (error) throw Error(error.message);
@@ -381,7 +419,7 @@ Deno.serve(async (req) => {
             ? protocol
             : "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "fitbike-visual-operations", version: "1.1.1" },
+        serverInfo: { name: "fitbike-visual-operations", version: "1.2.0" },
       },
     });
   }
@@ -462,7 +500,10 @@ Deno.serve(async (req) => {
           { p_worker_key: worker, p_request_id: a.requestId },
         );
         if (name === "get_visual_claim_result") result = current;
-        else if (name === "get_visual_dispatch_result") {
+        else if (name === "check_visual_source_usage") {
+          if (!current.claim) throw Error("VISUAL_CLAIM_RECEIPT_REQUIRED");
+          result = await sourceUsage(current.claim.pipelineImageId, a.sourceAssetUrl, a.sourceSha256);
+        } else if (name === "get_visual_dispatch_result") {
           if (!uuid(a.operationId) || !current.claim) {
             throw Error("INVALID_SOURCE_REQUEST");
           }
@@ -488,6 +529,8 @@ Deno.serve(async (req) => {
           if (!current.activeClaim) throw Error("ACTIVE_VISUAL_CLAIM_REQUIRED");
           if (!uuid(a.operationId)) throw Error("INVALID_OPERATION_ID");
           validateSpec(a.spec);
+          const usage = await sourceUsage(current.claim.pipelineImageId, a.spec.sourceAssetUrl);
+          if (usage.result === "DUPLICATE") throw Error("DUPLICATE_SOURCE_PREFLIGHT: select a different source within the same claim; no candidate dispatched");
           result = await rpc(
             "content_pipeline_dispatch_visual_source_request_v1",
             {
