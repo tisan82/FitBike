@@ -94,7 +94,11 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
       throw Error("GENERATED_ASSET_SHA_REQUIRED");
     }
   } else if (s.expectedGeneratedSha !== undefined) {
-    throw Error("GENERATED_ASSET_URL_REQUIRED");
+    // Native file input may include an optional integrity check without a URL.
+    if (!s.chatFile) throw Error("GENERATED_ASSET_URL_REQUIRED");
+    if (!/^[a-f0-9]{64}$/.test(s.expectedGeneratedSha)) {
+      throw Error("GENERATED_ASSET_SHA_REQUIRED");
+    }
   }
   if (s.chatFile) validateChatFile(s.chatFile);
   if (s.inputFile) validateChatFile(s.inputFile);
