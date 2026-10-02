@@ -60,3 +60,7 @@ Migration `20261001040232_visual_source_request_transport.sql` adds service-only
 ## 2026-10-01 Staging maintenance
 
 `content_pipeline_maintenance_run` stores service-only short-lived ticket hashes and bounded aggregate cleanup receipts. RLS enabled; no PUBLIC/anon/authenticated privileges. New usage/plan/ticket/dispatch/finish/chunk/status RPCs are service-only. The actual definition and daily pg_cron schedule are in `20261001095441_content_staging_maintenance.sql`; unrelated schema exports are unchanged. No Storage metadata is deleted through SQL.
+
+### 2026-10-02 Reference generation transport
+
+Migration `20261002014159_reference_visual_generation.sql` adds service-only generation permission/dispatch RPCs using existing `27_content_pipeline_source_stage_job` rows and existing Image statuses. It updates approval provenance for AI-edit input URL identity and includes `result.generatedInput.path` in staging cleanup plan/reservation/activation protection. No public table access or new Image status is introduced. Deployment must include the Source Stage `generation.ts` dependency and MCP `generation.ts`/`source.ts` validation dependencies.

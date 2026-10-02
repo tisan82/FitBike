@@ -99,7 +99,9 @@ export async function transformSource(
       throw Error("PDF_PAGE_REQUIRED");
     }
     const { parseHTML } = await import("npm:linkedom@0.18.12");
-    const pdfjsImport = await import("npm:pdfjs-dist@3.11.174/legacy/build/pdf.js");
+    const pdfjsImport = await import(
+      "npm:pdfjs-dist@3.11.174/legacy/build/pdf.js"
+    );
     const { document, window } = parseHTML(
       "<html><body></body></html>",
     ) as unknown as { document: unknown; window: { DOMParser: unknown } };
@@ -166,8 +168,12 @@ export async function transformSource(
   ) throw Error("SOURCE_DIMENSIONS_OR_FORMAT_INVALID");
   // Compute output geometry before allocating the annotation overlay. Decode the
   // source once, composite once and encode WebP once; no intermediate PNG roundtrips.
-  const cw = t.crop ? Math.max(1, Math.floor(t.crop.width * header.width)) : header.width;
-  const ch = t.crop ? Math.max(1, Math.floor(t.crop.height * header.height)) : header.height;
+  const cw = t.crop
+    ? Math.max(1, Math.floor(t.crop.width * header.width))
+    : header.width;
+  const ch = t.crop
+    ? Math.max(1, Math.floor(t.crop.height * header.height))
+    : header.height;
   const outputRatio = Math.min(1, (t.maxWidth ?? 780) / cw, 1600 / ch);
   const width = Math.max(1, Math.round(cw * outputRatio));
   const height = Math.max(1, Math.round(ch * outputRatio));
@@ -215,7 +221,12 @@ export async function transformSource(
         Math.max(1, Math.round(img.height * ratio)),
       );
     }
-    if (overlay) ImageMagick.read(overlay, (layer) => img.composite(layer, CompositeOperator.Over));
+    if (overlay) {
+      ImageMagick.read(
+        overlay,
+        (layer) => img.composite(layer, CompositeOperator.Over),
+      );
+    }
     img.quality = 84;
     // Low-effort encoder preserves WebP quality while keeping the CPU budget bounded.
     img.settings.setDefine(MagickFormat.WebP, "method", "0");
@@ -229,6 +240,13 @@ export async function inspectWebp(b: Uint8Array, mime: string) {
     new TextDecoder().decode(b.slice(0, 4)) !== "RIFF" ||
     new TextDecoder().decode(b.slice(8, 12)) !== "WEBP"
   ) throw Error("INVALID_WEBP");
+  const header = MagickImageInfo.create(b);
+  if (
+    header.format !== MagickFormat.WebP || header.width < 1 ||
+    header.height < 1 || header.width * header.height > 8000000
+  ) {
+    throw Error("WEBP_DIMENSIONS_TOO_LARGE");
+  }
   let width = 0, height = 0;
   ImageMagick.read(b, (img) => {
     width = img.width;
