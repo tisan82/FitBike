@@ -1,5 +1,6 @@
 import { sourceUrl } from "./source.ts";
 
+export type ChatFile = { download_url: string; file_id: string; mime_type?: string; file_name?: string };
 type Reference = {
   sourcePageUrl: string;
   sourceAssetUrl?: string;
@@ -16,6 +17,8 @@ export type GenerationSpec = {
   generatedAssetUrl?: string;
   resumeJobId?: string;
   expectedGeneratedSha?: string;
+  chatFile?: ChatFile;
+  inputFile?: ChatFile;
   transform: Record<string, unknown>;
 };
 export function validateGenerationSpec(raw: unknown): GenerationSpec {
@@ -33,6 +36,8 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
     "expectedGeneratedSha",
     "transform",
     "visualMcpOperation",
+    "chatFile",
+    "inputFile",
   ];
   if (
     Object.keys(s).some((k) => !keys.includes(k)) ||
@@ -81,7 +86,7 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
   if (
     s.resumeJobId !== undefined &&
     (!/^[a-f0-9-]{36}$/.test(s.resumeJobId) ||
-      s.generatedAssetUrl !== undefined)
+      (s.generatedAssetUrl !== undefined || s.chatFile !== undefined || s.inputFile !== undefined))
   ) throw Error("INVALID_GENERATION_RESUME");
   if (s.generatedAssetUrl !== undefined) {
     sourceUrl(s.generatedAssetUrl);
@@ -91,38 +96,42 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
   } else if (s.expectedGeneratedSha !== undefined) {
     throw Error("GENERATED_ASSET_URL_REQUIRED");
   }
+  if (s.chatFile) validateChatFile(s.chatFile);
+  if (s.inputFile) validateChatFile(s.inputFile);
+  if (s.chatFile && s.generatedAssetUrl) throw Error("MULTIPLE_GENERATED_INPUTS");
+  if (s.inputFile && s.productionMethod !== "REAL_SOURCE_AI_EDIT") throw Error("GENERATION_INPUT_METHOD_CONFLICT");
   return s;
 }
-export function generationCapabilities(
-  get: (key: string) => string | undefined,
-) {
-  const configuration = {
-    enabled: get("FITBIKE_IMAGE_GENERATION_ENABLED") === "true",
-    apiKeyPresent: Boolean(get("OPENAI_API_KEY")),
-    modelPresent: Boolean(get("FITBIKE_IMAGE_MODEL")),
-  };
-  const configured = configuration.enabled && configuration.apiKeyPresent &&
-    configuration.modelPresent;
+
+// This adapter only ingests files created in native ChatGPT. It never invokes a model.
+export function validateChatFile(raw: unknown): ChatFile {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw Error("INVALID_CHAT_FILE");
+  const f = raw as ChatFile;
+  if (Object.keys(f).some(k => !["download_url","file_id","mime_type","file_name"].includes(k)) ||
+      typeof f.file_id !== "string" || !f.file_id.trim() || f.file_id.length > 200 ||
+      typeof f.download_url !== "string" || f.download_url.length > 4000 ||
+      (f.mime_type !== undefined && !["image/png","image/jpeg","image/webp"].includes(f.mime_type)) ||
+      (f.file_name !== undefined && (typeof f.file_name !== "string" || f.file_name.length > 255))) throw Error("INVALID_CHAT_FILE");
+  sourceUrl(f.download_url); // Download also validates DNS/IP and every redirect.
+  return f;
+}
+export function generationCapabilities() {
   return {
-    referenceBasedGeneration: configured,
-    realSourceAiEdit: configured,
+    executionMode: "NATIVE_CHATGPT_FILE_HANDOFF",
+    externalGenerationApiAllowed: false,
+    referenceBasedGeneration: false,
+    realSourceAiEdit: false,
+    serverGenerationSupported: false,
+    nativeGenerationAvailability: "CHECK_CURRENT_CHAT",
+    nativeFileHandoff: true,
+    fileParamsSupported: true,
+    userFileUploadSupported: true,
     generatedAssetUrlHandoff: true,
-    providerConfigured: configured,
-    configuration,
-    requiredSettings: [
-      ...(configuration.enabled
-        ? []
-        : ["FITBIKE_IMAGE_GENERATION_ENABLED=true"]),
-      ...(configuration.apiKeyPresent ? [] : ["OPENAI_API_KEY"]),
-      ...(configuration.modelPresent ? [] : ["FITBIKE_IMAGE_MODEL"]),
-    ],
-    provider: "OPENAI_IMAGES_API",
+    providerConfigured: false,
+    provider: "NONE",
+    requiredSettings: [],
     chatImagegenBinaryBridge: false,
-    referenceConditioning: "VERIFIED_FACTS_TEXT_NO_REFERENCE_IMAGE_BINARY",
-    referenceVerification:
-      "OPERATOR_PIXEL_AND_FACT_EVIDENCE_REQUIRED_NOT_AUTOMATED",
-    nextAction: configured
-      ? "CLAIM_AND_DISPATCH_VISUAL_GENERATION"
-      : "CONFIGURE_PROVIDER_OR_SUPPLY_ACCESSIBLE_GENERATED_ASSET_URL",
+    automaticGeneratedFileHandoff: "UNVERIFIED_REQUIRES_CHAT_TEST",
+    nextAction: "VERIFY_NATIVE_CHAT_GENERATION_AND_FILE_INPUT_OR_OPEN_UPLOAD_WIDGET",
   };
 }

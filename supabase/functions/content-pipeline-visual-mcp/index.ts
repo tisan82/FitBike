@@ -55,11 +55,26 @@ const transformSchema = {
   },
   additionalProperties: false,
 };
-const tools = [
+const fileSchema = {
+  type: "object", properties: {
+    download_url: { type: "string", format: "uri", maxLength: 4000 },
+    file_id: { type: "string", minLength: 1, maxLength: 200 },
+    mime_type: { type: "string", enum: ["image/png", "image/jpeg", "image/webp"] },
+    file_name: { type: "string", maxLength: 255 },
+  }, required: ["download_url", "file_id"], additionalProperties: false,
+};
+const UPLOAD_RESOURCE = "ui://fitbike/visual-file-upload-v1.html";
+type VisualTool = {
+  name: string; description: string;
+  inputSchema: { type: string; properties: Record<string, unknown>; required?: string[]; additionalProperties: boolean };
+  annotations: { readOnlyHint: boolean; destructiveHint: boolean; openWorldHint: boolean; idempotentHint?: boolean };
+  _meta?: Record<string, unknown>;
+};
+const tools: VisualTool[] = [
   {
     name: "get_visual_generation_capabilities",
     description:
-      "Preflight actual server generation/edit configuration and generated-asset URL handoff before Claim. Does not generate, claim or approve. Chat imagegen output is not automatically accessible to MCP.",
+      "Read native ChatGPT file-handoff support before Claim. External generation APIs are prohibited. Server generation booleans are false by design; check native generation in this chat separately. Automatic access to generated Chat files remains unverified; fileParams or the upload widget must supply an actual file.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -75,12 +90,14 @@ const tools = [
   {
     name: "dispatch_visual_generation",
     description:
-      "Generate or AI-edit one candidate from operator-inspected factual references, then persist exact Final WebP in private Staging. Requires active Claim; Contract permission is enforced. Provider calls incur API usage when enabled. For an existing generated WebP file, supply accessible generatedAssetUrl + expectedGeneratedSha. Use resumeJobId only to reuse a preserved input with identical method, prompt, references and input URL. Never guess source URLs or claim uninspected reference facts. Poll/inspect/approve through existing source tools; STAGED is not QA PASS.",
+      "Ingest one image already generated or edited by native ChatGPT via top-level file (official fileParams), or verified generatedAssetUrl+SHA, or resumeJobId. Never invokes an external generation API. Requires active Claim and permitted same Contract. PNG/JPEG/WebP are decoded and normalized to private WebP; SHA is server-calculated for file inputs. Native AI edit also requires the exact original inputFile matching inputAssetUrl. Actual native editing is operator-attested, not performed by this server. Poll/inspect/approve existing tools; STAGED is not QA PASS.",
     inputSchema: {
       type: "object",
       properties: {
         requestId: { type: "string", format: "uuid" },
         operationId: { type: "string", format: "uuid" },
+        file: fileSchema,
+        inputFile: fileSchema,
         spec: {
           type: "object",
           properties: {
@@ -137,6 +154,12 @@ const tools = [
     },
   },
 
+  {
+    name: "get_visual_image_task",
+    description: "Read one exact image's current state and immutable generation Contract before Claim. Does not claim, modify or publish.",
+    inputSchema: { type: "object", properties: { pipelineImageId: { type: "integer", minimum: 1 } }, required: ["pipelineImageId"], additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
   {
     name: "get_visual_maintenance_status",
     description:
@@ -397,6 +420,24 @@ const tools = [
     },
   },
 ];
+const generationTool = tools.find(t => t.name === "dispatch_visual_generation")!;
+Object.assign(tools.find(t => t.name === "get_visual_dispatch_result")!, { _meta: { "openai/widgetAccessible": true, ui: { visibility: ["model", "app"] } } });
+Object.assign(generationTool, { _meta: {
+  "openai/fileParams": ["file", "inputFile"],
+  "openai/widgetAccessible": true,
+  ui: { visibility: ["model", "app"] },
+} });
+tools.push({
+  name: "open_visual_file_upload",
+  description: "Open an authenticated ChatGPT image-file upload/selection widget for this active Claim and a fixed generation spec. Does not dispatch or approve until the user selects a file. If Claim expires, use the normal same-image reclaim path; never upload into another image.",
+  inputSchema: { type: "object", properties: {
+    requestId: { type: "string", format: "uuid" }, operationId: { type: "string", format: "uuid" },
+    spec: generationTool.inputSchema.properties.spec,
+  }, required: ["requestId", "operationId", "spec"], additionalProperties: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  _meta: { ui: { resourceUri: UPLOAD_RESOURCE }, "openai/outputTemplate": UPLOAD_RESOURCE },
+} as typeof generationTool);
+
 function json(b: unknown, s = 200, h: Record<string, string> = {}) {
   return new Response(JSON.stringify(b), {
     status: s,
@@ -526,6 +567,7 @@ Deno.serve(async (req) => {
     params?: {
       protocolVersion?: string;
       name?: string;
+      uri?: string;
       arguments?: {
         requestId?: string;
         operationId?: string;
@@ -537,6 +579,8 @@ Deno.serve(async (req) => {
         sourceSha256?: string;
         qa?: Record<string, unknown>;
         spec?: Record<string, unknown>;
+        file?: Record<string, unknown>;
+        inputFile?: Record<string, unknown>;
         status?: string;
         stage?: string;
         code?: string;
@@ -577,8 +621,8 @@ Deno.serve(async (req) => {
           ["2024-11-05", "2025-03-26", "2025-06-18"].includes(protocol)
             ? protocol
             : "2025-06-18",
-        capabilities: { tools: {} },
-        serverInfo: { name: "fitbike-visual-operations", version: "1.4.0" },
+        capabilities: { tools: {}, resources: {} },
+        serverInfo: { name: "fitbike-visual-operations", version: "1.5.0" },
       },
     });
   }
@@ -591,10 +635,18 @@ Deno.serve(async (req) => {
         tools: tools.map((t) => ({
           ...t,
           securitySchemes: [{ type: "oauth2", scopes: ["email"] }],
-          _meta: { securitySchemes: [{ type: "oauth2", scopes: ["email"] }] },
+          _meta: { ...t._meta, securitySchemes: [{ type: "oauth2", scopes: ["email"] }] },
         })),
       },
     });
+  }
+  if (b.method === "resources/list") return json({ jsonrpc: "2.0", id, result: { resources: [{ uri: UPLOAD_RESOURCE, name: "FitBike image upload", mimeType: "text/html;profile=mcp-app" }] } });
+  if (b.method === "resources/read") {
+    if (b.params?.uri !== UPLOAD_RESOURCE) return json({ jsonrpc: "2.0", id, error: { code: -32602, message: "Unknown resource" } });
+    const { uploadWidget } = await import("./upload-widget.ts");
+    return json({ jsonrpc: "2.0", id, result: { contents: [{ uri: UPLOAD_RESOURCE, mimeType: "text/html;profile=mcp-app", text: uploadWidget,
+      _meta: { ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } } },
+    }] } });
   }
   if (b.method !== "tools/call") {
     return json({
@@ -630,7 +682,17 @@ Deno.serve(async (req) => {
     let images: Array<{ type: string; data: string; mimeType: string }> = [];
     if (name === "get_visual_generation_capabilities") {
       const { generationCapabilities } = await import("./generation.ts");
-      result = generationCapabilities((key) => Deno.env.get(key));
+      result = generationCapabilities();
+    } else if (name === "get_visual_image_task") {
+      if (!Number.isSafeInteger(a.pipelineImageId) || a.pipelineImageId! < 1) throw Error("INVALID_IMAGE_ID");
+      const read = await sb.from("21_content_pipeline_image").select("pipeline_image_id,pipeline_id,image_id,status,handoff_phase,generation_contract,generation_contract_hash,claim_expires_at,next_eligible_at,staging_asset").eq("pipeline_image_id", a.pipelineImageId).maybeSingle();
+      if (read.error || !read.data) throw Error("IMAGE_TASK_NOT_FOUND");
+      const image = read.data;
+      // Avoid exposing private storage URLs or another worker's token.
+      result = { pipelineImageId: image.pipeline_image_id, pipelineId: image.pipeline_id, imageId: image.image_id, status: image.status,
+        handoffPhase: image.handoff_phase, generationContract: image.generation_contract, generationContractHash: image.generation_contract_hash,
+        claimExpiresAt: image.claim_expires_at, nextEligibleAt: image.next_eligible_at,
+        stagingSha: image.staging_asset?.sha256 ?? null };
     } else if (name === "get_visual_maintenance_status") {
       result = await rpc("content_pipeline_staging_maintenance_status_v1", {});
     } else if (name === "get_visual_queue_status") {
@@ -693,21 +755,15 @@ Deno.serve(async (req) => {
           else {result = await rpc("content_pipeline_source_stage_status_v1", {
               p_job_id: jobs[0].job_id,
             });}
-        } else if (name === "dispatch_visual_generation") {
+        } else if (name === "dispatch_visual_generation" || name === "open_visual_file_upload") {
           if (!current.activeClaim) throw Error("ACTIVE_VISUAL_CLAIM_REQUIRED");
           if (!uuid(a.operationId)) throw Error("INVALID_OPERATION_ID");
-          const { validateGenerationSpec, generationCapabilities } =
-            await import("./generation.ts");
-          const spec = validateGenerationSpec(a.spec);
-          if (
-            !spec.generatedAssetUrl && !spec.resumeJobId &&
-            !generationCapabilities((key) => Deno.env.get(key))
-              .providerConfigured
-          ) {
-            throw Error(
-              "GENERATION_PROVIDER_NOT_CONFIGURED: run get_visual_generation_capabilities; do not retry source downloads or fabricate a generated-file URL",
-            );
-          }
+          const { validateGenerationSpec } = await import("./generation.ts");
+          // Only official top-level fileParams can populate these internal fields.
+          if (a.spec && ("chatFile" in a.spec || "inputFile" in a.spec)) throw Error("USE_TOP_LEVEL_FILE_PARAMS");
+          const spec = validateGenerationSpec({ ...a.spec, ...(a.file ? { chatFile: a.file } : {}), ...(a.inputFile ? { inputFile: a.inputFile } : {}) });
+          if (name === "dispatch_visual_generation" && !spec.chatFile && !spec.generatedAssetUrl && !spec.resumeJobId) throw Error("NATIVE_GENERATED_FILE_REQUIRED: supply official fileParams or open_visual_file_upload; external API generation is prohibited");
+          if (name === "dispatch_visual_generation" && spec.productionMethod === "REAL_SOURCE_AI_EDIT" && !spec.resumeJobId && !spec.inputFile) throw Error("NATIVE_EDIT_INPUT_FILE_REQUIRED");
           validateSpecTransform(spec.transform);
           if (spec.productionMethod === "REAL_SOURCE_AI_EDIT") {
             const usage = await sourceUsage(
@@ -718,18 +774,22 @@ Deno.serve(async (req) => {
               throw Error("DUPLICATE_SOURCE_PREFLIGHT");
             }
           }
-          result = await rpc(
-            "content_pipeline_dispatch_visual_generation_request_v1",
-            {
-              p_worker_key: worker,
-              p_request_id: a.requestId,
-              p_operation_id: a.operationId,
-              p_spec: spec,
-            },
-          );
+          // Verify Contract permission even when merely opening the upload UI.
+          const allowed = await rpc("content_pipeline_reference_generation_allowed_v1", { p_contract: current.claim.generationContract, p_method: spec.productionMethod });
+          if (allowed !== true) throw Error("REFERENCE_GENERATION_CONTRACT_NOT_ALLOWED");
+          if (name === "open_visual_file_upload") {
+            if (spec.generatedAssetUrl || spec.resumeJobId) throw Error("UPLOAD_REQUIRES_NEW_NATIVE_FILE");
+            result = { requestId: a.requestId, operationId: a.operationId, spec, pipelineImageId: current.claim.pipelineImageId,
+              contractHash: current.claim.generationContractHash, requiresInputFile: spec.productionMethod === "REAL_SOURCE_AI_EDIT", nextAction: "SELECT_OR_UPLOAD_NATIVE_CHAT_IMAGE" };
+          } else {
+            result = await rpc("content_pipeline_dispatch_visual_generation_request_v1", {
+              p_worker_key: worker, p_request_id: a.requestId, p_operation_id: a.operationId, p_spec: spec,
+            });
+          }
         } else if (name === "dispatch_visual_source") {
           if (!current.activeClaim) throw Error("ACTIVE_VISUAL_CLAIM_REQUIRED");
           if (!uuid(a.operationId)) throw Error("INVALID_OPERATION_ID");
+          if (!a.spec) throw Error("INVALID_SOURCE_SPEC");
           validateSpec(a.spec);
           const usage = await sourceUsage(
             current.claim.pipelineImageId,
