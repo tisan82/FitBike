@@ -15,7 +15,7 @@ const wasm = await Deno.readFile(
 await initializeImageMagick(wasm);
 let svgReady = false;
 let svgModule: typeof import("npm:@resvg/resvg-wasm@2.6.2");
-async function renderSvg(svg: string) {
+async function renderSvg(svg: string, fontBuffers: Uint8Array[] = []) {
   if (!svgReady) {
     svgModule = await import("npm:@resvg/resvg-wasm@2.6.2");
     await svgModule.initWasm(
@@ -28,7 +28,65 @@ async function renderSvg(svg: string) {
     );
     svgReady = true;
   }
-  return new svgModule.Resvg(svg).render().asPng();
+  const renderer = new svgModule.Resvg(svg, {
+    background: fontBuffers.length ? "white" : undefined,
+    font: { fontBuffers },
+  });
+  try {
+    const rendered = renderer.render();
+    try {
+      return rendered.asPng();
+    } finally {
+      rendered.free();
+    }
+  } finally {
+    renderer.free();
+  }
+}
+// PDF.js SVGGraphics' third argument is forceDataSchema, NOT embedFonts.
+// resvg-wasm cannot resolve SVG @font-face URLs. Load the exact PDF font bytes
+// explicitly and replace PDF.js' synthetic family IDs with their sfnt names.
+// Do not substitute system fonts: missing fonts must fail instead of hiding text.
+export function pdfFontFamily(bytes: Uint8Array): string {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const valid = (offset: number, length: number) =>
+    offset >= 0 && length >= 0 && offset + length <= bytes.length;
+  if (!valid(0, 12)) throw Error("PDF_FONT_INVALID");
+  const count = view.getUint16(4);
+  if (!valid(12, count * 16)) throw Error("PDF_FONT_INVALID");
+  for (let i = 0; i < count; i++) {
+    const entry = 12 + i * 16;
+    if (new TextDecoder().decode(bytes.subarray(entry, entry + 4)) !== "name") {
+      continue;
+    }
+    const offset = view.getUint32(entry + 8),
+      length = view.getUint32(entry + 12);
+    if (!valid(offset, length) || length < 6) throw Error("PDF_FONT_INVALID");
+    const records = view.getUint16(offset + 2),
+      storage = view.getUint16(offset + 4);
+    if (6 + records * 12 > length || storage > length) {
+      throw Error("PDF_FONT_INVALID");
+    }
+    for (let j = 0; j < records; j++) {
+      const record = offset + 6 + j * 12;
+      const platform = view.getUint16(record),
+        nameId = view.getUint16(record + 6);
+      if (nameId !== 1 || ![0, 3].includes(platform)) continue;
+      const size = view.getUint16(record + 8),
+        position = storage + view.getUint16(record + 10);
+      if (!size || size % 2 || position + size > length) {
+        throw Error("PDF_FONT_INVALID");
+      }
+      const name = new TextDecoder("utf-16be").decode(
+        bytes.subarray(offset + position, offset + position + size),
+      );
+      if (!name.trim() || /[\x00-\x1f]/.test(name)) {
+        throw Error("PDF_FONT_INVALID");
+      }
+      return name;
+    }
+  }
+  throw Error("PDF_FONT_FAMILY_UNAVAILABLE");
 }
 export type Transform = {
   crop?: { x: number; y: number; width: number; height: number };
@@ -118,6 +176,7 @@ export async function transformSource(
         promise: Promise<
           {
             numPages: number;
+            destroy(): Promise<void>;
             getPage(
               n: number,
             ): Promise<
@@ -135,26 +194,68 @@ export async function transformSource(
         a: unknown,
         b: unknown,
         c: boolean,
-      ) => { getSVG(a: unknown, b: unknown): Promise<{ outerHTML?: string }> };
+      ) => {
+        embedFonts: boolean;
+        embeddedFonts: Record<string, { data?: Uint8Array }>;
+        getSVG(a: unknown, b: unknown): Promise<{
+          outerHTML?: string;
+          querySelectorAll(selector: string): Iterable<{
+            textContent: string | null;
+            getAttribute(name: string): string | null;
+            setAttribute(name: string, value: string): void;
+          }>;
+        }>;
+      };
     };
     const pdfModule = pdfjsImport as unknown as Pdf & { default?: Pdf },
       pdfjs = pdfModule.default ?? pdfModule;
-    const pdf = await pdfjs.getDocument({ data: bytes, disableWorker: true })
-      .promise;
-    if (pageNo! > pdf.numPages) throw Error("PDF_PAGE_OUT_OF_RANGE");
-    const page = await pdf.getPage(pageNo!),
-      v = page.getViewport({ scale: 1.5 });
-    if (v.width * v.height > 4000000) throw Error("PDF_PAGE_TOO_LARGE");
-    const svg = await new pdfjs.SVGGraphics(page.commonObjs, page.objs, true)
-      .getSVG(await page.getOperatorList(), v);
-    let text = (svg.outerHTML || String(svg)).replaceAll("svg:", "");
-    if (!text.includes("xmlns=")) {
-      text = text.replace(
-        "<svg ",
-        '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ',
-      );
+    const pdf = await pdfjs.getDocument({
+      data: bytes,
+      disableWorker: true,
+      fontExtraProperties: true,
+      isEvalSupported: false,
+      useSystemFonts: false,
+    }).promise;
+    try {
+      if (pageNo! > pdf.numPages) throw Error("PDF_PAGE_OUT_OF_RANGE");
+      const page = await pdf.getPage(pageNo!),
+        v = page.getViewport({ scale: 1.5 });
+      if (v.width * v.height > 4000000) throw Error("PDF_PAGE_TOO_LARGE");
+      const graphics = new pdfjs.SVGGraphics(page.commonObjs, page.objs, true);
+      graphics.embedFonts = true;
+      const svg = await graphics.getSVG(await page.getOperatorList(), v);
+      const fontBuffers: Uint8Array[] = [];
+      const families = new Map<string, string>();
+      const familyHashes = new Map<string, string>();
+      for (const [id, font] of Object.entries(graphics.embeddedFonts)) {
+        if (!font.data?.length) throw Error("PDF_FONT_UNAVAILABLE");
+        const family = pdfFontFamily(font.data),
+          identity = await sha256(font.data);
+        if (familyHashes.has(family) && familyHashes.get(family) !== identity) {
+          throw Error("PDF_FONT_FAMILY_COLLISION");
+        }
+        familyHashes.set(family, identity);
+        families.set(id, family);
+        fontBuffers.push(font.data);
+      }
+      for (const node of svg.querySelectorAll("[font-family]")) {
+        const family = families.get(node.getAttribute("font-family") ?? "");
+        if (!family && node.textContent?.trim()) {
+          throw Error("PDF_FONT_UNAVAILABLE");
+        }
+        if (family) node.setAttribute("font-family", `"${family}"`);
+      }
+      let text = (svg.outerHTML || String(svg)).replaceAll("svg:", "");
+      if (!text.includes("xmlns=")) {
+        text = text.replace(
+          "<svg ",
+          '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ',
+        );
+      }
+      input = await renderSvg(text, fontBuffers);
+    } finally {
+      await pdf.destroy();
     }
-    input = await renderSvg(text);
   }
   const header = MagickImageInfo.create(input);
   const expectedFormat = mime === "image/jpeg"
