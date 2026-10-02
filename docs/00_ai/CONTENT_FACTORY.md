@@ -675,3 +675,18 @@ Before editing a source in ordinary Chat, use the dedicated MCP `check_visual_so
 ### Source Stage async execution and failure diagnosis
 
 Dispatch is not completion: poll the same Job using the returned pollAfterSeconds until STAGED or a confirmed terminal failure. Invoke pixel inspection only after STAGED. timedOut=true is an elapsed-time warning; use actual failureCode/transport evidence instead of inventing STALLED/TIMEOUT. Runtime546 resource failures are reconciled by the service status API documented in API.md. RETRY eligibility uses nextEligibleAt (ordinary failure cooldown5 minutes); Claim SKIP during cooldown is not a recovery defect. Never end normally at RUNNING, duplicate dispatch, infer QA PASS from a checkpoint, or change Task state directly to skip cooldown.
+
+## Reference-first generation transport (2026-10-02)
+
+3-A 전용 MCP는 `get_visual_generation_capabilities`와 `dispatch_visual_generation`을 제공한다. Claim 전에 실제 Provider 설정 또는 생성 파일 전달 경로를 확인한다. ChatGPT 내장 imagegen 결과가 MCP에서 자동으로 읽히는 기능은 제공하지 않는다. Provider/파일 연결 부재는 `BLOCKED` capability 문제이며 Source 다운로드 실패나 DB 업데이트 실패로 기록하지 않는다.
+
+- `REFERENCE_BASED_GENERATION`은 `generation_allowed=true`, `real_source_required=false`, 그리고 `source_strategy=REFERENCE_FIRST_GENERATIVE` 또는 명시적인 `reference_based_generation_allowed=true` Contract에서만 허용한다. 이 허용은 검증 근거 없는 Full Generation과 다르므로 `full_generation_allowed=false`를 해제하지 않는다. 기존 Contract hash/QA 기준을 그대로 적용한다.
+- `REAL_SOURCE_AI_EDIT`은 `ai_edit_allowed=true`일 때만 허용하고 실제 사진 binary를 Images edits API에 입력한다. 원본 input URL/SHA를 provenance와 승인 QA에 보존하여 기존 중복 Source gate를 유지한다.
+- Reference 기반 신규 생성은 Chat이 실제 픽셀·기술 사실을 확인한 `references[]`의 사실 근거를 텍스트로 전달하는 생성이다. Reference URL을 API에 전달했다고 원본 이미지 binary를 입력한 것으로 보고하지 않는다. 서버는 근거 필드/URL/Contract를 검증하며 사실의 의미적 검증은 Chat의 실제 조사·픽셀 검사 책임이다.
+- `spec`: `productionMethod`, `prompt`(20–6000 chars), `references[]`(1–4), `transform`. Reference에는 `sourcePageUrl`, `sourceOwner`, `verifiedFacts[]`, `pixelsInspected=true`, `checkedAt`을 기록하고 실제 확인한 `sourceAssetUrl`은 선택적으로 기록한다. 권리 상태 필드를 새로 만들지 않는다. AI Edit에는 reference와 일치하는 `inputAssetUrl`이 필수다.
+- 서버 생성은 Supabase Secrets의 `OPENAI_API_KEY`, `FITBIKE_IMAGE_MODEL`, `FITBIKE_IMAGE_GENERATION_ENABLED=true` 설정이 모두 있을 때만 활성화한다. Model은 운영자가 사용 가능한 GPT Image 모델로 지정한다. API 사용량은 ChatGPT 구독과 별도다. Provider 설정은 다른 실사 경로의 필수조건이 아니다.
+- 기존 생성 WebP를 전달하려면 실제 접근 가능한 `generatedAssetUrl`과 `expectedGeneratedSha`를 지정한다. 안전한 HTTPS/DNS/IP/redirect/MIME/크기/SHA 검증 후 처리한다. URL을 추측하거나 Chat 내부 파일 주소를 공개 다운로드 URL처럼 전달하지 않는다.
+- 동일 `requestId`/`operationId`의 결과 복구는 기존 `get_visual_dispatch_result`를 사용한다. 다른 operation으로 실행 중 후보를 중복 Dispatch하지 않는다.
+- 생성 WebP를 변환 전에 private Staging에 보존하고 SHA/read-back 및 `generatedInput` checkpoint를 기록한다. 이후 변환·저장 실패 시 같은 이미지/Contract/Worker의 `resumeJobId`로 보존 binary를 재사용한다. 원 생성 prompt/references/method는 같아야 하며 Transform만 수정 가능하다. 첫 영속 저장 자체가 실패해 binary를 보존하지 못한 경우 재사용을 보장하지 않는다.
+- 생성 후보 역시 기존 Job `PENDING → RUNNING → STAGED/FAILED`를 사용하며 새 Image 상태는 추가하지 않는다. STAGED 후 기존 status/inspect/approve/fail 도구를 사용한다. `staging_asset.qa` 저장 및 `READY_FOR_UPLOAD`+Claim 해제 재조회만 3-A PASS다. 생성 단계에서 QA PASS를 자동 기록하지 않는다.
+- 생성 보존본은 Daily Staging Maintenance의 미완료 보호·완료 후보 정리·Cleanup lease 보호에 포함한다.

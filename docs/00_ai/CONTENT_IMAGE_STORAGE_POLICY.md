@@ -202,3 +202,7 @@ Source Stage의 기술적 `STAGED` 성공은 Semantic/Mobile Image QA PASS가 �
 - Delete only through the Storage API; verify absence afterwards. Remove inspection chunks only for terminal eligible jobs whose Storage object no longer exists. Retain Image, Job, SHA, QA, provenance and maintenance audit receipts.
 - Partial failures are recorded and retried by the next run. No automatic Claim/QA/status/publish action is performed by cleanup.
 - `get_visual_maintenance_status` is the operator's read-only MCP entry point for usage and latest runs. Storage metadata inventory and database physical size are measured; monthly egress/function billing usage is not available from these counts and must be checked in the Supabase dashboard.
+
+### Generated recovery inputs
+
+Reference generation/AI editing may preserve the generated WebP before editorial transforms in `result.generatedInput` (`bucket/path/SHA/bytes/dimensions`). This is a recovery asset, not approved QA or Production. It is protected while the owning Image is incomplete, including RETRY/HOLD/READY_FOR_UPLOAD, and covered by the same cleanup lease/activation guard. Completed obsolete generated inputs follow the existing 24-hour minimum retention and daily cleanup. The canonical approved Final remains `staging_asset`, with unchanged 3-A/3-B SHA identity requirements.

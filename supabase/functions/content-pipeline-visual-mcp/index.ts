@@ -56,10 +56,107 @@ const transformSchema = {
   additionalProperties: false,
 };
 const tools = [
-  { name: "get_visual_maintenance_status", description: "Read Storage/database usage and latest daily staging cleanup results. Does not claim, clean, approve or publish.", inputSchema: {type: "object", properties: {}, required: [], additionalProperties: false}, annotations: {readOnlyHint: true, destructiveHint: false, openWorldHint: false} },
+  {
+    name: "get_visual_generation_capabilities",
+    description:
+      "Preflight actual server generation/edit configuration and generated-asset URL handoff before Claim. Does not generate, claim or approve. Chat imagegen output is not automatically accessible to MCP.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: "dispatch_visual_generation",
+    description:
+      "Generate or AI-edit one candidate from operator-inspected factual references, then persist exact Final WebP in private Staging. Requires active Claim; Contract permission is enforced. Provider calls incur API usage when enabled. For an existing generated WebP file, supply accessible generatedAssetUrl + expectedGeneratedSha. Use resumeJobId only to reuse a preserved input with identical method, prompt, references and input URL. Never guess source URLs or claim uninspected reference facts. Poll/inspect/approve through existing source tools; STAGED is not QA PASS.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        requestId: { type: "string", format: "uuid" },
+        operationId: { type: "string", format: "uuid" },
+        spec: {
+          type: "object",
+          properties: {
+            productionMethod: {
+              enum: ["REFERENCE_BASED_GENERATION", "REAL_SOURCE_AI_EDIT"],
+            },
+            prompt: { type: "string", minLength: 20, maxLength: 6000 },
+            references: {
+              type: "array",
+              minItems: 1,
+              maxItems: 4,
+              items: {
+                type: "object",
+                properties: {
+                  sourcePageUrl: { type: "string", format: "uri" },
+                  sourceAssetUrl: { type: "string", format: "uri" },
+                  sourceOwner: { type: "string", minLength: 1, maxLength: 200 },
+                  verifiedFacts: {
+                    type: "array",
+                    minItems: 1,
+                    maxItems: 10,
+                    items: { type: "string", minLength: 1, maxLength: 500 },
+                  },
+                  pixelsInspected: { const: true },
+                  checkedAt: { type: "string", format: "date-time" },
+                },
+                required: [
+                  "sourcePageUrl",
+                  "sourceOwner",
+                  "verifiedFacts",
+                  "pixelsInspected",
+                  "checkedAt",
+                ],
+                additionalProperties: false,
+              },
+            },
+            inputAssetUrl: { type: "string", format: "uri" },
+            generatedAssetUrl: { type: "string", format: "uri" },
+            resumeJobId: { type: "string", format: "uuid" },
+            expectedGeneratedSha: { type: "string", pattern: "^[a-f0-9]{64}$" },
+            transform: transformSchema,
+          },
+          required: ["productionMethod", "prompt", "references", "transform"],
+          additionalProperties: false,
+        },
+      },
+      required: ["requestId", "operationId", "spec"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+  },
+
+  {
+    name: "get_visual_maintenance_status",
+    description:
+      "Read Storage/database usage and latest daily staging cleanup results. Does not claim, clean, approve or publish.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  },
   {
     name: "check_visual_source_usage",
-    description: "Check a verified source URL and optional source SHA against READY_FOR_UPLOAD/DONE images before editing. Requires this operator's claim receipt. URL-only clear is provisional, not permission or QA PASS. If duplicate, select another source within the same active claim; never alter URL/crop to bypass identity.",
+    description:
+      "Check a verified source URL and optional source SHA against READY_FOR_UPLOAD/DONE images before editing. Requires this operator's claim receipt. URL-only clear is provisional, not permission or QA PASS. If duplicate, select another source within the same active claim; never alter URL/crop to bypass identity.",
     inputSchema: {
       type: "object",
       properties: {
@@ -70,7 +167,11 @@ const tools = [
       required: ["requestId", "sourceAssetUrl"],
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
   },
   {
     name: "get_visual_dispatch_result",
@@ -178,15 +279,34 @@ const tools = [
         expectedSha: { type: "string", pattern: "^[0-9a-f]{64}$" },
         qa: {
           type: "object",
-          description: "Use exact flat field names. Inspect actual pixels before reporting PASS. THUMBNAIL requires representativeImageQa/cardCropQa; HERO requires representativeImageQa/heroCropQa; THUMBNAIL_HERO requires all three. A 390px preview alone does not prove card/hero crop suitability. Extra evidence fields are preserved.",
+          description:
+            "Use exact flat field names. Inspect actual pixels before reporting PASS. THUMBNAIL requires representativeImageQa/cardCropQa; HERO requires representativeImageQa/heroCropQa; THUMBNAIL_HERO requires all three. A 390px preview alone does not prove card/hero crop suitability. Extra evidence fields are preserved.",
           properties: {
-            contractHash: { type: "string", description: "Current claim generationContractHash, unchanged." },
+            contractHash: {
+              type: "string",
+              description: "Current claim generationContractHash, unchanged.",
+            },
             imageQa: { type: "string", enum: ["PASS"] },
             mobileQa: { type: "string", enum: ["PASS"] },
             imageSeoQa: { type: "string", enum: ["PASS"] },
-            representativeImageQa: { type: "string", enum: ["PASS"], description: "Required for THUMBNAIL, HERO and THUMBNAIL_HERO after representative suitability inspection." },
-            cardCropQa: { type: "string", enum: ["PASS"], description: "Required for THUMBNAIL and THUMBNAIL_HERO after actual card crop inspection." },
-            heroCropQa: { type: "string", enum: ["PASS"], description: "Required for HERO and THUMBNAIL_HERO after actual hero crop inspection." },
+            representativeImageQa: {
+              type: "string",
+              enum: ["PASS"],
+              description:
+                "Required for THUMBNAIL, HERO and THUMBNAIL_HERO after representative suitability inspection.",
+            },
+            cardCropQa: {
+              type: "string",
+              enum: ["PASS"],
+              description:
+                "Required for THUMBNAIL and THUMBNAIL_HERO after actual card crop inspection.",
+            },
+            heroCropQa: {
+              type: "string",
+              enum: ["PASS"],
+              description:
+                "Required for HERO and THUMBNAIL_HERO after actual hero crop inspection.",
+            },
           },
           required: ["contractHash", "imageQa", "mobileQa", "imageSeoQa"],
           additionalProperties: true,
@@ -289,27 +409,63 @@ function json(b: unknown, s = 200, h: Record<string, string> = {}) {
     },
   });
 }
-async function sourceUsage(imageId: number, sourceUrl: unknown, sourceSha?: unknown) {
-  if (typeof sourceUrl !== "string" || sourceUrl.length > 4096) throw Error("INVALID_SOURCE_URL");
+async function sourceUsage(
+  imageId: number,
+  sourceUrl: unknown,
+  sourceSha?: unknown,
+) {
+  if (typeof sourceUrl !== "string" || sourceUrl.length > 4096) {
+    throw Error("INVALID_SOURCE_URL");
+  }
   const parsed = new URL(sourceUrl);
-  if (parsed.protocol !== "https:" || parsed.username || parsed.password) throw Error("INVALID_SOURCE_URL");
-  if (sourceSha !== undefined && (typeof sourceSha !== "string" || !/^[a-f0-9]{64}$/.test(sourceSha))) throw Error("INVALID_SOURCE_SHA");
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
+    throw Error("INVALID_SOURCE_URL");
+  }
+  if (
+    sourceSha !== undefined &&
+    (typeof sourceSha !== "string" || !/^[a-f0-9]{64}$/.test(sourceSha))
+  ) throw Error("INVALID_SOURCE_SHA");
   const matches: Record<string, unknown>[] = [];
-  for (const [field, value, matchedBy] of [
-    ["staging_asset->qa->>sourceAssetUrl", sourceUrl, "SOURCE_URL"],
-    ...(sourceSha ? [["staging_asset->qa->provenance->>sourceSha256", sourceSha, "SOURCE_SHA256"]] : []),
-  ]) {
+  for (
+    const [field, value, matchedBy] of [
+      ["staging_asset->qa->>sourceAssetUrl", sourceUrl, "SOURCE_URL"],
+      ...(sourceSha
+        ? [[
+          "staging_asset->qa->provenance->>sourceSha256",
+          sourceSha,
+          "SOURCE_SHA256",
+        ]]
+        : []),
+    ]
+  ) {
     const { data, error } = await sb.from("21_content_pipeline_image")
       .select("pipeline_image_id,pipeline_id,image_id,asset_key,status")
-      .in("status", ["READY_FOR_UPLOAD", "DONE"]).neq("pipeline_image_id", imageId)
+      .in("status", ["READY_FOR_UPLOAD", "DONE"]).neq(
+        "pipeline_image_id",
+        imageId,
+      )
       .eq(field, value).limit(5);
     if (error) throw Error("SOURCE_USAGE_READ_FAILED");
     for (const row of data ?? []) matches.push({ ...row, matchedBy });
   }
-  return { result: matches.length ? "DUPLICATE" : "NO_KNOWN_DUPLICATE", matches,
+  return {
+    result: matches.length ? "DUPLICATE" : "NO_KNOWN_DUPLICATE",
+    matches,
     identityScope: sourceSha ? "URL_AND_SOURCE_SHA256" : "EXACT_URL_ONLY",
-    nextAction: matches.length ? "SELECT_DIFFERENT_SOURCE_SAME_CLAIM" : "CONTINUE_SOURCE_VALIDATION",
-    finalApprovalGateRequired: true };
+    nextAction: matches.length
+      ? "SELECT_DIFFERENT_SOURCE_SAME_CLAIM"
+      : "CONTINUE_SOURCE_VALIDATION",
+    finalApprovalGateRequired: true,
+  };
+}
+
+function validateSpecTransform(transform: unknown) {
+  validateSpec({
+    sourceAssetUrl: "https://fitbike.co.kr/reference.jpg",
+    sourcePageUrl: "https://fitbike.co.kr/contents",
+    sourceOwner: "FitBike",
+    transform,
+  });
 }
 
 async function rpc(name: string, args: Record<string, unknown>) {
@@ -377,6 +533,8 @@ Deno.serve(async (req) => {
         pipelineImageId?: number;
         jobId?: string;
         expectedSha?: string;
+        sourceAssetUrl?: string;
+        sourceSha256?: string;
         qa?: Record<string, unknown>;
         spec?: Record<string, unknown>;
         status?: string;
@@ -420,7 +578,7 @@ Deno.serve(async (req) => {
             ? protocol
             : "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "fitbike-visual-operations", version: "1.3.0" },
+        serverInfo: { name: "fitbike-visual-operations", version: "1.4.0" },
       },
     });
   }
@@ -470,7 +628,10 @@ Deno.serve(async (req) => {
   try {
     let result;
     let images: Array<{ type: string; data: string; mimeType: string }> = [];
-    if (name === "get_visual_maintenance_status") {
+    if (name === "get_visual_generation_capabilities") {
+      const { generationCapabilities } = await import("./generation.ts");
+      result = generationCapabilities((key) => Deno.env.get(key));
+    } else if (name === "get_visual_maintenance_status") {
       result = await rpc("content_pipeline_staging_maintenance_status_v1", {});
     } else if (name === "get_visual_queue_status") {
       if (
@@ -505,7 +666,11 @@ Deno.serve(async (req) => {
         if (name === "get_visual_claim_result") result = current;
         else if (name === "check_visual_source_usage") {
           if (!current.claim) throw Error("VISUAL_CLAIM_RECEIPT_REQUIRED");
-          result = await sourceUsage(current.claim.pipelineImageId, a.sourceAssetUrl, a.sourceSha256);
+          result = await sourceUsage(
+            current.claim.pipelineImageId,
+            a.sourceAssetUrl,
+            a.sourceSha256,
+          );
         } else if (name === "get_visual_dispatch_result") {
           if (!uuid(a.operationId) || !current.claim) {
             throw Error("INVALID_SOURCE_REQUEST");
@@ -528,12 +693,53 @@ Deno.serve(async (req) => {
           else {result = await rpc("content_pipeline_source_stage_status_v1", {
               p_job_id: jobs[0].job_id,
             });}
+        } else if (name === "dispatch_visual_generation") {
+          if (!current.activeClaim) throw Error("ACTIVE_VISUAL_CLAIM_REQUIRED");
+          if (!uuid(a.operationId)) throw Error("INVALID_OPERATION_ID");
+          const { validateGenerationSpec, generationCapabilities } =
+            await import("./generation.ts");
+          const spec = validateGenerationSpec(a.spec);
+          if (
+            !spec.generatedAssetUrl && !spec.resumeJobId &&
+            !generationCapabilities((key) => Deno.env.get(key))
+              .providerConfigured
+          ) {
+            throw Error(
+              "GENERATION_PROVIDER_NOT_CONFIGURED: run get_visual_generation_capabilities; do not retry source downloads or fabricate a generated-file URL",
+            );
+          }
+          validateSpecTransform(spec.transform);
+          if (spec.productionMethod === "REAL_SOURCE_AI_EDIT") {
+            const usage = await sourceUsage(
+              current.claim.pipelineImageId,
+              spec.inputAssetUrl,
+            );
+            if (usage.result === "DUPLICATE") {
+              throw Error("DUPLICATE_SOURCE_PREFLIGHT");
+            }
+          }
+          result = await rpc(
+            "content_pipeline_dispatch_visual_generation_request_v1",
+            {
+              p_worker_key: worker,
+              p_request_id: a.requestId,
+              p_operation_id: a.operationId,
+              p_spec: spec,
+            },
+          );
         } else if (name === "dispatch_visual_source") {
           if (!current.activeClaim) throw Error("ACTIVE_VISUAL_CLAIM_REQUIRED");
           if (!uuid(a.operationId)) throw Error("INVALID_OPERATION_ID");
           validateSpec(a.spec);
-          const usage = await sourceUsage(current.claim.pipelineImageId, a.spec.sourceAssetUrl);
-          if (usage.result === "DUPLICATE") throw Error("DUPLICATE_SOURCE_PREFLIGHT: select a different source within the same claim; no candidate dispatched");
+          const usage = await sourceUsage(
+            current.claim.pipelineImageId,
+            a.spec.sourceAssetUrl,
+          );
+          if (usage.result === "DUPLICATE") {
+            throw Error(
+              "DUPLICATE_SOURCE_PREFLIGHT: select a different source within the same claim; no candidate dispatched",
+            );
+          }
           result = await rpc(
             "content_pipeline_dispatch_visual_source_request_v1",
             {
@@ -569,8 +775,17 @@ Deno.serve(async (req) => {
             });
           } else if (name === "inspect_visual_source") {
             if (job.status !== "STAGED" || !job.result) {
-              const status = await rpc("content_pipeline_source_stage_status_v1", { p_job_id: a.jobId });
-              throw Error(`SOURCE_INSPECTION_NOT_READY: status=${status?.status ?? "UNKNOWN"}; failureCode=${status?.failureCode ?? "NONE"}; nextAction=${status?.nextAction ?? "POLL_SAME_JOB"}; inspect only after STAGED`);
+              const status = await rpc(
+                "content_pipeline_source_stage_status_v1",
+                { p_job_id: a.jobId },
+              );
+              throw Error(
+                `SOURCE_INSPECTION_NOT_READY: status=${
+                  status?.status ?? "UNKNOWN"
+                }; failureCode=${status?.failureCode ?? "NONE"}; nextAction=${
+                  status?.nextAction ?? "POLL_SAME_JOB"
+                }; inspect only after STAGED`,
+              );
             }
             const r = job.result;
             const expectedPath =
@@ -637,16 +852,30 @@ Deno.serve(async (req) => {
               }
               const qa = a.qa;
               if (qa.contractHash !== current.claim.generationContractHash) {
-                throw Error("QA_CONTRACT_HASH_MISMATCH: use current claim generationContractHash");
+                throw Error(
+                  "QA_CONTRACT_HASH_MISMATCH: use current claim generationContractHash",
+                );
               }
-              const role = String(current.claim.generationContract?.asset_role ?? "BODY").toUpperCase();
+              const role = String(
+                current.claim.generationContract?.asset_role ?? "BODY",
+              ).toUpperCase();
               const requiredQa = ["imageQa", "mobileQa", "imageSeoQa"];
-              if (["THUMBNAIL", "HERO", "THUMBNAIL_HERO"].includes(role)) requiredQa.push("representativeImageQa");
-              if (["THUMBNAIL", "THUMBNAIL_HERO"].includes(role)) requiredQa.push("cardCropQa");
-              if (["HERO", "THUMBNAIL_HERO"].includes(role)) requiredQa.push("heroCropQa");
+              if (["THUMBNAIL", "HERO", "THUMBNAIL_HERO"].includes(role)) {
+                requiredQa.push("representativeImageQa");
+              }
+              if (["THUMBNAIL", "THUMBNAIL_HERO"].includes(role)) {
+                requiredQa.push("cardCropQa");
+              }
+              if (["HERO", "THUMBNAIL_HERO"].includes(role)) {
+                requiredQa.push("heroCropQa");
+              }
               const missingQa = requiredQa.filter((k) => qa[k] !== "PASS");
               if (missingQa.length) {
-                throw Error(`EXPLICIT_QA_PASS_REQUIRED: assetRole=${role}; missingOrNonPass=${missingQa.join(",")}; use exact flat qa fields after actual inspection`);
+                throw Error(
+                  `EXPLICIT_QA_PASS_REQUIRED: assetRole=${role}; missingOrNonPass=${
+                    missingQa.join(",")
+                  }; use exact flat qa fields after actual inspection`,
+                );
               }
               await rpc("content_pipeline_approve_source_stage_v1", {
                 p_job_id: a.jobId,

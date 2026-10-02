@@ -7,6 +7,7 @@ import {
   validateTransform,
 } from "./transform.ts";
 import { downloadSource, sourceUrl } from "./source.ts";
+import { generateAsset, generationCapabilities } from "./generation.ts";
 const BUCKET = "content-pipeline-staging";
 Deno.serve(async (req) => {
   if (req.method !== "POST") return out({ error: "METHOD_NOT_ALLOWED" }, 405);
@@ -34,13 +35,135 @@ Deno.serve(async (req) => {
     }
     authorized = true;
     const s = j.spec;
-    const u = sourceUrl(s.sourceAssetUrl);
-    sourceUrl(s.sourcePageUrl);
-    if (typeof s.sourceOwner !== "string" || !s.sourceOwner.trim()) {
-      throw Error("SOURCE_PROVENANCE_REQUIRED");
+    if (s.capabilityProbe === true && !j.pipelineImageId) {
+      const capabilities = generationCapabilities((key) => Deno.env.get(key));
+      const { error } = await sb.from("27_content_pipeline_source_stage_job")
+        .update({
+          status: "STAGED",
+          result: { kind: "CAPABILITY_ONLY_NOT_IMAGE", capabilities },
+          updated_at: new Date().toISOString(),
+        }).eq("job_id", jobId).eq("status", "RUNNING");
+      if (error) throw Error("CAPABILITY_RECEIPT_SAVE_FAILED");
+      return out({ jobId, capabilities }, 200);
+    }
+    const generative = Boolean(s.productionMethod);
+    const u = generative ? null : sourceUrl(s.sourceAssetUrl);
+    if (!generative) {
+      sourceUrl(s.sourcePageUrl);
+      if (typeof s.sourceOwner !== "string" || !s.sourceOwner.trim()) {
+        throw Error("SOURCE_PROVENANCE_REQUIRED");
+      }
     }
     const transform = validateTransform(s.transform);
-    const downloaded = await downloadSource(u.href);
+    let contract: Record<string, unknown> = {};
+    if (generative) {
+      if (!j.pipelineImageId) throw Error("GENERATION_IMAGE_CLAIM_REQUIRED");
+      const { data: image, error } = await sb.from("21_content_pipeline_image")
+        .select("generation_contract,generation_contract_hash").eq(
+          "pipeline_image_id",
+          j.pipelineImageId,
+        ).single();
+      if (error || image.generation_contract_hash !== j.contractHash) {
+        throw Error("GENERATION_CONTRACT_CHANGED");
+      }
+      contract = image.generation_contract;
+      const { data: allowed, error: permissionError } = await sb.rpc(
+        "content_pipeline_reference_generation_allowed_v1",
+        {
+          p_contract: contract,
+          p_method: s.productionMethod,
+        },
+      );
+      if (permissionError || allowed !== true) {
+        throw Error("REFERENCE_GENERATION_CONTRACT_NOT_ALLOWED");
+      }
+    }
+    let downloaded;
+    if (generative && s.resumeJobId) {
+      const { data: previous, error } = await sb.from(
+        "27_content_pipeline_source_stage_job",
+      )
+        .select("pipeline_image_id,contract_hash,spec,result").eq(
+          "job_id",
+          s.resumeJobId,
+        ).single();
+      if (
+        error || previous.pipeline_image_id !== j.pipelineImageId ||
+        previous.contract_hash !== j.contractHash ||
+        previous.spec.productionMethod !== s.productionMethod ||
+        previous.spec.inputAssetUrl !== s.inputAssetUrl ||
+        previous.spec.prompt !== s.prompt ||
+        JSON.stringify(previous.spec.references) !==
+          JSON.stringify(s.references) ||
+        previous.spec.visualMcpOperation?.workerKey !==
+          s.visualMcpOperation?.workerKey
+      ) throw Error("GENERATION_RESUME_ACCESS_DENIED");
+      const input = previous.result?.generatedInput;
+      if (
+        !input || input.bucket !== BUCKET ||
+        input.path !==
+          `${j.pipelineId}/${j.pipelineImageId}/${input.sha256}.webp`
+      ) throw Error("GENERATION_RESUME_ASSET_MISSING");
+      const read = await sb.storage.from(BUCKET).download(input.path);
+      if (read.error || !read.data) {
+        throw Error("GENERATION_RESUME_ASSET_MISSING");
+      }
+      const bytes = new Uint8Array(await read.data.arrayBuffer());
+      const proof = await inspectWebp(bytes, read.data.type);
+      if (proof.sha256 !== input.sha256 || proof.bytes !== input.bytes) {
+        throw Error("GENERATION_RESUME_IDENTITY_MISMATCH");
+      }
+      downloaded = {
+        bytes,
+        mime: "image/webp",
+        finalUrl: null,
+        redirects: [],
+        generation: previous.result.generation,
+      };
+    } else {
+      downloaded = generative
+        ? await generateAsset(s, contract)
+        : await downloadSource(u!.href);
+    }
+    let generatedInput;
+    if (generative) {
+      const inputProof = await inspectWebp(downloaded.bytes, downloaded.mime);
+      const inputPath =
+        `${j.pipelineId}/${j.pipelineImageId}/${inputProof.sha256}.webp`;
+      let read = await sb.storage.from(BUCKET).download(inputPath);
+      if (read.error || !read.data) {
+        const { error } = await sb.storage.from(BUCKET).upload(
+          inputPath,
+          downloaded.bytes,
+          { contentType: "image/webp", upsert: false, cacheControl: "0" },
+        );
+        if (error) throw Error("GENERATED_BINARY_PRESERVATION_FAILED");
+        read = await sb.storage.from(BUCKET).download(inputPath);
+      }
+      if (read.error || !read.data) {
+        throw Error("GENERATED_BINARY_READBACK_FAILED");
+      }
+      const proof = await inspectWebp(
+        new Uint8Array(await read.data.arrayBuffer()),
+        read.data.type,
+      );
+      if (
+        proof.sha256 !== inputProof.sha256 || proof.bytes !== inputProof.bytes
+      ) throw Error("GENERATED_BINARY_IDENTITY_MISMATCH");
+      generatedInput = { ...proof, bucket: BUCKET, path: inputPath };
+      const { data: saved, error } = await sb.from(
+        "27_content_pipeline_source_stage_job",
+      ).update({
+        result: {
+          checkpoint: "GENERATED_BINARY_PRESERVED",
+          generatedInput,
+          generation: "generation" in downloaded ? downloaded.generation : null,
+        },
+        updated_at: new Date().toISOString(),
+      }).eq("job_id", jobId).eq("status", "RUNNING").select("job_id")
+        .maybeSingle();
+      if (error || !saved) throw Error("GENERATED_BINARY_RECEIPT_SAVE_FAILED");
+    }
     const source = downloaded.bytes, mime = downloaded.mime;
     const final = await transformSource(
         source,
@@ -82,18 +205,45 @@ Deno.serve(async (req) => {
       mobileQa: "PENDING",
       imageSeoQa: "PENDING",
       provenance: {
-        sourceAssetUrl: u.href,
+        sourceAssetUrl: u?.href ??
+          (s.productionMethod === "REAL_SOURCE_AI_EDIT"
+            ? s.inputAssetUrl
+            : null),
         finalSourceAssetUrl: downloaded.finalUrl,
         sourceRedirects: downloaded.redirects,
         sourceCheckedAt: new Date().toISOString(),
         sourcePageUrl: s.sourcePageUrl ?? null,
         sourceOwner: s.sourceOwner ?? null,
         sourceMime: mime,
-        sourceSha256: await sha256(source),
+        sourceSha256: generative
+          ? ("generation" in downloaded
+            ? downloaded.generation.inputSourceSha256 ?? null
+            : null)
+          : await sha256(source),
+        generatedBinarySha256: generative ? await sha256(source) : null,
         sourcePdfPage: s.sourcePdfPage ?? null,
+        ...(generative
+          ? {
+            references: s.references,
+            referenceEvidence: "OPERATOR_VERIFIED",
+            inputAssetUrl: s.inputAssetUrl ?? null,
+          }
+          : {}),
       },
+      ...(generative
+        ? {
+          productionMethod: s.productionMethod,
+          generation: "generation" in downloaded ? downloaded.generation : null,
+          generatedInput,
+          references: s.references,
+          aiEditingApplied: s.productionMethod === "REAL_SOURCE_AI_EDIT",
+          aiGenerationApplied:
+            s.productionMethod === "REFERENCE_BASED_GENERATION",
+        }
+        : {}),
       transform,
-      editingApplied: Boolean(transform.crop),
+      editingApplied: Boolean(transform.crop) ||
+        s.productionMethod === "REAL_SOURCE_AI_EDIT",
       annotationApplied: Boolean(transform.annotations?.length),
       stagedAt: new Date().toISOString(),
       probeOnly: !j.pipelineImageId,
@@ -102,38 +252,62 @@ Deno.serve(async (req) => {
     // A checkpoint is technical evidence only, never an approval or STAGED receipt.
     const { data: checkpoint, error: checkpointError } = await sb.from(
       "27_content_pipeline_source_stage_job",
-    ).update({ result: { ...result, checkpoint: "STORAGE_VERIFIED" }, updated_at: new Date().toISOString() })
-      .eq("job_id", jobId).eq("status", "RUNNING").select("job_id").maybeSingle();
-    if (checkpointError || !checkpoint) throw Error("JOB_CHECKPOINT_SAVE_FAILED");
+    ).update({
+      result: { ...result, checkpoint: "STORAGE_VERIFIED" },
+      updated_at: new Date().toISOString(),
+    })
+      .eq("job_id", jobId).eq("status", "RUNNING").select("job_id")
+      .maybeSingle();
+    if (checkpointError || !checkpoint) {
+      throw Error("JOB_CHECKPOINT_SAVE_FAILED");
+    }
 
     const { data: preview, error: previewError } = await sb.storage.from(BUCKET)
       .createSignedUrl(path, 3600);
     if (previewError || !preview) throw Error("PREVIEW_URL_FAILED");
-    Object.assign(result, { previewUrl: preview.signedUrl, previewExpiresAt: new Date(Date.now() + 3600000).toISOString() });
+    Object.assign(result, {
+      previewUrl: preview.signedUrl,
+      previewExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+    });
 
     // Materialize the exact verified staged binary for independent pixel QA.
     // The bridge is service-role-only and chunked to keep each DB payload bounded.
-    const { error: deleteError } = await sb.from("28_content_pipeline_source_stage_inspection_chunk")
+    const { error: deleteError } = await sb.from(
+      "28_content_pipeline_source_stage_inspection_chunk",
+    )
       .delete().eq("job_id", jobId);
     if (deleteError) throw Error("INSPECTION_BRIDGE_WRITE_FAILED");
-    const rows: Array<{ job_id: string; seq: number; chunk_base64: string }> = [];
+    const rows: Array<{ job_id: string; seq: number; chunk_base64: string }> =
+      [];
     const inspectChunkBytes = 4500;
-    for (let seq = 0, offset = 0; offset < final.webp.length; seq++, offset += inspectChunkBytes) {
-      const part = final.webp.subarray(offset, Math.min(offset + inspectChunkBytes, final.webp.length));
+    for (
+      let seq = 0, offset = 0;
+      offset < final.webp.length;
+      seq++, offset += inspectChunkBytes
+    ) {
+      const part = final.webp.subarray(
+        offset,
+        Math.min(offset + inspectChunkBytes, final.webp.length),
+      );
       let binary = "";
-      for (let i = 0; i < part.length; i++) binary += String.fromCharCode(part[i]);
+      for (let i = 0; i < part.length; i++) {
+        binary += String.fromCharCode(part[i]);
+      }
       rows.push({ job_id: jobId, seq, chunk_base64: btoa(binary) });
     }
 
     for (let offset = 0; offset < rows.length; offset += 100) {
-      const { error: chunkError } = await sb.from("28_content_pipeline_source_stage_inspection_chunk")
+      const { error: chunkError } = await sb.from(
+        "28_content_pipeline_source_stage_inspection_chunk",
+      )
         .insert(rows.slice(offset, offset + 100));
       if (chunkError) throw Error("INSPECTION_BRIDGE_WRITE_FAILED");
     }
     const { data: saved, error: saveError } = await sb.from(
       "27_content_pipeline_source_stage_job",
     ).update({ status: "STAGED", result, updated_at: new Date().toISOString() })
-      .eq("job_id", jobId).eq("status", "RUNNING").select("job_id").maybeSingle();
+      .eq("job_id", jobId).eq("status", "RUNNING").select("job_id")
+      .maybeSingle();
     if (!saved || saveError) throw Error("JOB_RECEIPT_SAVE_FAILED");
     return out({ jobId, status: "STAGED", result }, 200);
   } catch (e) {
