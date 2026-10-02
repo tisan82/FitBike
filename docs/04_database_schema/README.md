@@ -64,3 +64,7 @@ Migration `20261001040232_visual_source_request_transport.sql` adds service-only
 ### 2026-10-02 Reference generation transport
 
 Migration `20261002014159_reference_visual_generation.sql` adds service-only generation permission/dispatch RPCs using existing `27_content_pipeline_source_stage_job` rows and existing Image statuses. It updates approval provenance for AI-edit input URL identity and includes `result.generatedInput.path` in staging cleanup plan/reservation/activation protection. No public table access or new Image status is introduced. Deployment must include the Source Stage `generation.ts` dependency and MCP `generation.ts`/`source.ts` validation dependencies.
+
+### 2026-10-02 Native ChatGPT file input
+
+`20261002042408_native_chat_file_handoff.sql` replaces only the generation dispatch body and adds service-only `content_pipeline_native_file_identity_v1(jsonb)`. Existing image/job tables, statuses, Contract permission and preserved-input protection remain. Native file references travel through existing private Job specs; signed URLs are not input identity and are scrubbed after preservation/handled failure. No table/column or public grant is added.

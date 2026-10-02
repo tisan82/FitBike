@@ -17,6 +17,7 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } },
   );
   let authorized = false, jobId = "";
+  let activeSpec: Record<string, unknown> | null = null;
   try {
     const b = await req.json();
     jobId = String(b.jobId ?? "");
@@ -35,8 +36,9 @@ Deno.serve(async (req) => {
     }
     authorized = true;
     const s = j.spec;
+    activeSpec = s;
     if (s.capabilityProbe === true && !j.pipelineImageId) {
-      const capabilities = generationCapabilities((key) => Deno.env.get(key));
+      const capabilities = generationCapabilities();
       const { error } = await sb.from("27_content_pipeline_source_stage_job")
         .update({
           status: "STAGED",
@@ -122,11 +124,17 @@ Deno.serve(async (req) => {
       };
     } else {
       downloaded = generative
-        ? await generateAsset(s, contract)
+        ? await generateAsset(s)
         : await downloadSource(u!.href);
     }
     let generatedInput;
     if (generative) {
+      // Preserve a decoded, normalized WebP before applying the requested transform.
+      // PNG/JPEG and WebP inputs all get the same bounded server decode/encode path.
+      if (downloaded.mime !== "image/webp") {
+        const normalized = await transformSource(downloaded.bytes, downloaded.mime, { maxWidth: 1600 });
+        downloaded = { ...downloaded, bytes: normalized.webp, mime: "image/webp" };
+      }
       const inputProof = await inspectWebp(downloaded.bytes, downloaded.mime);
       const inputPath =
         `${j.pipelineId}/${j.pipelineImageId}/${inputProof.sha256}.webp`;
@@ -154,6 +162,7 @@ Deno.serve(async (req) => {
       const { data: saved, error } = await sb.from(
         "27_content_pipeline_source_stage_job",
       ).update({
+        spec: scrubFileUrls(s),
         result: {
           checkpoint: "GENERATED_BINARY_PRESERVED",
           generatedInput,
@@ -220,7 +229,9 @@ Deno.serve(async (req) => {
             ? downloaded.generation.inputSourceSha256 ?? null
             : null)
           : await sha256(source),
-        generatedBinarySha256: generative ? await sha256(source) : null,
+        generatedBinarySha256: generative
+          ? ("generation" in downloaded ? downloaded.generation.inputSha256 ?? await sha256(source) : await sha256(source))
+          : null,
         sourcePdfPage: s.sourcePdfPage ?? null,
         ...(generative
           ? {
@@ -316,6 +327,7 @@ Deno.serve(async (req) => {
       const failed = await sb.from("27_content_pipeline_source_stage_job")
         .update({
           status: "FAILED",
+          ...(activeSpec ? { spec: scrubFileUrls(activeSpec) } : {}),
           failure_code: code.slice(0, 200),
           updated_at: new Date().toISOString(),
         }).eq("job_id", jobId).eq("status", "RUNNING");
@@ -334,4 +346,16 @@ function out(body: unknown, status: number) {
       "cache-control": "no-store",
     },
   });
+}
+
+function scrubFileUrls(spec: Record<string, unknown>) {
+  const out = { ...spec };
+  for (const key of ["chatFile", "inputFile"]) {
+    if (out[key] && typeof out[key] === "object") {
+      const file = { ...(out[key] as Record<string, unknown>) };
+      delete file.download_url;
+      out[key] = file;
+    }
+  }
+  return out;
 }

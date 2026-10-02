@@ -91,6 +91,7 @@ async function fetchPinned(
   u: URL,
   address: string,
   signal: AbortSignal,
+  fileInput = false,
 ): Promise<Hop> {
   // Dial only the validated address, then authenticate TLS using the source host.
   // startTls preserves hostname verification without re-resolving the socket.
@@ -197,7 +198,7 @@ async function fetchPinned(
             .toLowerCase();
           if (
             !["image/png", "image/jpeg", "image/webp", "application/pdf"]
-              .includes(mime)
+              .includes(mime) && !(fileInput && ["application/octet-stream", ""].includes(mime))
           ) throw Error("SOURCE_MIME_INVALID");
           if (
             headers["content-encoding"] &&
@@ -270,6 +271,12 @@ async function fetchPinned(
     ) throw Error("SOURCE_HTTP_INVALID");
     if (!bytes.length) throw Error("SOURCE_EMPTY");
     if (bytes.length > max) throw Error("SOURCE_TOO_LARGE");
+    if (fileInput && ["application/octet-stream", ""].includes(mime)) {
+      if (bytes[0] === 137 && bytes[1] === 80) mime = "image/png";
+      else if (bytes[0] === 255 && bytes[1] === 216) mime = "image/jpeg";
+      else if (new TextDecoder().decode(bytes.subarray(0,4)) === "RIFF") mime = "image/webp";
+      else throw Error("NATIVE_FILE_MUST_BE_IMAGE");
+    }
     verifySourceSignature(bytes, mime);
     return { bytes, mime };
   };
@@ -280,13 +287,13 @@ async function fetchPinned(
     close();
   }
 }
-export async function downloadSource(value: unknown): Promise<Download> {
+export async function downloadSource(value: unknown, fileInput = false): Promise<Download> {
   const signal = AbortSignal.timeout(20000), redirects: string[] = [];
   let u = sourceUrl(value);
   try {
     for (let hop = 0; hop <= 4; hop++) {
       const address = await resolvePublic(u, signal);
-      const result = await fetchPinned(u, address, signal);
+      const result = await fetchPinned(u, address, signal, fileInput);
       if (result.location) {
         if (hop === 4) throw Error("SOURCE_REDIRECT_LIMIT");
         u = sourceUrl(new URL(result.location, u).href);

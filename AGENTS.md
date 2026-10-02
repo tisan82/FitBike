@@ -40,7 +40,7 @@ repository for small changes.
 
 -   Product/Business: `SERVICE.md` > Service Module > Task > implementation
 -   Content production execution: `CONTENT.md` (product/editorial policy) > `CONTENT_FACTORY.md` (AI production procedure) > `CONTENT_QUEUE.md` (queue reconciliation/execution) > Task > implementation
--   Cross-repository policy ownership: these FitBike documents are the only editable content-policy source. `tisan82/FitBike-Content-Factory` may contain links/pointers but must not mirror policy text. Content production may run in ordinary Chat or scheduled Chat when that runtime passes the required tool/file-transport preflight. Work handles development and recovery; it is not a prerequisite for each content run. Optional OpenAI API provider configuration is not a Chat-production prerequisite.
+-   Cross-repository policy ownership: these FitBike documents are the only editable content-policy source. `tisan82/FitBike-Content-Factory` may contain links/pointers but must not mirror policy text. Content production may run in ordinary Chat or scheduled Chat when that runtime passes the required tool/file-transport preflight. Work handles development and recovery; it is not a prerequisite for each content run. This content workflow uses native ChatGPT generation only; external OpenAI generation APIs are prohibited. Chat file handoff must be verified separately.
 -   Database: current Supabase export in `docs/04_database_schema/` > `DATABASE.md` > Service Module > implementation
 -   Architecture/API: `ARCHITECTURE.md` + `API.md` > Service Module > Task > implementation
 -   UI/UX: `SCREEN.md` > Service Module > Task > implementation
