@@ -1,3 +1,4 @@
+import { labelFont } from "./label-font.ts";
 import {
   CompositeOperator,
   ImageMagick,
@@ -15,7 +16,7 @@ const wasm = await Deno.readFile(
 await initializeImageMagick(wasm);
 let svgReady = false;
 let svgModule: typeof import("npm:@resvg/resvg-wasm@2.6.2");
-async function renderSvg(svg: string, fontBuffers: Uint8Array[] = []) {
+export async function renderSvg(svg: string, fontBuffers: Uint8Array[] = [], transparent = false) {
   if (!svgReady) {
     svgModule = await import("npm:@resvg/resvg-wasm@2.6.2");
     await svgModule.initWasm(
@@ -29,7 +30,7 @@ async function renderSvg(svg: string, fontBuffers: Uint8Array[] = []) {
     svgReady = true;
   }
   const renderer = new svgModule.Resvg(svg, {
-    background: fontBuffers.length ? "white" : undefined,
+    background: fontBuffers.length && !transparent ? "white" : undefined,
     font: { fontBuffers },
   });
   try {
@@ -98,7 +99,7 @@ export type Transform = {
       y1: number;
       x2: number;
       y2: number;
-    }
+    } | { type: "label"; text: string; x: number; y: number; fontSize?: number }
   >;
 };
 const unit = (n: unknown) =>
@@ -136,6 +137,11 @@ export function validateTransform(raw: unknown): Transform {
           ![a.x1, a.y1, a.x2, a.y2].every(unit) ||
           a.x1 === a.x2 && a.y1 === a.y2
         ) throw Error("INVALID_ANNOTATION");
+      } else if (a.type === "label") {
+        if (!unit(a.x) || !unit(a.y) || typeof a.text !== "string" ||
+            !/^[\x20-\x7e\u3131-\u318e\uac00-\ud7a3]{1,16}$/.test(a.text.normalize("NFC")) || !a.text.trim() ||
+            (a.fontSize !== undefined && (!Number.isInteger(a.fontSize) || a.fontSize < 14 || a.fontSize > 24)) ||
+            Object.keys(a).some(k => !["type", "text", "x", "y", "fontSize"].includes(k))) throw Error("INVALID_LABEL");
       } else throw Error("UNSUPPORTED_ANNOTATION");
     }
   }
@@ -283,7 +289,7 @@ export async function transformSource(
   if (t.annotations?.length) {
     const scale = Math.min(width, height),
       stroke = Math.max(4, Math.round(width * 0.009));
-    const shapes = t.annotations.map((a) =>
+    const shapes = t.annotations.filter(a => a.type !== "label").map((a) =>
       a.type === "circle"
         ? `<circle cx="${a.x * width}" cy="${a.y * height}" r="${
           a.radius * scale
@@ -292,11 +298,21 @@ export async function transformSource(
           a.y2 * height
         }" marker-end="url(#head)"/>`
     ).join("");
+    const escapeXml = (s: string) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
+    const labels = t.annotations.filter(a => a.type === "label").map(a => {
+      // fontSize is in pixels at 390px display width, independent of output size.
+      const size = (a.fontSize ?? 16) * width / 390;
+      const text = a.text.normalize("NFC");
+      const boxWidth = (Array.from(text).length + 1) * size, boxHeight = size * 1.8;
+      if (boxWidth > width || boxHeight > height) throw Error("LABEL_DOES_NOT_FIT");
+      const x = Math.min(a.x * width, width - boxWidth), y = Math.min(a.y * height, height - boxHeight);
+      return `<rect x="${x}" y="${y}" width="${boxWidth}" height="${boxHeight}" rx="${size * .2}" fill="#111827"/><text x="${x + size * .5}" y="${y + size * 1.25}" font-family="Noto Sans KR" font-size="${size}" font-weight="600" fill="white">${escapeXml(text)}</text>`;
+    }).join("");
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs><marker id="head" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 Z" fill="#facc15"/></marker></defs><g fill="none" stroke="#111827" stroke-width="${
         stroke + 4
-      }">${shapes}</g><g fill="none" stroke="#facc15" stroke-width="${stroke}">${shapes}</g></svg>`;
-    overlay = await renderSvg(svg);
+      }">${shapes}</g><g fill="none" stroke="#facc15" stroke-width="${stroke}">${shapes}</g>${labels}</svg>`;
+    overlay = await renderSvg(svg, labels ? [await labelFont()] : [], true);
   }
   const webp = ImageMagick.read(input, (img) => {
     if (t.crop) {

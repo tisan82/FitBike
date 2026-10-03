@@ -8,6 +8,7 @@ import {
 } from "./transform.ts";
 import { downloadSource, sourceUrl } from "./source.ts";
 import { generateAsset, generationCapabilities } from "./generation.ts";
+import { composeSources, validateComposition } from "./composition.ts";
 const BUCKET = "content-pipeline-staging";
 Deno.serve(async (req) => {
   if (req.method !== "POST") return out({ error: "METHOD_NOT_ALLOWED" }, 405);
@@ -48,6 +49,13 @@ Deno.serve(async (req) => {
       if (error) throw Error("CAPABILITY_RECEIPT_SAVE_FAILED");
       return out({ jobId, capabilities }, 200);
     }
+    const composite = s.composition !== undefined;
+    if (composite && s.productionMethod) throw Error("COMPOSITION_GENERATION_CONFLICT");
+    if (composite) {
+      const c = validateComposition(s.composition);
+      if (c.sources[0].sourceAssetUrl !== s.sourceAssetUrl || c.sources[0].sourcePageUrl !== s.sourcePageUrl || c.sources[0].sourceOwner !== s.sourceOwner) throw Error("COMPOSITION_PRIMARY_SOURCE_MISMATCH");
+      if (s.transform?.crop || s.transform?.annotations?.length) throw Error("COMPOSITION_FINAL_TRANSFORM_NOT_ALLOWED");
+    }
     const generative = Boolean(s.productionMethod);
     const u = generative ? null : sourceUrl(s.sourceAssetUrl);
     if (!generative) {
@@ -80,6 +88,7 @@ Deno.serve(async (req) => {
         throw Error("REFERENCE_GENERATION_CONTRACT_NOT_ALLOWED");
       }
     }
+    let composed: Awaited<ReturnType<typeof composeSources>> | undefined;
     let downloaded;
     if (generative && s.resumeJobId) {
       const { data: previous, error } = await sb.from(
@@ -123,7 +132,10 @@ Deno.serve(async (req) => {
         generation: previous.result.generation,
       };
     } else {
-      downloaded = generative
+      if (composite) composed = await composeSources(s.composition, s.transform.maxWidth ?? 1170);
+      downloaded = composed
+        ? { bytes: composed.webp, mime: "image/webp", finalUrl: null, redirects: [] }
+        : generative
         ? await generateAsset(s)
         : await downloadSource(u!.href);
     }
@@ -174,7 +186,7 @@ Deno.serve(async (req) => {
       if (error || !saved) throw Error("GENERATED_BINARY_RECEIPT_SAVE_FAILED");
     }
     const source = downloaded.bytes, mime = downloaded.mime;
-    const final = await transformSource(
+    const final = composed ?? await transformSource(
         source,
         mime,
         transform,
@@ -214,17 +226,18 @@ Deno.serve(async (req) => {
       mobileQa: "PENDING",
       imageSeoQa: "PENDING",
       provenance: {
+        ...(composed ? { sources: composed.provenance, composition: composed.recipe, editingMethod: "DETERMINISTIC_SIDE_BY_SIDE" } : {}),
         sourceAssetUrl: u?.href ??
           (s.productionMethod === "REAL_SOURCE_AI_EDIT"
             ? s.inputAssetUrl
             : null),
-        finalSourceAssetUrl: downloaded.finalUrl,
+        finalSourceAssetUrl: composed ? composed.provenance[0].finalSourceAssetUrl : downloaded.finalUrl,
         sourceRedirects: downloaded.redirects,
         sourceCheckedAt: new Date().toISOString(),
         sourcePageUrl: s.sourcePageUrl ?? null,
         sourceOwner: s.sourceOwner ?? null,
-        sourceMime: mime,
-        sourceSha256: generative
+        sourceMime: composed ? composed.provenance[0].sourceMime : mime,
+        sourceSha256: composed ? composed.provenance[0].sourceSha256 : generative
           ? ("generation" in downloaded
             ? downloaded.generation.inputSourceSha256 ?? null
             : null)
@@ -253,9 +266,10 @@ Deno.serve(async (req) => {
         }
         : {}),
       transform,
-      editingApplied: Boolean(transform.crop) ||
+      editingApplied: Boolean(composed) || Boolean(transform.crop) ||
         s.productionMethod === "REAL_SOURCE_AI_EDIT",
       annotationApplied: Boolean(transform.annotations?.length),
+      labelApplied: Boolean(composed?.recipe.sources.some(p => p.label)) || Boolean(transform.annotations?.some(a => a.type === "label")),
       stagedAt: new Date().toISOString(),
       probeOnly: !j.pipelineImageId,
     };

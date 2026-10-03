@@ -45,3 +45,17 @@ test("file intake binds server worker and delegates the exact native file withou
 test("upload widget opens without dispatch or QA mutation",async()=>{const h=harness();const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:generationSpec},"open_visual_file_upload")).json();assert.equal(b.result.isError,undefined);assert.equal(b.result.structuredContent.pipelineImageId,2000);assert.equal(h.calls.some(c=>c.name.includes("dispatch")),false);});
 
 test("native file with optional SHA dispatches without requiring an asset URL",async()=>{const h=harness();const sha="a".repeat(64);const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{...generationSpec,expectedGeneratedSha:sha},file:nativeFile},"dispatch_visual_generation")).json();assert.equal(b.result.isError,undefined);const c=h.calls.at(-1);assert.equal(c.name,"content_pipeline_dispatch_visual_generation_request_v1");assert.equal(c.args.p_spec.expectedGeneratedSha,sha);assert.deepEqual(c.args.p_spec.chatFile,nativeFile);});
+
+test("Korean labels are advertised and accepted without native generation",async()=>{
+ const h=harness(); const list=await(await h.send()).json();
+ const branches=list.result.tools.find(t=>t.name==="dispatch_visual_source").inputSchema.properties.spec.properties.transform.properties.annotations.items.oneOf;
+ assert.equal(branches.find(b=>b.properties.type.const==="label").properties.fontSize.minimum,14);
+ const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{sourceAssetUrl:"https://photos.example.org/image.jpg",sourcePageUrl:"https://photos.example.org/page",sourceOwner:"Manufacturer",transform:{annotations:[{type:"label",text:"배터리",x:.1,y:.1,fontSize:16}]}}},"dispatch_visual_source")).json();
+ assert.equal(b.result.isError,undefined);assert.equal(h.calls.at(-1).args.p_spec.transform.annotations[0].text,"배터리");
+});
+test("invalid Korean labels fail before creating a source job",async()=>{
+ for(const extra of [{text:""},{text:"⚠"},{fontSize:12},{text:"가".repeat(17)},{text:"배터리\n"}]){
+ const h=harness();const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{sourceAssetUrl:"https://photos.example.org/image.jpg",sourcePageUrl:"https://photos.example.org/page",sourceOwner:"Manufacturer",transform:{annotations:[{type:"label",text:"배터리",x:.1,y:.1,...extra}]}}},"dispatch_visual_source")).json();
+ assert.equal(b.result.isError,true);assert.equal(h.calls.some(c=>c.name.includes("dispatch")),false);
+ }
+});

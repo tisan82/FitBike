@@ -546,3 +546,7 @@ Arrow/Circle/Short Label/Zoom Inset은 위치 식별에 필요한 경우만 적�
 사람 표현은 Contract NONE/HANDS_ONLY/PERSON_REQUIRED를 따르고 불필요한 인물 노출을 줄인다. 사람이 필요한 경우 기존 동양인 기준을 유지한다. ALT/Caption은 Final 픽셀에 맞게 최소 조정하고 이유·이전 값·최종 값을 QA metadata에 보존한다. Primary Query/Title/Heading 전략은 바꾸지 않으며 생성형/AI 이미지 표현은 고객 ALT/Caption에 넣지 않는다.
 
 3-A의 정상 종료는 Staging read-back 검증과 READY_FOR_UPLOAD다. 3-B는 동일 WebP를 등록·검증하며 이미지 제작을 수행하지 않는다. 의미 오류는 3-A로 반환한다. 실행 도구 성공, metadata 또는 HTTP 200만으로 Semantic QA를 PASS하지 않는다.
+
+### Official source label annotations
+
+`REAL_SOURCE_CROP_OR_MARK` supports deterministic Korean/English short labels alongside circle/arrow annotations. Use `transform.annotations` with `{type:"label",text:"배터리",x:0.1,y:0.1,fontSize:16}`; x/y refer to the cropped output, and fontSize is measured at 390px display width (14–24, default 16). Labels are limited to 16 characters and six total annotations. Use only names and positions verified against the same Contract/Reference. This is editorial annotation, not AI editing or product-label reconstruction. Inspect the actual final pixels and 390px preview before approval. Native generation and generated-file handoff are not prerequisites for this source path.

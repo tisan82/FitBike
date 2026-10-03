@@ -145,3 +145,32 @@ Deno.test("missing or invalid PDF fonts fail instead of producing blank text", a
     "missing font silently rendered: " + failure,
   );
 });
+
+Deno.test("Korean labels render distinct glyphs at 390px and keep outside pixels", async () => {
+  const outputs: Uint8Array[] = [];
+  for (const text of ["배터리", "엔진오일"]) {
+    const r = await transformSource(source, "image/png", validateTransform({maxWidth:390,
+      annotations:[{type:"label",text,x:.05,y:.1},{type:"arrow",x1:.3,y1:.3,x2:.5,y2:.6}]}));
+    const proof = await inspectWebp(r.webp,"image/webp");
+    assert(proof.width===390 && proof.height===234,"mobile geometry");
+    ImageMagick.read(r.webp,img=>{
+      const rgb=img.getPixels(p=>p.toByteArray(0,0,img.width,img.height,"RGB"))!;
+      let bright=0;
+      for(let y=24;y<52;y++) for(let x=20;x<130;x++) {
+        const i=(y*390+x)*3; if(rgb[i]>200 && rgb[i+1]>200 && rgb[i+2]>200) bright++;
+      }
+      assert(bright>40,"Korean label has no visible glyphs");
+      const i=(220*390+380)*3;
+      assert(Math.abs(rgb[i]-51)<12 && Math.abs(rgb[i+1]-65)<12,"overlay replaced source background");
+    });
+    outputs.push(r.webp);
+    if(text==="배터리") await Deno.writeFile("/tmp/korean-label-mobile.webp",r.webp);
+  }
+  assert((await inspectWebp(outputs[0],"image/webp")).sha256!==(await inspectWebp(outputs[1],"image/webp")).sha256,"different labels rendered identically");
+});
+Deno.test("label validation rejects empty/control/unsupported glyphs and sizes",()=>{
+  for(const extra of [{text:""},{text:"배터리\n"},{text:"⚠"},{text:"가".repeat(17)},{fontSize:13},{fontSize:25},{x:2},{fill:"url(http://evil)"}]) {
+    let rejected=false;try{validateTransform({annotations:[{type:"label",text:"배터리",x:.1,y:.1,...extra}]});}catch{rejected=true;}
+    assert(rejected,"unsafe label accepted");
+  }
+});

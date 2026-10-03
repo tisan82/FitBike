@@ -49,6 +49,13 @@ const transformSchema = {
           },
           required: ["type", "x1", "y1", "x2", "y2"],
           additionalProperties: false,
+        }, {
+          type: "object",
+          properties: {
+            type: { const: "label" }, text: { type: "string", minLength: 1, maxLength: 16 },
+            x: unitSchema, y: unitSchema,
+            fontSize: { type: "integer", minimum: 14, maximum: 24, description: "Pixels at 390px display width; default 16" },
+          }, required: ["type", "text", "x", "y"], additionalProperties: false,
         }],
       },
     },
@@ -218,7 +225,7 @@ const tools: VisualTool[] = [
   {
     name: "dispatch_visual_source",
     description:
-      "Stage one public HTTPS photo/PDF candidate for this operator’s active image. Use one operationId per candidate/edit intent and retain it after response loss. Records provenance only. Supports crop, maxWidth and annotations[] circle/arrow; not AI Editing.",
+      "Stage one public HTTPS photo/PDF candidate for this operator’s active image. Use one operationId per candidate/edit intent and retain it after response loss. Preserves provenance. Supports crop/maxWidth/circle/arrow and Korean label annotations (type=label,text,x,y,fontSize; max 16 characters; size in 390px display pixels). Coordinates refer to the cropped output; verify names and positions against the Contract. Also supports composition SIDE_BY_SIDE of 2–3 inspected raster sources with individual crop and short ASCII labels. No image generation; retain operationId for recovery.",
     inputSchema: {
       type: "object",
       properties: {
@@ -231,6 +238,27 @@ const tools: VisualTool[] = [
             sourcePageUrl: { type: "string" },
             sourceOwner: { type: "string" },
             sourcePdfPage: { type: "integer", minimum: 1, maximum: 500 },
+            composition: {
+              type: "object", additionalProperties: false,
+              properties: {
+                layout: { type: "string", enum: ["SIDE_BY_SIDE"] },
+                sources: { type: "array", minItems: 2, maxItems: 3, items: {
+                  type: "object", additionalProperties: false,
+                  properties: {
+                    sourceAssetUrl: { type: "string", format: "uri" },
+                    sourcePageUrl: { type: "string", format: "uri" },
+                    sourceOwner: { type: "string" },
+                    verifiedFacts: { type: "array", minItems: 1, maxItems: 8, items: { type: "string" } },
+                    pixelsInspected: { type: "boolean", const: true },
+                    checkedAt: { type: "string", format: "date-time" },
+                    expectedSourceSha: { type: "string", pattern: "^[a-f0-9]{64}$" },
+                    crop: transformSchema.properties.crop,
+                    label: { type: "string", maxLength: 24, pattern: "^[A-Za-z0-9 &()+.,/-]{1,24}$" },
+                  },
+                  required: ["sourceAssetUrl", "sourcePageUrl", "sourceOwner", "verifiedFacts", "pixelsInspected", "checkedAt"],
+                } },
+              }, required: ["layout", "sources"],
+            },
             transform: transformSchema,
           },
           required: [
@@ -791,14 +819,13 @@ Deno.serve(async (req) => {
           if (!uuid(a.operationId)) throw Error("INVALID_OPERATION_ID");
           if (!a.spec) throw Error("INVALID_SOURCE_SPEC");
           validateSpec(a.spec);
-          const usage = await sourceUsage(
-            current.claim.pipelineImageId,
-            a.spec.sourceAssetUrl,
-          );
+          for (const candidate of ((a.spec.composition as { sources: Array<{ sourceAssetUrl: string; expectedSourceSha?: string }> } | undefined)?.sources ?? [{ sourceAssetUrl: String(a.spec.sourceAssetUrl), expectedSourceSha: undefined }])) {
+          const usage = await sourceUsage(current.claim.pipelineImageId, candidate.sourceAssetUrl, candidate.expectedSourceSha);
           if (usage.result === "DUPLICATE") {
             throw Error(
               "DUPLICATE_SOURCE_PREFLIGHT: select a different source within the same claim; no candidate dispatched",
             );
+          }
           }
           result = await rpc(
             "content_pipeline_dispatch_visual_source_request_v1",
@@ -1035,10 +1062,30 @@ function validateSpec(raw: unknown) {
         "sourcePageUrl",
         "sourceOwner",
         "sourcePdfPage",
+        "composition",
         "transform",
       ].includes(k)
     )
   ) throw Error("INVALID_SOURCE_SPEC");
+  if (s.composition !== undefined) {
+    const c = s.composition as { layout: string; sources: Array<Record<string, unknown>> };
+    if (!c || c.layout !== "SIDE_BY_SIDE" || Object.keys(c).some(k=>!["layout","sources"].includes(k)) || !Array.isArray(c.sources) || c.sources.length < 2 || c.sources.length > 3) throw Error("INVALID_SOURCE_COMPOSITION");
+    if (s.sourcePdfPage !== undefined) throw Error("COMPOSITION_RASTER_REQUIRED");
+    const seen = new Set();
+    for (const p of c.sources) {
+      if (!p || Object.keys(p).some(k=>!["sourceAssetUrl","sourcePageUrl","sourceOwner","verifiedFacts","pixelsInspected","checkedAt","expectedSourceSha","crop","label"].includes(k))) throw Error("INVALID_COMPOSITION_SOURCE");
+      validateSpec({sourceAssetUrl:p.sourceAssetUrl,sourcePageUrl:p.sourcePageUrl,sourceOwner:p.sourceOwner,transform:p.crop?{crop:p.crop}:{}});
+      if (seen.has(p.sourceAssetUrl)) throw Error("COMPOSITION_DUPLICATE_SOURCE"); seen.add(p.sourceAssetUrl);
+      if (p.pixelsInspected !== true || !Array.isArray(p.verifiedFacts) || !p.verifiedFacts.length || p.verifiedFacts.length>8 || p.verifiedFacts.some(f=>typeof f!=="string" || !f.trim() || f.length>500) || typeof p.checkedAt!=="string" || !Number.isFinite(Date.parse(p.checkedAt))) throw Error("COMPOSITION_VERIFICATION_REQUIRED");
+      if (p.expectedSourceSha !== undefined && (typeof p.expectedSourceSha!=="string" || !/^[a-f0-9]{64}$/.test(p.expectedSourceSha))) throw Error("INVALID_SOURCE_SHA");
+      if (p.label !== undefined && (typeof p.label!=="string" || !/^[A-Za-z0-9 &()+.,/-]{1,24}$/.test(p.label))) throw Error("COMPOSITION_LABEL_UNSUPPORTED");
+    }
+    const first=c.sources[0];
+    if (first.sourceAssetUrl!==s.sourceAssetUrl || first.sourcePageUrl!==s.sourcePageUrl || first.sourceOwner!==s.sourceOwner) throw Error("COMPOSITION_PRIMARY_SOURCE_MISMATCH");
+    const t=s.transform as Record<string,unknown>;
+    if (t?.crop || (Array.isArray(t?.annotations) && t.annotations.length)) throw Error("COMPOSITION_FINAL_TRANSFORM_NOT_ALLOWED");
+    if (t?.maxWidth !== undefined && Number(t.maxWidth)<780) throw Error("COMPOSITION_WIDTH_INVALID");
+  }
   for (const k of ["sourceAssetUrl", "sourcePageUrl"]) {
     const u = new URL(String(s[k]));
     if (
@@ -1063,6 +1110,8 @@ function validateSpec(raw: unknown) {
         x: number;
         y: number;
         radius: number;
+        text: string;
+        fontSize?: number;
         x1: number;
         y1: number;
         x2: number;
@@ -1101,6 +1150,11 @@ function validateSpec(raw: unknown) {
           ![a.x1, a.y1, a.x2, a.y2].every(unit) ||
           (a.x1 === a.x2 && a.y1 === a.y2)
         ) throw Error("INVALID_ANNOTATION");
+      } else if (a.type === "label") {
+        if (!unit(a.x) || !unit(a.y) || typeof a.text !== "string" ||
+            !/^[\x20-\x7e\u3131-\u318e\uac00-\ud7a3]{1,16}$/.test(a.text.normalize("NFC")) || !a.text.trim() ||
+            (a.fontSize !== undefined && (!Number.isInteger(a.fontSize) || a.fontSize < 14 || a.fontSize > 24)) ||
+            Object.keys(a).some(k => !["type", "text", "x", "y", "fontSize"].includes(k))) throw Error("INVALID_LABEL");
       } else throw Error("UNSUPPORTED_ANNOTATION");
     }
   }

@@ -121,6 +121,11 @@ export function validateChatFile(raw: unknown): ChatFile {
 }
 export function generationCapabilities() {
   return {
+    sourceTextAnnotationSupported: true,
+    sourceAnnotationTypes: ["circle", "arrow", "label"],
+    sourceLabelLanguages: ["ko", "en"],
+    sourceLabelMaxCharacters: 16,
+    sourceLabelFontSizeAt390px: { minimum: 14, maximum: 24, default: 16 },
     executionMode: "NATIVE_CHATGPT_FILE_HANDOFF",
     externalGenerationApiAllowed: false,
     referenceBasedGeneration: false,
