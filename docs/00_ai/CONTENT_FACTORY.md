@@ -733,3 +733,8 @@ A newly dispatched candidate without registered pre-Staging QA is automatically 
 After recording candidate QA, dispatch the same source using a NEW operationId (native generation uses preserved resumeJobId). The worker checks downloaded bytes against the bound QA before annotations and keeps final canonical/Mobile/SEO/crop QA mandatory. Composition first renders without labels for the gate, then pins every panel SHA when rendering labels to reject changed source bytes.
 
 Connector tool discovery must expose record_visual_source_qa and reject_visual_source before this production protocol is used. Cached approve_visual_source requires final PASS fields and must not be repurposed with fake PASS values for preliminary QA. Refresh tool discovery; server preflight protections remain active while discovery is stale. A preflight STAGED receipt is not Production READY_FOR_UPLOAD.
+
+
+### Image-scoped Visual Claim exclusion
+
+Active leases exclude only the same pipelineImageId, regardless of Worker. A Worker may serve multiple execution requestIds on different eligible images. Same-request replay preserves its owned token; a new request must never resume or mutate another request's lease. Explicit occupied targets return BUSY/TARGET_IMAGE_OWNS_ACTIVE_CLAIM with CLAIM_NEXT_ELIGIBLE_IMAGE. Queue claims retain per-image FOR UPDATE SKIP LOCKED. Worker advisory transaction locks serialize short receipt creation only; they must not block the full production lifetime.
