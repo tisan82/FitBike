@@ -5,15 +5,15 @@ import test from "node:test";
 import ts from "typescript";
 const source=readFileSync(new URL("../../supabase/functions/content-pipeline-visual-mcp/index.ts",import.meta.url),"utf8").replace(/^import .*;$/gm,"").replaceAll('await import("./generation.ts")','await loadGeneration()').replaceAll('await import("./inspection.ts")','await loadInspection()').replace('e instanceof Error?e.message:"VISUAL_OPERATION_FAILED"','String(e.message ?? e)');
 const REQUEST="11111111-1111-4111-8111-111111111111",JOB="22222222-2222-4222-8222-222222222222";
-function harness({email="operator@example.org",confirmed=true,configured=true,active=true,jobImage=2000,role="BODY",duplicate=false,recovery=null,signedError=false,staged=false,claimResult}={}){
- let handler;const calls=[];
+function harness({email="operator@example.org",confirmed=true,configured=true,active=true,jobImage=2000,role="BODY",duplicate=false,recovery=null,signedError=false,staged=false,missingPixels=false,storageFailsOnce=false,claimResult}={}){
+ let handler;let downloads=0;const calls=[];
  const current={result:claimResult??(active?"CLAIMED":"CLOSED"),failureCode:"MUST_SHOW_MISMATCH",activeClaim:active,status:active?"PROCESSING":"RETRY",claim:{pipelineImageId:2000,pipelineId:21,pipelineImageRunId:3,claimToken:REQUEST,generationContractHash:"contract",generationContract:{asset_role:role}}};
  const stagedResult={sha256:"a".repeat(64),bucket:"content-pipeline-staging",path:"21/2000/"+"a".repeat(64)+".webp",bytes:12,width:1200,height:675};
- const sb={storage:{from:()=>({download:async()=>({data:new Blob([new Uint8Array(12)],{type:"image/webp"}),error:null}),createSignedUrl:async(path,seconds)=>{calls.push({name:"signedUrl",args:{path,seconds}});return signedError?{data:null,error:{message:"sign error"}}:{data:{signedUrl:"https://example.supabase.co/storage/signed/canonical"},error:null};}})},auth:{getUser:async token=>token==="valid"?{data:{user:{id:"user",email,email_confirmed_at:confirmed?"now":null}},error:null}:{data:{user:null},error:{message:"bad"}}},rpc:async(name,args)=>{calls.push({name,args});if(name==="content_pipeline_reference_generation_allowed_v1")return {data:true,error:null};if(name==="content_pipeline_visual_recovery_v1")return {data:recovery,error:null};if(name.includes("request_status"))return {data:current,error:null};if(name.includes("approve_visual_request")){current.status="READY_FOR_UPLOAD";return {data:{},error:null};}if(name.includes("fail_visual_request")){current.activeClaim=false;current.status=args.p_status;return {data:{},error:null};}if(name==="content_pipeline_source_stage_status_v1")return{data:{jobId:JOB,status:"STAGED",result:stagedResult},error:null};return{data:{jobId:JOB},error:null};},from:()=>({select:()=>({in:()=>({neq:()=>({eq:()=>({limit:async()=>({data:duplicate?[{pipeline_image_id:2003,status:"DONE"}]:[],error:null})})})}),eq:()=>({maybeSingle:async()=>({data:{pipeline_image_id:jobImage,pipeline_id:21,image_id:"IMG_01",generation_contract:{},generation_contract_hash:"contract",contract_hash:"contract",staging_asset:null,status:"STAGED",result:staged?stagedResult:{}}}),single:async()=>({data:{status:current.status,handoff_phase:current.status==="READY_FOR_UPLOAD"?"READY_FOR_UPLOAD":"PRODUCING",staging_asset:current.status==="READY_FOR_UPLOAD"?{sha256:"a".repeat(64)}:null},error:null})})})})};
+ const sb={storage:{from:()=>({download:async()=>{downloads++;return storageFailsOnce&&downloads===1?{data:null,error:{message:"temporary"}}:{data:new Blob([new Uint8Array(12)],{type:"image/webp"}),error:null};},createSignedUrl:async(path,seconds)=>{calls.push({name:"signedUrl",args:{path,seconds}});return signedError?{data:null,error:{message:"sign error"}}:{data:{signedUrl:"https://example.supabase.co/storage/signed/canonical"},error:null};}})},auth:{getUser:async token=>token==="valid"?{data:{user:{id:"user",email,email_confirmed_at:confirmed?"now":null}},error:null}:{data:{user:null},error:{message:"bad"}}},rpc:async(name,args)=>{calls.push({name,args});if(name==="content_pipeline_reference_generation_allowed_v1")return {data:true,error:null};if(name==="content_pipeline_visual_recovery_v1")return {data:recovery,error:null};if(name.includes("request_status"))return {data:current,error:null};if(name.includes("approve_visual_request")){current.status="READY_FOR_UPLOAD";return {data:{},error:null};}if(name.includes("fail_visual_request")){current.activeClaim=false;current.status=args.p_status;return {data:{},error:null};}if(name==="content_pipeline_source_stage_status_v1")return{data:{jobId:JOB,status:"STAGED",result:stagedResult},error:null};return{data:{jobId:JOB},error:null};},from:()=>({select:()=>({in:()=>({neq:()=>({eq:()=>({limit:async()=>({data:duplicate?[{pipeline_image_id:2003,status:"DONE"}]:[],error:null})})})}),eq:()=>({maybeSingle:async()=>({data:{pipeline_image_id:jobImage,pipeline_id:21,image_id:"IMG_01",generation_contract:{},generation_contract_hash:"contract",contract_hash:"contract",staging_asset:null,status:"STAGED",result:staged?stagedResult:{}}}),single:async()=>({data:{status:current.status,handoff_phase:current.status==="READY_FOR_UPLOAD"?"READY_FOR_UPLOAD":"PRODUCING",staging_asset:current.status==="READY_FOR_UPLOAD"?{sha256:"a".repeat(64)}:null},error:null})})})})};
  const context={sourceUrl:value=>{const u=new URL(String(value));if(u.protocol!=="https:")throw Error("SOURCE_URL_UNSAFE");return u;},Date,createClient:()=>sb,Deno:{env:{get:key=>key==="CONTENT_FACTORY_MCP_OPERATOR_EMAILS"?(configured?"operator@example.org":""):"https://example.supabase.co"},serve:fn=>{handler=fn;}},Request,Response,Blob,URL,TextEncoder,Uint8Array,Array,Number,JSON,String,Error,btoa};
  const generation=readFileSync(new URL("../../supabase/functions/content-pipeline-visual-mcp/generation.ts",import.meta.url),"utf8").replace(/^import .*;$/gm,"").replace(/export /g,"");
  vm.runInNewContext(ts.transpile(generation,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),context);
- context.loadInspection=async()=>({inspectPixels:async()=>({metadata:{sha256:"a".repeat(64),decode:"PASS"},canonical:new Uint8Array(12),mobile:new Uint8Array(10)})});
+ context.loadInspection=async()=>({inspectPixels:async()=>({metadata:{sha256:"a".repeat(64),decode:"PASS"},canonical:missingPixels?new Uint8Array():Uint8Array.from([137,80,78,71,13,10,26,10,...new Uint8Array(24)]),mobile:Uint8Array.from([137,80,78,71,13,10,26,10,...new Uint8Array(24)])})});
  context.loadGeneration=async()=>({validateGenerationSpec:context.validateGenerationSpec,generationCapabilities:context.generationCapabilities,nativeGenerationContext:context.nativeGenerationContext});
  vm.runInNewContext(ts.transpile(source,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),context);
  return {calls,send:async(method="tools/list",args={},name,token="valid",body)=>handler(new Request("https://example.supabase.co/functions/v1/content-pipeline-visual-mcp",{method:"POST",headers:{"content-type":"application/json",...(token?{authorization:`Bearer ${token}`}:{})},body:body??JSON.stringify({jsonrpc:"2.0",id:1,method,params:{name,arguments:args}})}))};
@@ -121,4 +121,27 @@ test("native packet has no retained context from another task",()=>{
  const b=c.nativeGenerationContext(2,"hash-b",{must_show:["right handlebar starter button"]});
  assert.match(a.prompt,/oil warning dashboard/);assert.doesNotMatch(b.prompt,/oil warning dashboard|hash-a/);
  assert.match(b.prompt,/right handlebar starter button/);assert.equal(b.qa.mustShow.length,1);
+});
+
+test("missing PNG block fails explicitly with preserved recovery metadata",async()=>{
+ const h=harness({staged:true,missingPixels:true});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB},"inspect_visual_source")).json();
+ assert.equal(b.result.isError,true);const s=b.result.structuredContent;
+ assert.equal(s.failureCode,"INSPECTION_IMAGE_BLOCK_MISSING");assert.equal(s.technicalVerification,"FAIL");
+ assert.equal(s.technicalQa,"PASS");assert.equal(s.pixelDeliveryQa,"FAIL");assert.equal(s.semanticQa,"BLOCKED");
+ assert.equal(s.jobId,JOB);assert.equal(s.inspectionAccess.available,true);
+ assert.equal(h.calls.some(c=>c.name.includes("fail_visual")||c.name.includes("dispatch")),false);
+});
+test("inspection reports server content delivery without claiming client display or semantic QA",async()=>{
+ const h=harness({staged:true});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB},"inspect_visual_source")).json();
+ assert.equal(b.result.structuredContent.pixelDeliveryQa,"PASS");
+ assert.equal(b.result.structuredContent.clientPixelDelivery,"UNVERIFIED_REQUIRES_RENDERING");
+ assert.equal(b.result.content[b.result.structuredContent.canonicalImage.contentIndex].type,"image");
+ assert.equal(b.result.content[b.result.structuredContent.mobile390Image.contentIndex].type,"image");
+});
+
+test("Storage read failure uses bounded same-asset fallback without source dispatch",async()=>{
+ const h=harness({staged:true,storageFailsOnce:true});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB},"inspect_visual_source")).json();
+ assert.equal(b.result.isError,undefined);assert.equal(b.result.structuredContent.readbackTransport,"STORAGE_INTERNAL_RETRY");
+ assert.equal(b.result.content.filter(c=>c.type==="image").length,2);
+ assert.equal(h.calls.some(c=>c.name.includes("dispatch")),false);
 });

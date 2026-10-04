@@ -905,17 +905,54 @@ Deno.serve(async (req) => {
             const { data: blob, error: readError } = await sb.storage.from(
               "content-pipeline-staging",
             ).download(r.path);
-            if (readError || !blob) throw Error("STAGING_READBACK_FAILED");
-            if (blob.size !== r.bytes || blob.type !== "image/webp") {
+            let canonicalBlob = blob;
+            let readbackTransport = "STORAGE_INTERNAL";
+            if (readError || !canonicalBlob) {
+              // Download only the server-generated URL for this validated private path.
+              const access = await inspectionAccess(r, current.claim);
+              try {
+                if (!access?.available) throw Error("INSPECTION_SIGNED_URL_UNAVAILABLE");
+                const signed = new URL(access.canonicalDownloadUrl);
+                if (signed.origin !== new URL(url).origin) throw Error("INSPECTION_URL_ORIGIN_MISMATCH");
+                const res = await fetch(signed, { redirect: "error", signal: AbortSignal.timeout(15000) });
+                if (!res.ok || !res.body) throw Error("INSPECTION_SIGNED_DOWNLOAD_FAILED");
+                const reader = res.body.getReader();
+                const parts: Uint8Array[] = []; let count = 0;
+                try {
+                  while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    count += value.length;
+                    if (count > r.bytes || count > 4194304) throw Error("STAGING_IDENTITY_MISMATCH");
+                    parts.push(value);
+                  }
+                } finally { await reader.cancel(); }
+                canonicalBlob = new Blob(parts, { type: res.headers.get("content-type")?.split(";")[0] ?? "" });
+                readbackTransport = "SIGNED_CANONICAL_URL";
+              } catch {
+                // Bounded last attempt; never change source, contract, or staged identity.
+                const retry = await sb.storage.from("content-pipeline-staging").download(r.path);
+                if (retry.error || !retry.data) throw Error("STAGING_READBACK_FAILED");
+                canonicalBlob = retry.data;
+                readbackTransport = "STORAGE_INTERNAL_RETRY";
+              }
+            }
+            if (canonicalBlob.size !== r.bytes || canonicalBlob.type !== "image/webp") {
               throw Error("STAGING_IDENTITY_MISMATCH");
             }
-            const bytes = new Uint8Array(await blob.arrayBuffer());
+            const bytes = new Uint8Array(await canonicalBlob.arrayBuffer());
             const { inspectPixels } = await import("./inspection.ts");
             const proof = await inspectPixels(bytes, r);
             result = {
               jobId: a.jobId,
               ...proof.metadata,
               technicalVerification: "PASS",
+              technicalQa: "PASS",
+              pixelDeliveryQa: "PASS",
+              pixelDeliveryScope: "SERVER_MCP_RESPONSE",
+              readbackTransport,
+              clientPixelDelivery: "UNVERIFIED_REQUIRES_RENDERING",
+              mobileQa: "NOT_EVALUATED",
               semanticQa: "NOT_EVALUATED",
               mobilePreview: "DERIVED_390PX_NOT_CANONICAL",
               canonicalPath: r.path,
@@ -925,6 +962,15 @@ Deno.serve(async (req) => {
               nextAction: "VIEW_BOTH_IMAGE_CONTENT_BLOCKS_THEN_PERFORM_SEMANTIC_AND_MOBILE_QA",
               clientRenderingInstruction: "Forward each MCP image block to the model (functions.exec: image(block)). Metadata/decode PASS is not semantic QA. If pixels remain unavailable, preserve this job/SHA and resume inspection; do not regenerate.",
             };
+            if (!proof.canonical?.length || !proof.mobile?.length) {
+              result.pixelDeliveryQa = "FAIL";
+              result.technicalVerification = "FAIL";
+              result.semanticQa = "BLOCKED";
+              result.mobileQa = "BLOCKED";
+              result.failureCode = "INSPECTION_IMAGE_BLOCK_MISSING";
+              result.nextAction = "RECOVER_SAME_JOB_PIXELS_USING_INSPECTION_ACCESS";
+              return inspectionError(id, result);
+            }
             images = [{
               type: "image",
               data: encodeBase64(proof.canonical),
@@ -1040,14 +1086,16 @@ Deno.serve(async (req) => {
         }
       }
     }
-    return json({
-      jsonrpc: "2.0",
-      id,
-      result: {
-        content: [{ type: "text", text: JSON.stringify(result) }, ...images],
-        structuredContent: result,
-      },
-    });
+    const content = [{ type: "text", text: JSON.stringify(result) }, ...images];
+    if (name === "inspect_visual_source") {
+      const code = inspectionContentError(result, content);
+      if (code) {
+        return inspectionError(id, { ...result, technicalVerification: "FAIL", pixelDeliveryQa: "FAIL",
+          semanticQa: "BLOCKED", mobileQa: "BLOCKED", failureCode: code,
+          nextAction: "RECOVER_SAME_JOB_PIXELS_USING_INSPECTION_ACCESS" });
+      }
+    }
+    return json({ jsonrpc: "2.0", id, result: { content, structuredContent: result } });
   } catch (e) {
     return json({
       jsonrpc: "2.0",
@@ -1194,8 +1242,31 @@ async function inspectionAccess(r: Record<string, unknown>, claim: { pipelineId:
   return { available: true, canonicalDownloadUrl: data.signedUrl, expiresInSeconds: 600,
     canonicalPath: r.path, expectedSha: sha, expectedBytes: r.bytes,
     width: r.width, height: r.height, mobileWidth: 390,
+      fallbackOrder: ["MCP_IMAGE_CONTENT", "SIGNED_CANONICAL_URL_VERIFY_SHA", "REINVOKE_SAME_JOB_STORAGE_READBACK"],
+      assetPolicy: "PRESERVE_JOB_SHA_NO_REGENERATION",
     nextAction: "DOWNLOAD_VERIFY_SHA_VIEW_PIXELS_AND_DERIVE_390PX", semanticQa: "NOT_EVALUATED" };
 }
 function inactiveClaimError(current: Record<string, unknown>) {
   return Error(`ACTIVE_VISUAL_CLAIM_REQUIRED: result=${current.result ?? "UNKNOWN"}; status=${current.status ?? "UNKNOWN"}; failureStage=${current.failureStage ?? "NONE"}; failureCode=${current.failureCode ?? "NONE"}; nextAction=REPLAY_OWN_REQUEST_OR_WAIT_FOR_OWNER`);
+}
+
+
+function inspectionContentError(metadata: any, content: any[]): string | null {
+  for (const key of ["canonicalImage", "mobile390Image"]) {
+    const declared = metadata?.[key];
+    const block = declared && content[declared.contentIndex];
+    if (!declared || !Number.isInteger(declared.contentIndex) ||
+        declared.contentIndex !== (key === "canonicalImage" ? 1 : 2) ||
+        block?.type !== "image" || block.mimeType !== "image/png" ||
+        typeof block.data !== "string" || block.data.length < 32 ||
+        !block.data.startsWith("iVBORw0KGgo") ||
+        declared.derivedFromSha256 !== metadata.sha256) {
+      return "INSPECTION_IMAGE_BLOCK_MISSING";
+    }
+  }
+  return null;
+}
+function inspectionError(id: unknown, metadata: any) {
+  return json({ jsonrpc: "2.0", id, result: { isError: true,
+    structuredContent: metadata, content: [{ type: "text", text: JSON.stringify(metadata) }] } });
 }
