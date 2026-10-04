@@ -725,6 +725,8 @@ Deno.serve(async (req) => {
       result.recoverableStaging = recovery;
       result.stagingSha ??= recovery?.sha256 ?? null;
       result.stagingApproved = !!image.staging_asset;
+      const { nativeGenerationContext } = await import("./generation.ts");
+      result.nativeGenerationContext = nativeGenerationContext(image.pipeline_image_id, image.generation_contract_hash, image.generation_contract ?? {});
       result.nextAction = recovery && !image.staging_asset ? "INSPECT_EXISTING_STAGED_JOB" : "FOLLOW_TASK_STATUS";
     } else if (name === "get_visual_maintenance_status") {
       result = await rpc("content_pipeline_staging_maintenance_status_v1", {});
@@ -753,12 +755,22 @@ Deno.serve(async (req) => {
           p_request_id: a.requestId,
           p_pipeline_image_id: a.pipelineImageId ?? null,
         });
+        if (result?.claim) {
+          const { nativeGenerationContext } = await import("./generation.ts");
+          result.nativeGenerationContext = nativeGenerationContext(result.claim.pipelineImageId, result.claim.generationContractHash, result.claim.generationContract ?? {});
+        }
       } else {
         const current = await rpc(
           "content_pipeline_visual_claim_request_status_v1",
           { p_worker_key: worker, p_request_id: a.requestId },
         );
-        if (name === "get_visual_claim_result") result = current;
+        if (name === "get_visual_claim_result") {
+          result = current;
+          if (current.claim) {
+            const { nativeGenerationContext } = await import("./generation.ts");
+            result.nativeGenerationContext = nativeGenerationContext(current.claim.pipelineImageId, current.claim.generationContractHash, current.claim.generationContract ?? {});
+          }
+        }
         else if (name === "check_visual_source_usage") {
           if (!current.claim) throw Error("VISUAL_CLAIM_RECEIPT_REQUIRED");
           result = await sourceUsage(
@@ -908,12 +920,15 @@ Deno.serve(async (req) => {
               mobilePreview: "DERIVED_390PX_NOT_CANONICAL",
               canonicalPath: r.path,
               inspectionAccess: await inspectionAccess(r, current.claim),
-              nextAction: "INSPECT_IMAGE_CONTENT_OR_DOWNLOAD_CANONICAL_AND_DERIVE_390PX",
+              canonicalImage: { contentIndex: 1, mimeType: "image/png", width: r.width, height: r.height, derivedFromSha256: r.sha256, transform: "LOSSLESS_DECODE_NO_RESIZE" },
+              mobile390Image: { contentIndex: 2, mimeType: "image/png", width: 390, height: Math.max(1, Math.round(r.height * 390 / r.width)), derivedFromSha256: r.sha256 },
+              nextAction: "VIEW_BOTH_IMAGE_CONTENT_BLOCKS_THEN_PERFORM_SEMANTIC_AND_MOBILE_QA",
+              clientRenderingInstruction: "Forward each MCP image block to the model (functions.exec: image(block)). Metadata/decode PASS is not semantic QA. If pixels remain unavailable, preserve this job/SHA and resume inspection; do not regenerate.",
             };
             images = [{
               type: "image",
-              data: encodeBase64(bytes),
-              mimeType: "image/webp",
+              data: encodeBase64(proof.canonical),
+              mimeType: "image/png",
             }, {
               type: "image",
               data: encodeBase64(proof.mobile),

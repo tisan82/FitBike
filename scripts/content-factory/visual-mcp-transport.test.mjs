@@ -13,8 +13,8 @@ function harness({email="operator@example.org",confirmed=true,configured=true,ac
  const context={sourceUrl:value=>{const u=new URL(String(value));if(u.protocol!=="https:")throw Error("SOURCE_URL_UNSAFE");return u;},Date,createClient:()=>sb,Deno:{env:{get:key=>key==="CONTENT_FACTORY_MCP_OPERATOR_EMAILS"?(configured?"operator@example.org":""):"https://example.supabase.co"},serve:fn=>{handler=fn;}},Request,Response,Blob,URL,TextEncoder,Uint8Array,Array,Number,JSON,String,Error,btoa};
  const generation=readFileSync(new URL("../../supabase/functions/content-pipeline-visual-mcp/generation.ts",import.meta.url),"utf8").replace(/^import .*;$/gm,"").replace(/export /g,"");
  vm.runInNewContext(ts.transpile(generation,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),context);
- context.loadInspection=async()=>({inspectPixels:async()=>({metadata:{sha256:"a".repeat(64),decode:"PASS"},mobile:new Uint8Array(10)})});
- context.loadGeneration=async()=>({validateGenerationSpec:context.validateGenerationSpec,generationCapabilities:context.generationCapabilities});
+ context.loadInspection=async()=>({inspectPixels:async()=>({metadata:{sha256:"a".repeat(64),decode:"PASS"},canonical:new Uint8Array(12),mobile:new Uint8Array(10)})});
+ context.loadGeneration=async()=>({validateGenerationSpec:context.validateGenerationSpec,generationCapabilities:context.generationCapabilities,nativeGenerationContext:context.nativeGenerationContext});
  vm.runInNewContext(ts.transpile(source,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),context);
  return {calls,send:async(method="tools/list",args={},name,token="valid",body)=>handler(new Request("https://example.supabase.co/functions/v1/content-pipeline-visual-mcp",{method:"POST",headers:{"content-type":"application/json",...(token?{authorization:`Bearer ${token}`}:{})},body:body??JSON.stringify({jsonrpc:"2.0",id:1,method,params:{name,arguments:args}})}))};
 }
@@ -77,6 +77,8 @@ test("inspection keeps image content and a fresh verified-path download fallback
  assert.equal(b.result.isError,undefined);
  assert.equal(b.result.content.filter(c=>c.type==="image").length,2);
  assert.equal(b.result.structuredContent.semanticQa,"NOT_EVALUATED");
+ assert.deepEqual(b.result.content.filter(c=>c.type==="image").map(c=>c.mimeType),["image/png","image/png"]);
+ assert.equal(b.result.structuredContent.canonicalImage.derivedFromSha256,"a".repeat(64));
  assert.equal(b.result.structuredContent.inspectionAccess.available,true);
  assert.equal(b.result.structuredContent.inspectionAccess.expectedSha,"a".repeat(64));
  assert.equal(b.result.structuredContent.inspectionAccess.mobileWidth,390);
@@ -103,4 +105,20 @@ test("a non-owning receipt cannot dispatch or close another execution",async()=>
  assert.match(b.result.content[0].text,/CLAIM_NOT_OWNED/);
  await h.send("tools/call",{requestId:REQUEST,status:"RETRY",stage:"CLAIM",code:"CLOSED",error:"not owned"},"fail_visual_image");
  assert.equal(h.calls.some(c=>c.name.includes("dispatch")||c.name.includes("fail_visual_request")),false);
+});
+test("task-specific native context includes only current Contract and truthful operator retry policy",async()=>{
+ const h=harness();const b=await(await h.send("tools/call",{requestId:REQUEST},"get_visual_claim_result")).json();
+ const p=b.result.structuredContent.nativeGenerationContext;
+ assert.equal(p.pipelineImageId,2000);assert.equal(p.generationContractHash,"contract");
+ assert.equal(p.inheritPreviousImage,false);assert.equal(p.serverVisionQaSupported,false);
+ assert.equal(p.qa.maxAttempts,3);assert.equal(p.qa.status,"NOT_EVALUATED");
+ assert.equal(p.referenceImages.length,0);assert.match(p.prompt,/CURRENT TASK ONLY/);
+});
+test("native packet has no retained context from another task",()=>{
+ const generation=readFileSync(new URL("../../supabase/functions/content-pipeline-visual-mcp/generation.ts",import.meta.url),"utf8").replace(/^import .*;$/gm,"").replace(/export /g,"");
+ const c={JSON,Array};vm.runInNewContext(ts.transpile(generation,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),c);
+ const a=c.nativeGenerationContext(1,"hash-a",{must_show:["oil warning dashboard"]});
+ const b=c.nativeGenerationContext(2,"hash-b",{must_show:["right handlebar starter button"]});
+ assert.match(a.prompt,/oil warning dashboard/);assert.doesNotMatch(b.prompt,/oil warning dashboard|hash-a/);
+ assert.match(b.prompt,/right handlebar starter button/);assert.equal(b.qa.mustShow.length,1);
 });

@@ -29,6 +29,7 @@ export async function inspectPixels(
     throw Error("STAGING_IDENTITY_MISMATCH");
   }
   let width = 0, height = 0;
+  let canonical = new Uint8Array();
   const mobile = ImageMagick.read(bytes, (img) => {
     width = img.width;
     height = img.height;
@@ -41,6 +42,8 @@ export async function inspectPixels(
     if (mobileHeight > 4000 || 390 * mobileHeight > 1560000) {
       throw Error("MOBILE_PREVIEW_ASPECT_RATIO_UNSUPPORTED");
     }
+    // PNG is a lossless display transport; canonical storage/SHA remain WebP.
+    canonical = img.write(MagickFormat.Png, (d) => Uint8Array.from(d));
     img.resize(390, mobileHeight);
     return img.write(MagickFormat.Png, (d) => Uint8Array.from(d));
   });
@@ -54,6 +57,7 @@ export async function inspectPixels(
       decode: "PASS",
       signature: "RIFF/WEBP",
     },
+    canonical,
     mobile,
   };
 }
