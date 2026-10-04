@@ -391,7 +391,7 @@ const tools: VisualTool[] = [
   {
     name: "claim_visual_image",
     description:
-      "Claim exactly one 3-A image. Generate one requestId per execution intent and reuse it after an interrupted response. A new request resumes this operator's existing active 3-A claim instead of claiming another image. Does not produce, upload or complete an image.",
+      "Claim exactly one 3-A image. Generate one requestId per execution intent and reuse it after an interrupted response. Only the same requestId resumes a claim. A new request returns BUSY while another execution owns an active claim; never borrow its requestId. Does not produce, upload or complete an image.",
     inputSchema: {
       type: "object",
       properties: {
@@ -721,6 +721,11 @@ Deno.serve(async (req) => {
         handoffPhase: image.handoff_phase, generationContract: image.generation_contract, generationContractHash: image.generation_contract_hash,
         claimExpiresAt: image.claim_expires_at, nextEligibleAt: image.next_eligible_at,
         stagingSha: image.staging_asset?.sha256 ?? null };
+      const recovery = await rpc("content_pipeline_visual_recovery_v1", { p_pipeline_image_id: image.pipeline_image_id });
+      result.recoverableStaging = recovery;
+      result.stagingSha ??= recovery?.sha256 ?? null;
+      result.stagingApproved = !!image.staging_asset;
+      result.nextAction = recovery && !image.staging_asset ? "INSPECT_EXISTING_STAGED_JOB" : "FOLLOW_TASK_STATUS";
     } else if (name === "get_visual_maintenance_status") {
       result = await rpc("content_pipeline_staging_maintenance_status_v1", {});
     } else if (name === "get_visual_queue_status") {
@@ -784,7 +789,7 @@ Deno.serve(async (req) => {
               p_job_id: jobs[0].job_id,
             });}
         } else if (name === "dispatch_visual_generation" || name === "open_visual_file_upload") {
-          if (!current.activeClaim) throw Error("ACTIVE_VISUAL_CLAIM_REQUIRED");
+          if (!current.activeClaim) throw inactiveClaimError(current);
           if (!uuid(a.operationId)) throw Error("INVALID_OPERATION_ID");
           const { validateGenerationSpec } = await import("./generation.ts");
           // Only official top-level fileParams can populate these internal fields.
@@ -815,7 +820,7 @@ Deno.serve(async (req) => {
             });
           }
         } else if (name === "dispatch_visual_source") {
-          if (!current.activeClaim) throw Error("ACTIVE_VISUAL_CLAIM_REQUIRED");
+          if (!current.activeClaim) throw inactiveClaimError(current);
           if (!uuid(a.operationId)) throw Error("INVALID_OPERATION_ID");
           if (!a.spec) throw Error("INVALID_SOURCE_SPEC");
           validateSpec(a.spec);
@@ -860,6 +865,9 @@ Deno.serve(async (req) => {
             result = await rpc("content_pipeline_source_stage_status_v1", {
               p_job_id: a.jobId,
             });
+            if (result?.status === "STAGED" && result.result) {
+              result.inspectionAccess = await inspectionAccess(result.result, current.claim);
+            }
           } else if (name === "inspect_visual_source") {
             if (job.status !== "STAGED" || !job.result) {
               const status = await rpc(
@@ -899,6 +907,8 @@ Deno.serve(async (req) => {
               semanticQa: "NOT_EVALUATED",
               mobilePreview: "DERIVED_390PX_NOT_CANONICAL",
               canonicalPath: r.path,
+              inspectionAccess: await inspectionAccess(r, current.claim),
+              nextAction: "INSPECT_IMAGE_CONTENT_OR_DOWNLOAD_CANONICAL_AND_DERIVE_390PX",
             };
             images = [{
               type: "image",
@@ -964,9 +974,9 @@ Deno.serve(async (req) => {
                   }; use exact flat qa fields after actual inspection`,
                 );
               }
-              await rpc("content_pipeline_approve_source_stage_v1", {
+              await rpc("content_pipeline_approve_visual_request_v1", {
                 p_job_id: a.jobId,
-                p_claim_token: current.claim.claimToken,
+                p_worker_key: worker, p_request_id: a.requestId,
                 p_expected_sha: a.expectedSha,
                 p_qa: a.qa,
               });
@@ -1000,16 +1010,9 @@ Deno.serve(async (req) => {
           ) throw Error("INVALID_FAILURE");
           if (!current.activeClaim) result = current;
           else {
-            await rpc("content_pipeline_fail_image_v1", {
-              p_pipeline_image_id: current.claim.pipelineImageId,
-              p_pipeline_image_run_id: current.claim.pipelineImageRunId,
-              p_claim_token: current.claim.claimToken,
-              p_failure_status: a.status,
-              p_failure_stage: a.stage,
-              p_failure_code: a.code,
-              p_error: a.error,
-              p_retry_action: "RESUME_LAST_SUCCESSFUL_STAGE",
-              p_metadata: { transport: "VISUAL_MCP", requestId: a.requestId },
+            await rpc("content_pipeline_fail_visual_request_v1", {
+              p_worker_key: worker, p_request_id: a.requestId,
+              p_status: a.status, p_stage: a.stage, p_code: a.code, p_error: a.error,
             });
             result = await rpc(
               "content_pipeline_visual_claim_request_status_v1",
@@ -1158,4 +1161,26 @@ function validateSpec(raw: unknown) {
       } else throw Error("UNSUPPORTED_ANNOTATION");
     }
   }
+}
+
+// A transient signed URL is a transport fallback, never a persistent asset identity.
+async function inspectionAccess(r: Record<string, unknown>, claim: { pipelineId: number; pipelineImageId: number }) {
+  const sha = r.sha256;
+  if (typeof sha !== "string" || !/^[a-f0-9]{64}$/.test(sha) ||
+      r.bucket !== "content-pipeline-staging" ||
+      r.path !== `${claim.pipelineId}/${claim.pipelineImageId}/${sha}.webp`) {
+    throw Error("STAGING_METADATA_INVALID");
+  }
+  const { data, error } = await sb.storage.from("content-pipeline-staging").createSignedUrl(String(r.path), 600);
+  if (error || !data?.signedUrl) {
+    return { available: false, failureCode: "INSPECTION_SIGNED_URL_FAILED",
+      canonicalPath: r.path, expectedSha: sha, nextAction: "RETRY_SAME_JOB_INSPECTION" };
+  }
+  return { available: true, canonicalDownloadUrl: data.signedUrl, expiresInSeconds: 600,
+    canonicalPath: r.path, expectedSha: sha, expectedBytes: r.bytes,
+    width: r.width, height: r.height, mobileWidth: 390,
+    nextAction: "DOWNLOAD_VERIFY_SHA_VIEW_PIXELS_AND_DERIVE_390PX", semanticQa: "NOT_EVALUATED" };
+}
+function inactiveClaimError(current: Record<string, unknown>) {
+  return Error(`ACTIVE_VISUAL_CLAIM_REQUIRED: result=${current.result ?? "UNKNOWN"}; status=${current.status ?? "UNKNOWN"}; failureStage=${current.failureStage ?? "NONE"}; failureCode=${current.failureCode ?? "NONE"}; nextAction=REPLAY_OWN_REQUEST_OR_WAIT_FOR_OWNER`);
 }

@@ -692,3 +692,23 @@ Dispatch is not completion: poll the same Job using the returned pollAfterSecond
 - `requestId`/`operationId`를 응답 유실 후 재사용하고 먼저 `get_visual_dispatch_result`를 조회한다. 갱신된 임시 다운로드 URL만 달라진 동일 fileId/spec은 동일 작업으로 복구한다. 작업 발생 여부를 확인하기 전 새 operation으로 Dispatch하지 않는다.
 - 기존 Job `PENDING → RUNNING → STAGED/FAILED` 후 `inspect_visual_source`로 canonical WebP·390px 픽셀을 확인하고 모바일·SEO QA를 완료한다. 명시적 증거와 expected SHA를 `approve_visual_source`에 전달한다. `READY_FOR_UPLOAD`와 Claim 해제 재조회만 3-A 완료다. 서버/fixture 테스트나 Work 실행은 일반 채팅 end-to-end PASS의 대체물이 아니다.
 - 3-B Production 업로드·DONE과 4단계 Final QA/Publish는 별도로 유지한다. 생성 입력 보호와 Daily Staging Maintenance도 유지한다.
+
+### 3-A execution ownership and staged inspection recovery
+
+- One execution intent owns one `requestId`. Lost-response recovery replays that same ID.
+  A different ID cannot automatically borrow an active Claim, even for the same account/Worker;
+  `BUSY` means wait for the owner, not close it or copy its request ID. Closed and expired receipts
+  cannot authorize mutations. Failure and approval recheck ownership atomically on the server.
+- Before selecting a new Source, read `recoverableStaging` from the Task/Claim result. A same-contract
+  STAGED Job with existing private storage resumes from Inspection. The Job is the durable candidate
+  receipt; `staging_asset` remains reserved for QA-approved 3-B input. A non-null `stagingSha` therefore
+  does not by itself mean QA passed; check `stagingApproved` and the Task status.
+- Inspection returns image content and a fresh, short-lived `inspectionAccess.canonicalDownloadUrl`.
+  If the host omits image content, download that exact file, verify `expectedSha` and byte count, inspect
+  actual pixels, and derive the 390px mobile view from those same bytes. A signed URL is temporary
+  transport, not persistent asset identity. Requery the same Job to renew it; do not regenerate solely
+  because image content or a URL expired.
+- RETRY records include recoverable Job/SHA/path/Contract metadata and the next stage. Storage cleanup
+  continues to protect candidates referenced by unfinished Tasks. Technical decode/SHA checks do not
+  replace semantic, mobile, SEO or role crop QA. A previously approved candidate returned for production
+  correction is not advertised for reapproval unless it remains the Task's current approved asset.

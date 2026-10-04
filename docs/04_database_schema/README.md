@@ -68,3 +68,12 @@ Migration `20261002014159_reference_visual_generation.sql` adds service-only gen
 ### 2026-10-02 Native ChatGPT file input
 
 `20261002042408_native_chat_file_handoff.sql` replaces only the generation dispatch body and adds service-only `content_pipeline_native_file_identity_v1(jsonb)`. Existing image/job tables, statuses, Contract permission and preserved-input protection remain. Native file references travel through existing private Job specs; signed URLs are not input identity and are scrubbed after preservation/handled failure. No table/column or public grant is added.
+
+### 2026-10-04 Visual execution ownership and candidate recovery
+
+Migration `20261004052044_visual_execution_isolation_recovery.sql` changes no tables or columns.
+The first `29_content_pipeline_visual_claim_request` receipt for a Claim token owns the execution;
+new request IDs return BUSY and historical Resume aliases no longer authorize mutations.
+Service-only recovery, failure and approval RPCs use existing image/job/run receipts. Recovery joins
+same-contract STAGED jobs to existing private Storage objects, and excludes old approved jobs that no
+longer match `staging_asset.sourceJobId`. QA-approved staging semantics and public grants are unchanged.

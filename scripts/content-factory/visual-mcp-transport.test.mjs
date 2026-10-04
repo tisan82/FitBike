@@ -3,15 +3,17 @@ import vm from "node:vm";
 import assert from "node:assert/strict";
 import test from "node:test";
 import ts from "typescript";
-const source=readFileSync(new URL("../../supabase/functions/content-pipeline-visual-mcp/index.ts",import.meta.url),"utf8").replace(/^import .*;$/gm,"").replaceAll('await import("./generation.ts")','await loadGeneration()').replace('e instanceof Error?e.message:"VISUAL_OPERATION_FAILED"','String(e.message ?? e)');
+const source=readFileSync(new URL("../../supabase/functions/content-pipeline-visual-mcp/index.ts",import.meta.url),"utf8").replace(/^import .*;$/gm,"").replaceAll('await import("./generation.ts")','await loadGeneration()').replaceAll('await import("./inspection.ts")','await loadInspection()').replace('e instanceof Error?e.message:"VISUAL_OPERATION_FAILED"','String(e.message ?? e)');
 const REQUEST="11111111-1111-4111-8111-111111111111",JOB="22222222-2222-4222-8222-222222222222";
-function harness({email="operator@example.org",confirmed=true,configured=true,active=true,jobImage=2000,role="BODY",duplicate=false}={}){
+function harness({email="operator@example.org",confirmed=true,configured=true,active=true,jobImage=2000,role="BODY",duplicate=false,recovery=null,signedError=false,staged=false,claimResult}={}){
  let handler;const calls=[];
- const current={activeClaim:active,status:active?"PROCESSING":"RETRY",claim:{pipelineImageId:2000,pipelineId:21,pipelineImageRunId:3,claimToken:REQUEST,generationContractHash:"contract",generationContract:{asset_role:role}}};
- const sb={auth:{getUser:async token=>token==="valid"?{data:{user:{id:"user",email,email_confirmed_at:confirmed?"now":null}},error:null}:{data:{user:null},error:{message:"bad"}}},rpc:async(name,args)=>{calls.push({name,args});if(name==="content_pipeline_reference_generation_allowed_v1")return {data:true,error:null};if(name.includes("request_status"))return {data:current,error:null};if(name.includes("approve_source_stage")){current.status="READY_FOR_UPLOAD";return {data:{},error:null};}if(name.includes("fail_image")){current.activeClaim=false;current.status=args.p_failure_status;return {data:{},error:null};}return{data:{jobId:JOB},error:null};},from:()=>({select:()=>({in:()=>({neq:()=>({eq:()=>({limit:async()=>({data:duplicate?[{pipeline_image_id:2003,status:"DONE"}]:[],error:null})})})}),eq:()=>({maybeSingle:async()=>({data:{pipeline_image_id:jobImage,contract_hash:"contract",status:"STAGED",result:{}}}),single:async()=>({data:{status:current.status,handoff_phase:current.status==="READY_FOR_UPLOAD"?"READY_FOR_UPLOAD":"PRODUCING",staging_asset:current.status==="READY_FOR_UPLOAD"?{sha256:"a".repeat(64)}:null},error:null})})})})};
- const context={sourceUrl:value=>{const u=new URL(String(value));if(u.protocol!=="https:")throw Error("SOURCE_URL_UNSAFE");return u;},Date,createClient:()=>sb,Deno:{env:{get:key=>key==="CONTENT_FACTORY_MCP_OPERATOR_EMAILS"?(configured?"operator@example.org":""):"https://example.supabase.co"},serve:fn=>{handler=fn;}},Request,Response,URL,TextEncoder,Uint8Array,Array,Number,JSON,String,Error,btoa};
+ const current={result:claimResult??(active?"CLAIMED":"CLOSED"),failureCode:"MUST_SHOW_MISMATCH",activeClaim:active,status:active?"PROCESSING":"RETRY",claim:{pipelineImageId:2000,pipelineId:21,pipelineImageRunId:3,claimToken:REQUEST,generationContractHash:"contract",generationContract:{asset_role:role}}};
+ const stagedResult={sha256:"a".repeat(64),bucket:"content-pipeline-staging",path:"21/2000/"+"a".repeat(64)+".webp",bytes:12,width:1200,height:675};
+ const sb={storage:{from:()=>({download:async()=>({data:new Blob([new Uint8Array(12)],{type:"image/webp"}),error:null}),createSignedUrl:async(path,seconds)=>{calls.push({name:"signedUrl",args:{path,seconds}});return signedError?{data:null,error:{message:"sign error"}}:{data:{signedUrl:"https://example.supabase.co/storage/signed/canonical"},error:null};}})},auth:{getUser:async token=>token==="valid"?{data:{user:{id:"user",email,email_confirmed_at:confirmed?"now":null}},error:null}:{data:{user:null},error:{message:"bad"}}},rpc:async(name,args)=>{calls.push({name,args});if(name==="content_pipeline_reference_generation_allowed_v1")return {data:true,error:null};if(name==="content_pipeline_visual_recovery_v1")return {data:recovery,error:null};if(name.includes("request_status"))return {data:current,error:null};if(name.includes("approve_visual_request")){current.status="READY_FOR_UPLOAD";return {data:{},error:null};}if(name.includes("fail_visual_request")){current.activeClaim=false;current.status=args.p_status;return {data:{},error:null};}if(name==="content_pipeline_source_stage_status_v1")return{data:{jobId:JOB,status:"STAGED",result:stagedResult},error:null};return{data:{jobId:JOB},error:null};},from:()=>({select:()=>({in:()=>({neq:()=>({eq:()=>({limit:async()=>({data:duplicate?[{pipeline_image_id:2003,status:"DONE"}]:[],error:null})})})}),eq:()=>({maybeSingle:async()=>({data:{pipeline_image_id:jobImage,pipeline_id:21,image_id:"IMG_01",generation_contract:{},generation_contract_hash:"contract",contract_hash:"contract",staging_asset:null,status:"STAGED",result:staged?stagedResult:{}}}),single:async()=>({data:{status:current.status,handoff_phase:current.status==="READY_FOR_UPLOAD"?"READY_FOR_UPLOAD":"PRODUCING",staging_asset:current.status==="READY_FOR_UPLOAD"?{sha256:"a".repeat(64)}:null},error:null})})})})};
+ const context={sourceUrl:value=>{const u=new URL(String(value));if(u.protocol!=="https:")throw Error("SOURCE_URL_UNSAFE");return u;},Date,createClient:()=>sb,Deno:{env:{get:key=>key==="CONTENT_FACTORY_MCP_OPERATOR_EMAILS"?(configured?"operator@example.org":""):"https://example.supabase.co"},serve:fn=>{handler=fn;}},Request,Response,Blob,URL,TextEncoder,Uint8Array,Array,Number,JSON,String,Error,btoa};
  const generation=readFileSync(new URL("../../supabase/functions/content-pipeline-visual-mcp/generation.ts",import.meta.url),"utf8").replace(/^import .*;$/gm,"").replace(/export /g,"");
  vm.runInNewContext(ts.transpile(generation,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),context);
+ context.loadInspection=async()=>({inspectPixels:async()=>({metadata:{sha256:"a".repeat(64),decode:"PASS"},mobile:new Uint8Array(10)})});
  context.loadGeneration=async()=>({validateGenerationSpec:context.validateGenerationSpec,generationCapabilities:context.generationCapabilities});
  vm.runInNewContext(ts.transpile(source,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),context);
  return {calls,send:async(method="tools/list",args={},name,token="valid",body)=>handler(new Request("https://example.supabase.co/functions/v1/content-pipeline-visual-mcp",{method:"POST",headers:{"content-type":"application/json",...(token?{authorization:`Bearer ${token}`}:{})},body:body??JSON.stringify({jsonrpc:"2.0",id:1,method,params:{name,arguments:args}})}))};
@@ -27,8 +29,8 @@ test("closed claim cannot authorize source dispatch",async()=>{const h=harness({
 
 const baseQa={contractHash:"contract",imageQa:"PASS",mobileQa:"PASS",imageSeoQa:"PASS"};
 test("approval schema exposes exact role QA fields without prohibiting evidence",async()=>{const b=await(await harness().send()).json();const q=b.result.tools.find(t=>t.name==="approve_visual_source").inputSchema.properties.qa;assert.deepEqual(q.required,Object.keys(baseQa));for(const k of ["representativeImageQa","cardCropQa","heroCropQa"])assert.deepEqual(q.properties[k].enum,["PASS"]);assert.equal(q.additionalProperties,true);});
-test("role approval reports every missing field before mutation",async()=>{for(const [role,missing] of [["BODY",[]],["THUMBNAIL",["representativeImageQa","cardCropQa"]],["HERO",["representativeImageQa","heroCropQa"]],["THUMBNAIL_HERO",["representativeImageQa","cardCropQa","heroCropQa"]]]){const h=harness({role});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB,expectedSha:"a".repeat(64),qa:{...baseQa,representative:{status:"PASS"}}},"approve_visual_source")).json();if(missing.length){assert.equal(b.result.isError,true);for(const k of missing)assert.ok(b.result.content[0].text.includes(k));assert.equal(h.calls.some(c=>c.name.includes("approve_source_stage")),false);}else assert.equal(b.result.structuredContent.status,"READY_FOR_UPLOAD");}});
-test("hero approval forwards inspected QA and evidence unchanged; rejects mismatch and non-PASS",async()=>{const qa={...baseQa,representativeImageQa:"PASS",cardCropQa:"PASS",heroCropQa:"PASS",evidence:"inspected service crops"};const h=harness({role:"THUMBNAIL_HERO"});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB,expectedSha:"a".repeat(64),qa},"approve_visual_source")).json();assert.equal(b.result.structuredContent.status,"READY_FOR_UPLOAD");assert.deepEqual(h.calls.find(c=>c.name.includes("approve_source_stage")).args.p_qa,qa);for(const change of [{contractHash:"other"},{heroCropQa:"FAIL"}]){const x=harness({role:"THUMBNAIL_HERO"});const bad=await(await x.send("tools/call",{requestId:REQUEST,jobId:JOB,expectedSha:"a".repeat(64),qa:{...qa,...change}},"approve_visual_source")).json();assert.equal(bad.result.isError,true);assert.equal(x.calls.some(c=>c.name.includes("approve_source_stage")),false);}});
+test("role approval reports every missing field before mutation",async()=>{for(const [role,missing] of [["BODY",[]],["THUMBNAIL",["representativeImageQa","cardCropQa"]],["HERO",["representativeImageQa","heroCropQa"]],["THUMBNAIL_HERO",["representativeImageQa","cardCropQa","heroCropQa"]]]){const h=harness({role});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB,expectedSha:"a".repeat(64),qa:{...baseQa,representative:{status:"PASS"}}},"approve_visual_source")).json();if(missing.length){assert.equal(b.result.isError,true);for(const k of missing)assert.ok(b.result.content[0].text.includes(k));assert.equal(h.calls.some(c=>c.name.includes("approve_visual_request")),false);}else assert.equal(b.result.structuredContent.status,"READY_FOR_UPLOAD");}});
+test("hero approval forwards inspected QA and evidence unchanged; rejects mismatch and non-PASS",async()=>{const qa={...baseQa,representativeImageQa:"PASS",cardCropQa:"PASS",heroCropQa:"PASS",evidence:"inspected service crops"};const h=harness({role:"THUMBNAIL_HERO"});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB,expectedSha:"a".repeat(64),qa},"approve_visual_source")).json();assert.equal(b.result.structuredContent.status,"READY_FOR_UPLOAD");assert.deepEqual(h.calls.find(c=>c.name.includes("approve_visual_request")).args.p_qa,qa);for(const change of [{contractHash:"other"},{heroCropQa:"FAIL"}]){const x=harness({role:"THUMBNAIL_HERO"});const bad=await(await x.send("tools/call",{requestId:REQUEST,jobId:JOB,expectedSha:"a".repeat(64),qa:{...qa,...change}},"approve_visual_source")).json();assert.equal(bad.result.isError,true);assert.equal(x.calls.some(c=>c.name.includes("approve_visual_request")),false);}});
 
 test("source usage is readonly and duplicate dispatch stops before creating a job",async()=>{const args={requestId:REQUEST,sourceAssetUrl:"https://photos.example.org/image.jpg"};for(const duplicate of [false,true]){const h=harness({duplicate});const b=await(await h.send("tools/call",args,"check_visual_source_usage")).json();assert.equal(b.result.structuredContent.result,duplicate?"DUPLICATE":"NO_KNOWN_DUPLICATE");assert.equal(b.result.structuredContent.identityScope,"EXACT_URL_ONLY");assert.equal(h.calls.length,1);}const h=harness({duplicate:true});const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{sourceAssetUrl:args.sourceAssetUrl,sourcePageUrl:"https://photos.example.org/page",sourceOwner:"Manufacturer",transform:{}}},"dispatch_visual_source")).json();assert.equal(b.result.isError,true);assert.match(b.result.content[0].text,/DUPLICATE_SOURCE_PREFLIGHT/);assert.equal(h.calls.some(c=>c.name.includes("dispatch")),false);});
 
@@ -58,4 +60,47 @@ test("invalid Korean labels fail before creating a source job",async()=>{
  const h=harness();const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{sourceAssetUrl:"https://photos.example.org/image.jpg",sourcePageUrl:"https://photos.example.org/page",sourceOwner:"Manufacturer",transform:{annotations:[{type:"label",text:"배터리",x:.1,y:.1,...extra}]}}},"dispatch_visual_source")).json();
  assert.equal(b.result.isError,true);assert.equal(h.calls.some(c=>c.name.includes("dispatch")),false);
  }
+});
+
+
+test("task read exposes the preserved same-contract candidate without promoting QA",async()=>{
+ const recovery={jobId:JOB,sha256:"a".repeat(64),canonicalPath:"21/2000/canonical.webp",resumeFrom:"INSPECTION"};
+ const h=harness({recovery});const b=await(await h.send("tools/call",{pipelineImageId:2000},"get_visual_image_task")).json();
+ assert.equal(b.result.structuredContent.stagingSha,recovery.sha256);
+ assert.equal(b.result.structuredContent.stagingApproved,false);
+ assert.equal(b.result.structuredContent.recoverableStaging.jobId,JOB);
+ assert.equal(b.result.structuredContent.nextAction,"INSPECT_EXISTING_STAGED_JOB");
+ assert.equal(h.calls.some(c=>c.name.includes("claim_visual")||c.name.includes("dispatch")),false);
+});
+test("inspection keeps image content and a fresh verified-path download fallback",async()=>{
+ const h=harness({staged:true});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB},"inspect_visual_source")).json();
+ assert.equal(b.result.isError,undefined);
+ assert.equal(b.result.content.filter(c=>c.type==="image").length,2);
+ assert.equal(b.result.structuredContent.semanticQa,"NOT_EVALUATED");
+ assert.equal(b.result.structuredContent.inspectionAccess.available,true);
+ assert.equal(b.result.structuredContent.inspectionAccess.expectedSha,"a".repeat(64));
+ assert.equal(b.result.structuredContent.inspectionAccess.mobileWidth,390);
+ assert.equal(h.calls.find(c=>c.name==="signedUrl").args.seconds,600);
+});
+test("source status renews expired URL; signing failure does not discard image content",async()=>{
+ const h=harness({staged:true});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB},"get_visual_source_status")).json();
+ assert.equal(b.result.structuredContent.inspectionAccess.available,true);
+ const x=harness({staged:true,signedError:true});const r=await(await x.send("tools/call",{requestId:REQUEST,jobId:JOB},"inspect_visual_source")).json();
+ assert.equal(r.result.isError,undefined);assert.equal(r.result.content.filter(c=>c.type==="image").length,2);
+ assert.equal(r.result.structuredContent.inspectionAccess.failureCode,"INSPECTION_SIGNED_URL_FAILED");
+});
+test("failure and approval use atomic request-bound server wrappers",async()=>{
+ const h=harness();await h.send("tools/call",{requestId:REQUEST,status:"RETRY",stage:"INSPECTION",code:"NO_PIXELS",error:"pixels unavailable"},"fail_visual_image");
+ const f=h.calls.find(c=>c.name==="content_pipeline_fail_visual_request_v1");
+ assert.equal(f.args.p_request_id,REQUEST);assert.equal(f.args.p_worker_key,"mcp-3a-user");
+ assert.equal(h.calls.some(c=>c.name==="content_pipeline_fail_image_v1"),false);
+ const x=harness();await x.send("tools/call",{requestId:REQUEST,jobId:JOB,expectedSha:"a".repeat(64),qa:baseQa},"approve_visual_source");
+ const a=x.calls.find(c=>c.name==="content_pipeline_approve_visual_request_v1");
+ assert.equal(a.args.p_request_id,REQUEST);assert.equal(a.args.p_claim_token,undefined);
+});
+test("a non-owning receipt cannot dispatch or close another execution",async()=>{
+ const h=harness({active:false,claimResult:"CLAIM_NOT_OWNED"});const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:generationSpec,file:nativeFile},"dispatch_visual_generation")).json();
+ assert.match(b.result.content[0].text,/CLAIM_NOT_OWNED/);
+ await h.send("tools/call",{requestId:REQUEST,status:"RETRY",stage:"CLAIM",code:"CLOSED",error:"not owned"},"fail_visual_image");
+ assert.equal(h.calls.some(c=>c.name.includes("dispatch")||c.name.includes("fail_visual_request")),false);
 });
