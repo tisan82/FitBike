@@ -108,6 +108,8 @@ const tools: VisualTool[] = [
         spec: {
           type: "object",
           properties: {
+            preflightOnly: { type: "boolean", description: "True: unannotated candidate preview only; inspect pixels before production." },
+            preStagingQa: { type: "object", description: "Current task/Contract/source Job+SHA pixel attestation. Required for production. Get exact fields from get_visual_image_task.preStagingProtocol.", additionalProperties: true },
             productionMethod: {
               enum: ["REFERENCE_BASED_GENERATION", "REAL_SOURCE_AI_EDIT"],
             },
@@ -234,6 +236,8 @@ const tools: VisualTool[] = [
         spec: {
           type: "object",
           properties: {
+            preflightOnly: { type: "boolean", description: "True: unannotated candidate preview only; inspect pixels before production." },
+            preStagingQa: { type: "object", description: "Current task/Contract/source Job+SHA pixel attestation. Required for production. Get exact fields from get_visual_image_task.preStagingProtocol.", additionalProperties: true },
             sourceAssetUrl: { type: "string" },
             sourcePageUrl: { type: "string" },
             sourceOwner: { type: "string" },
@@ -279,6 +283,23 @@ const tools: VisualTool[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
+  },
+  {
+    name: "record_visual_source_qa",
+    description: "Record actual pixel QA for a preflight candidate, bound to the current Task/Contract/source Job+SHA. Never approves or closes the Claim. Supply exact Contract strings in checks. Server validates attestation identity, not automated Vision.",
+    inputSchema: { type:"object", additionalProperties:false,
+      properties: {requestId:{type:"string",format:"uuid"},jobId:{type:"string",format:"uuid"},expectedSha:{type:"string",pattern:"^[a-f0-9]{64}$"},preStagingQa:{type:"object",additionalProperties:true}},
+      required:["requestId","jobId","expectedSha","preStagingQa"] },
+    annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false},
+  },
+  {
+    name: "reject_visual_source",
+    description: "Invalidate an actually inspected same-contract staged Job/SHA with semantic FAIL. Preserves bytes and history; keeps this Claim active for source replacement. Never use for unviewable pixels or technical delivery failures.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: { requestId: {type:"string",format:"uuid"}, jobId: {type:"string",format:"uuid"}, expectedSha: {type:"string",pattern:"^[a-f0-9]{64}$"},
+        reason: {type:"string",enum:["MUST_SHOW_MISMATCH","MUST_NOT_SHOW_VIOLATION","ANNOTATION_TARGET_MISMATCH","SOURCE_MISMATCH"]}, evidence: {type:"string",minLength:10,maxLength:2000} },
+      required: ["requestId","jobId","expectedSha","reason","evidence"] },
+    annotations: {readOnlyHint:false,destructiveHint:false,openWorldHint:false,idempotentHint:true},
   },
   {
     name: "get_visual_source_status",
@@ -713,7 +734,7 @@ Deno.serve(async (req) => {
       result = generationCapabilities();
     } else if (name === "get_visual_image_task") {
       if (!Number.isSafeInteger(a.pipelineImageId) || a.pipelineImageId! < 1) throw Error("INVALID_IMAGE_ID");
-      const read = await sb.from("21_content_pipeline_image").select("pipeline_image_id,pipeline_id,image_id,status,handoff_phase,generation_contract,generation_contract_hash,claim_expires_at,next_eligible_at,staging_asset").eq("pipeline_image_id", a.pipelineImageId).maybeSingle();
+      const read = await sb.from("21_content_pipeline_image").select("pipeline_image_id,pipeline_id,image_id,status,handoff_phase,generation_contract,generation_contract_hash,claim_expires_at,next_eligible_at,staging_asset,retry_action").eq("pipeline_image_id", a.pipelineImageId).maybeSingle();
       if (read.error || !read.data) throw Error("IMAGE_TASK_NOT_FOUND");
       const image = read.data;
       // Avoid exposing private storage URLs or another worker's token.
@@ -725,9 +746,14 @@ Deno.serve(async (req) => {
       result.recoverableStaging = recovery;
       result.stagingSha ??= recovery?.sha256 ?? null;
       result.stagingApproved = !!image.staging_asset;
+      result.preStagingProtocol = { phase1: "dispatch with spec.preflightOnly=true and no annotations; poll and inspect actual PNGs", phase2: "dispatch production with preStagingQa, same original source/PDF page or generation resumeJobId; final pixel QA still mandatory",
+        qaFields: ["pipelineImageId","contractHash","sourceJobId","sourceSha256","pixelsInspected=true","status=PASS","evidence","mustShowChecks","mustNotShowChecks","inspectionTargetVerified=true","annotationTargetChecks"],
+        checkKeys: "Use exact current Contract strings as keys, each inspected result PASS. SHA is preview result.preStagingSourceSha256 (inspection.sourceSha256), not provenance/source-original SHA.", evaluator:"OPERATOR_PIXEL_ATTESTATION", serverVisionSupported:false,
+        rejection: "reject_visual_source after actual semantic FAIL; preserves Claim",
+        schemaRefreshRequired: "Discover record_visual_source_qa and reject_visual_source before production. Missing attestation results in an unannotated preview only. Record actual QA, then dispatch same source with NEW operationId (native resumeJobId). Never send fake final-QA PASS to record preliminary checks.", };
       const { nativeGenerationContext } = await import("./generation.ts");
       result.nativeGenerationContext = nativeGenerationContext(image.pipeline_image_id, image.generation_contract_hash, image.generation_contract ?? {});
-      result.nextAction = recovery && !image.staging_asset ? "INSPECT_EXISTING_STAGED_JOB" : "FOLLOW_TASK_STATUS";
+      result.nextAction = recovery && !image.staging_asset ? "INSPECT_EXISTING_STAGED_JOB" : image.retry_action === "SOURCE_SELECTION" ? "SELECT_NEW_SOURCE" : "FOLLOW_TASK_STATUS";
     } else if (name === "get_visual_maintenance_status") {
       result = await rpc("content_pipeline_staging_maintenance_status_v1", {});
     } else if (name === "get_visual_queue_status") {
@@ -770,6 +796,12 @@ Deno.serve(async (req) => {
             const { nativeGenerationContext } = await import("./generation.ts");
             result.nativeGenerationContext = nativeGenerationContext(current.claim.pipelineImageId, current.claim.generationContractHash, current.claim.generationContract ?? {});
           }
+        }
+        else if (name === "record_visual_source_qa") {
+          result = await rpc("content_pipeline_register_pre_staging_qa_v1", {p_worker_key:worker,p_request_id:a.requestId,p_job_id:a.jobId,p_expected_sha:a.expectedSha,p_qa:a.preStagingQa});
+        }
+        else if (name === "reject_visual_source") {
+          result = await rpc("content_pipeline_reject_visual_source_v1", {p_worker_key:worker,p_request_id:a.requestId,p_job_id:a.jobId,p_expected_sha:a.expectedSha,p_reason:a.reason,p_evidence:a.evidence});
         }
         else if (name === "check_visual_source_usage") {
           if (!current.claim) throw Error("VISUAL_CLAIM_RECEIPT_REQUIRED");
@@ -945,6 +977,7 @@ Deno.serve(async (req) => {
             const proof = await inspectPixels(bytes, r);
             result = {
               jobId: a.jobId,
+              sourceSha256: r.preStagingSourceSha256 ?? r.provenance?.sourceSha256 ?? null,
               ...proof.metadata,
               technicalVerification: "PASS",
               technicalQa: "PASS",
@@ -954,6 +987,8 @@ Deno.serve(async (req) => {
               clientPixelDelivery: "UNVERIFIED_REQUIRES_RENDERING",
               mobileQa: "NOT_EVALUATED",
               semanticQa: "NOT_EVALUATED",
+              preflightOnly: job.result.preflightOnly === true,
+              preStagingNextAction: job.result.preflightOnly ? "VIEW_PIXELS_THEN_RECORD_VISUAL_SOURCE_QA_OR_REJECT_VISUAL_SOURCE" : "FINAL_PIXEL_QA",
               mobilePreview: "DERIVED_390PX_NOT_CANONICAL",
               canonicalPath: r.path,
               inspectionAccess: await inspectionAccess(r, current.claim),
@@ -1129,6 +1164,8 @@ function validateSpec(raw: unknown) {
         "sourceOwner",
         "sourcePdfPage",
         "composition",
+        "preflightOnly",
+        "preStagingQa",
         "transform",
       ].includes(k)
     )

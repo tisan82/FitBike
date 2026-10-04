@@ -20,7 +20,7 @@ function harness({email="operator@example.org",confirmed=true,configured=true,ac
 }
 test("authentication blocks anonymous, invalid, unconfigured and unapproved users",async()=>{for(const [options,token,status] of [[{},"",401],[{},"bad",401],[{configured:false},"valid",503],[{email:"other@example.org"},"valid",403],[{confirmed:false},"valid",403]]){const h=harness(options);assert.equal((await h.send("ping",{},null,token)).status,status);assert.equal(h.calls.length,0);}});
 test("null and arrays are rejected before JSON-RPC access",async()=>{for(const body of ["null","[]"]){assert.equal((await harness().send("ping",{},null,"valid",body)).status,400);}});
-test("tool list includes the complete 3-A boundaries with truthful annotations",async()=>{const b=await(await harness().send()).json();assert.equal(b.result.tools.length,15);assert.equal(b.result.tools.find(t=>t.name==="inspect_visual_source").annotations.readOnlyHint,true);assert.equal(b.result.tools.find(t=>t.name==="dispatch_visual_source").annotations.openWorldHint,true);});
+test("tool list includes the complete 3-A boundaries with truthful annotations",async()=>{const b=await(await harness().send()).json();assert.equal(b.result.tools.length,17);assert.equal(b.result.tools.find(t=>t.name==="inspect_visual_source").annotations.readOnlyHint,true);assert.equal(b.result.tools.find(t=>t.name==="dispatch_visual_source").annotations.openWorldHint,true);});
 test("valid source delegates only bounded named dispatch with server-owned worker",async()=>{const h=harness();const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{sourceAssetUrl:"https://photos.example.org/image.jpg",sourcePageUrl:"https://photos.example.org/page",sourceOwner:"Manufacturer",transform:{maxWidth:780,annotations:[{type:"circle",x:.5,y:.5,radius:.1}]}}},"dispatch_visual_source")).json();assert.equal(b.result.isError,undefined);const call=h.calls.at(-1);assert.equal(call.name,"content_pipeline_dispatch_visual_source_request_v1");assert.equal(call.args.p_worker_key,"mcp-3a-user");});
 test("invalid transform/rights fields and inactive claim never dispatch",async()=>{for(const [options,extra] of [[{}, {circle:{x:.5,y:.5,radius:.1}}],[{active:false},{}]]){const h=harness(options);const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{sourceAssetUrl:"https://photos.example.org/image.jpg",sourcePageUrl:"https://photos.example.org/page",sourceOwner:"Manufacturer",transform:extra}},"dispatch_visual_source")).json();assert.equal(b.result.isError,true);assert.equal(h.calls.some(c=>c.name.includes("dispatch")),false);}});
 test("cross-image inspection is rejected before storage download",async()=>{const h=harness({jobImage:2001});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB},"inspect_visual_source")).json();assert.equal(b.result.isError,true);assert.match(b.result.content[0].text,/ACCESS_DENIED/);});
@@ -144,4 +144,19 @@ test("Storage read failure uses bounded same-asset fallback without source dispa
  assert.equal(b.result.isError,undefined);assert.equal(b.result.structuredContent.readbackTransport,"STORAGE_INTERNAL_RETRY");
  assert.equal(b.result.content.filter(c=>c.type==="image").length,2);
  assert.equal(h.calls.some(c=>c.name.includes("dispatch")),false);
+});
+
+test("semantic rejection delegates exact Job/SHA without closing Claim",async()=>{
+ const h=harness();const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB,expectedSha:"a".repeat(64),reason:"SOURCE_MISMATCH",evidence:"Actual pixels show handlebar controls, not engine underside."},"reject_visual_source")).json();
+ assert.equal(b.result.isError,undefined);assert.equal(h.calls.at(-1).name,"content_pipeline_reject_visual_source_v1");
+ assert.equal(h.calls.some(c=>c.name.includes("fail_visual")),false);
+});
+test("source spec accepts task-bound pixel gate and unannotated preflight",async()=>{
+ const h=harness();const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{sourceAssetUrl:"https://photos.example.org/image.jpg",sourcePageUrl:"https://photos.example.org/page",sourceOwner:"Manufacturer",preflightOnly:true,transform:{maxWidth:1200}}},"dispatch_visual_source")).json();
+ assert.equal(b.result.isError,undefined);assert.equal(h.calls.at(-1).args.p_spec.preflightOnly,true);
+});
+test("preflight QA uses dedicated tool and never invokes approval",async()=>{
+ const h=harness({staged:true});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB,expectedSha:"a".repeat(64),preStagingQa:{status:"PASS"}},"record_visual_source_qa")).json();
+ assert.equal(b.result.isError,undefined);assert.equal(h.calls.at(-1).name,"content_pipeline_register_pre_staging_qa_v1");
+ assert.equal(h.calls.some(c=>c.name.includes("approve_visual_request")),false);
 });

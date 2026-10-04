@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
       if (error) throw Error("CAPABILITY_RECEIPT_SAVE_FAILED");
       return out({ jobId, capabilities }, 200);
     }
+    if (s.preflightOnly === true && (s.transform?.annotations?.length || s.composition?.sources?.some((x: { label?: string }) => x.label))) throw Error("PREFLIGHT_ANNOTATIONS_FORBIDDEN");
     const composite = s.composition !== undefined;
     if (composite && s.productionMethod) throw Error("COMPOSITION_GENERATION_CONFLICT");
     if (composite) {
@@ -132,7 +133,10 @@ Deno.serve(async (req) => {
         generation: previous.result.generation,
       };
     } else {
-      if (composite) composed = await composeSources(s.composition, s.transform.maxWidth ?? 1170);
+      if (composite) {
+        const unannotated = { ...s.composition, sources: s.composition.sources.map((part: Record<string, unknown>) => { const copy = { ...part }; delete copy.label; return copy; }) };
+        composed = await composeSources(unannotated, s.transform.maxWidth ?? 1170);
+      }
       downloaded = composed
         ? { bytes: composed.webp, mime: "image/webp", finalUrl: null, redirects: [] }
         : generative
@@ -186,6 +190,23 @@ Deno.serve(async (req) => {
       if (error || !saved) throw Error("GENERATED_BINARY_RECEIPT_SAVE_FAILED");
     }
     const source = downloaded.bytes, mime = downloaded.mime;
+    let preStagingGate: Record<string, unknown> | null = null;
+    if (j.pipelineImageId) {
+      const { data: gate, error: gateError } = await sb.rpc("content_pipeline_pre_staging_gate_v1", {
+        p_image_id: j.pipelineImageId, p_contract_hash: j.contractHash,
+        p_spec: s, p_source_sha: await sha256(source),
+      });
+      if (gateError || !gate) throw Error(gateError?.message ?? "PRE_STAGING_VISUAL_QA_REQUIRED");
+      preStagingGate = gate;
+      if (gate.status === "PREFLIGHT_ONLY") {
+        delete transform.annotations;
+      }
+    }
+
+    if (composite && preStagingGate?.status === "PASS") {
+      const pinned = { ...s.composition, sources: s.composition.sources.map((part: Record<string, unknown>, index: number) => ({ ...part, expectedSourceSha: composed!.provenance[index].sourceSha256 })) };
+      composed = await composeSources(pinned, s.transform.maxWidth ?? 1170);
+    }
     const final = composed ?? await transformSource(
         source,
         mime,
@@ -271,7 +292,10 @@ Deno.serve(async (req) => {
       annotationApplied: Boolean(transform.annotations?.length),
       labelApplied: Boolean(composed?.recipe.sources.some(p => p.label)) || Boolean(transform.annotations?.some(a => a.type === "label")),
       stagedAt: new Date().toISOString(),
-      probeOnly: !j.pipelineImageId,
+      probeOnly: !j.pipelineImageId || (s.preflightOnly === true || preStagingGate?.status === "PREFLIGHT_ONLY"),
+      preflightOnly: s.preflightOnly === true || preStagingGate?.status === "PREFLIGHT_ONLY",
+      preStagingGate,
+      preStagingSourceSha256: await sha256(source),
     };
     // Preserve the verified candidate before the optional legacy inspection bridge.
     // A checkpoint is technical evidence only, never an approval or STAGED receipt.

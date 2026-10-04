@@ -36,6 +36,8 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
     "expectedGeneratedSha",
     "transform",
     "visualMcpOperation",
+    "preflightOnly",
+    "preStagingQa",
     "chatFile",
     "inputFile",
   ];
