@@ -148,6 +148,29 @@ export function generationCapabilities() {
 }
 
 // A task-only packet, not a claim that the host generator supports session isolation.
+// Read-only reconstruction of an existing native intake spec. Never manufactures
+// reference evidence, exports file URLs, or treats this packet as pixel QA.
+export function nativeRecoveryPacket(job: Record<string, any>, worker: string, claim: Record<string, any>) {
+  const s = job.spec, r = job.result, input = r?.generatedInput;
+  if (job.status !== "STAGED" || r?.semanticValidation?.status === "FAIL" ||
+      job.pipeline_image_id !== claim.pipelineImageId || job.contract_hash !== claim.generationContractHash ||
+      s?.visualMcpOperation?.workerKey !== worker || !input ||
+      input.bucket !== "content-pipeline-staging" || !/^[a-f0-9]{64}$/.test(input.sha256 ?? "") ||
+      input.path !== `${claim.pipelineId}/${claim.pipelineImageId}/${input.sha256}.webp`) return null;
+  const spec = {
+    productionMethod: s.productionMethod, prompt: s.prompt, references: s.references,
+    ...(s.inputAssetUrl ? { inputAssetUrl: s.inputAssetUrl } : {}),
+    resumeJobId: job.job_id, transform: s.transform, preflightOnly: true,
+  };
+  try { validateGenerationSpec(spec); } catch { return null; }
+  return {
+    spec, sourceSha256: input.sha256, canonicalSha256: r.sha256,
+    nextAction: "INSPECT_PIXELS_RECORD_SOURCE_QA_THEN_SET_PREFLIGHT_FALSE_AND_DISPATCH_NEW_OPERATION",
+    preserveExactly: ["prompt", "references", "productionMethod", "inputAssetUrl"],
+    qaStatus: "NOT_EVALUATED", generationCallObservedByServer: false,
+  };
+}
+
 export function nativeGenerationContext(pipelineImageId: number, contractHash: string, contract: Record<string, unknown>) {
   const required = Array.isArray(contract?.must_show) ? contract.must_show : [];
   const forbidden = Array.isArray(contract?.must_not_show) ? contract.must_not_show : [];
