@@ -145,7 +145,7 @@ const tools: VisualTool[] = [
             },
             inputAssetUrl: { type: "string", format: "uri" },
             generatedAssetUrl: { type: "string", format: "uri" },
-            resumeJobId: { type: "string", format: "uuid" },
+            resumeJobId: { type: "string", format: "uuid", description: "Use get_visual_source_status.nativeRecovery.spec unchanged for prompt/references/method/inputAssetUrl. Do not rewrite prompt or reference checkedAt. Inspect, record pre-Staging QA, then set preflightOnly=false with a new operationId. Source SHA is normalized input, not final output SHA." },
             expectedGeneratedSha: { type: "string", pattern: "^[a-f0-9]{64}$" },
             transform: transformSchema,
           },
@@ -412,7 +412,7 @@ const tools: VisualTool[] = [
   {
     name: "claim_visual_image",
     description:
-      "Claim exactly one 3-A image. Generate one requestId per execution intent and reuse it after an interrupted response. Only the same requestId resumes a claim. A new request returns BUSY while another execution owns an active claim; never borrow its requestId. Does not produce, upload or complete an image.",
+      "Claim exactly one 3-A image. Generate one requestId per execution intent and reuse it after an interrupted response. Only the same requestId resumes its claim. BUSY locks only the occupied image; skip it and claim the next eligible image without borrowing another execution's requestId. Does not produce, upload or complete an image.",
     inputSchema: {
       type: "object",
       properties: {
@@ -898,7 +898,7 @@ Deno.serve(async (req) => {
           const { data: job, error: jobError } = await sb.from(
             "27_content_pipeline_source_stage_job",
           ).select(
-            "job_id,pipeline_image_id,contract_hash,status,result,approved_at",
+            "job_id,pipeline_image_id,contract_hash,status,spec,result,approved_at",
           ).eq("job_id", a.jobId).maybeSingle();
           if (jobError) throw Error("SOURCE_JOB_READ_FAILED");
           if (
@@ -911,6 +911,8 @@ Deno.serve(async (req) => {
             });
             if (result?.status === "STAGED" && result.result) {
               result.inspectionAccess = await inspectionAccess(result.result, current.claim);
+              const { nativeRecoveryPacket } = await import("./generation.ts");
+              result.nativeRecovery = nativeRecoveryPacket(job, worker, current.claim);
             }
           } else if (name === "inspect_visual_source") {
             if (job.status !== "STAGED" || !job.result) {

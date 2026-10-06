@@ -689,6 +689,7 @@ Dispatch is not completion: poll the same Job using the returned pollAfterSecond
 - 수동 대기 중 Claim이 만료되면 동일 이미지의 정상 reclaim 경로를 사용한다. 오래된 화면/receipt는 다른 이미지에 파일을 전달할 수 없다. Claim 유효기간을 임의 연장하거나 SQL로 Gate를 우회하지 않는다.
 - 서버는 HTTPS/DNS/IP/redirect/MIME/signature/8MiB/8MP 제한과 실제 decode를 검증하고 WebP 변환·SHA 계산·private Staging 저장·read-back을 수행한다. 임시 파일 다운로드 URL은 모델 결과에 노출하지 않으며 완료/실패 시 Job spec에서 제거한다. fileId는 입력 identity로 보존한다.
 - PNG/JPEG 입력은 먼저 정규화한 WebP로 보존한다. `generatedInput`은 서버에서 read-back 검증한 보존본이며 원본 PNG/JPEG binary 그 자체가 아니다. 같은 이미지·Contract·Worker·제작 방식·원 prompt·references·원본 URL로만 `resumeJobId`를 사용할 수 있고 Transform만 수정 가능하다. 새 AI 수정은 별도 후보다. 첫 영속 저장 실패 시 재사용을 보장하지 않는다.
+- `get_visual_source_status.nativeRecovery`는 같은 Task/Contract/Worker의 유효한 STAGED Native Job에 대해 원 접수 spec의 복구 입력을 반환한다. 원 prompt와 references(checkedAt 포함)를 그대로 사용한다. 이는 서버가 내장 생성 호출을 관찰한 로그가 아니며 QA PASS도 아니다. 실제 픽셀 검사 후 `record_visual_source_qa`를 기록하고 `preflightOnly=false`와 새 operationId로 접수한다. 사전 QA의 sourceSha256은 `generatedInput.sha256`이며 최종 출력 sha256과 혼동하지 않는다. 복구 packet에는 파일 다운로드 URL·Claim token을 넣지 않는다.
 - `requestId`/`operationId`를 응답 유실 후 재사용하고 먼저 `get_visual_dispatch_result`를 조회한다. 갱신된 임시 다운로드 URL만 달라진 동일 fileId/spec은 동일 작업으로 복구한다. 작업 발생 여부를 확인하기 전 새 operation으로 Dispatch하지 않는다.
 - 기존 Job `PENDING → RUNNING → STAGED/FAILED` 후 `inspect_visual_source`로 canonical WebP·390px 픽셀을 확인하고 모바일·SEO QA를 완료한다. 명시적 증거와 expected SHA를 `approve_visual_source`에 전달한다. `READY_FOR_UPLOAD`와 Claim 해제 재조회만 3-A 완료다. 서버/fixture 테스트나 Work 실행은 일반 채팅 end-to-end PASS의 대체물이 아니다.
 - 3-B Production 업로드·DONE과 4단계 Final QA/Publish는 별도로 유지한다. 생성 입력 보호와 Daily Staging Maintenance도 유지한다.
@@ -697,7 +698,7 @@ Dispatch is not completion: poll the same Job using the returned pollAfterSecond
 
 - One execution intent owns one `requestId`. Lost-response recovery replays that same ID.
   A different ID cannot automatically borrow an active Claim, even for the same account/Worker;
-  `BUSY` means wait for the owner, not close it or copy its request ID. Closed and expired receipts
+  `BUSY` applies only to the occupied image: skip it and claim the next eligible image without closing it or copying its request ID. Closed and expired receipts
   cannot authorize mutations. Failure and approval recheck ownership atomically on the server.
 - Before selecting a new Source, read `recoverableStaging` from the Task/Claim result. A same-contract
   STAGED Job with existing private storage resumes from Inspection. The Job is the durable candidate

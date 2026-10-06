@@ -14,7 +14,7 @@ function harness({email="operator@example.org",confirmed=true,configured=true,ac
  const generation=readFileSync(new URL("../../supabase/functions/content-pipeline-visual-mcp/generation.ts",import.meta.url),"utf8").replace(/^import .*;$/gm,"").replace(/export /g,"");
  vm.runInNewContext(ts.transpile(generation,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),context);
  context.loadInspection=async()=>({inspectPixels:async()=>({metadata:{sha256:"a".repeat(64),decode:"PASS"},canonical:missingPixels?new Uint8Array():Uint8Array.from([137,80,78,71,13,10,26,10,...new Uint8Array(24)]),mobile:Uint8Array.from([137,80,78,71,13,10,26,10,...new Uint8Array(24)])})});
- context.loadGeneration=async()=>({validateGenerationSpec:context.validateGenerationSpec,generationCapabilities:context.generationCapabilities,nativeGenerationContext:context.nativeGenerationContext});
+ context.loadGeneration=async()=>({validateGenerationSpec:context.validateGenerationSpec,generationCapabilities:context.generationCapabilities,nativeGenerationContext:context.nativeGenerationContext,nativeRecoveryPacket:context.nativeRecoveryPacket});
  vm.runInNewContext(ts.transpile(source,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),context);
  return {calls,send:async(method="tools/list",args={},name,token="valid",body)=>handler(new Request("https://example.supabase.co/functions/v1/content-pipeline-visual-mcp",{method:"POST",headers:{"content-type":"application/json",...(token?{authorization:`Bearer ${token}`}:{})},body:body??JSON.stringify({jsonrpc:"2.0",id:1,method,params:{name,arguments:args}})}))};
 }
