@@ -135,6 +135,10 @@ export function generationCapabilities() {
     serverGenerationSupported: false,
     nativeGenerationAvailability: "CHECK_CURRENT_CHAT",
     nativeFileHandoff: true,
+    nativeAttemptAuditSupported: true,
+    nativeAttemptAuditTool: "record_visual_generation_attempt",
+    nativeAttemptAuditProvenance: "OPERATOR_REPORTED",
+    serverObservedNativeCall: false,
     splitProductionReviewSupported: true,
     splitClaimTools: ["claim_visual_production","claim_visual_review"],
     productionFinishTool: "handoff_visual_review",
@@ -190,6 +194,14 @@ export function nativeGenerationContext(pipelineImageId: number, contractHash: s
   ].join("\n");
   return {
     pipelineImageId, generationContractHash: contractHash, prompt,
+    attemptEvidenceProtocol: {
+      tool: "record_visual_generation_attempt", provenance: "OPERATOR_REPORTED", serverObservedNativeCall: false,
+      beforeCall: "Create attemptId. Save REQUEST evidence: contractHash and nativeCall with the exact intended imagegen arguments. This is intention, not proof of invocation.",
+      afterCall: "Save RESULT: actualNativeCall copied from this actual invocation, outputs with actual fileId/path, inspectedOutput, pixelsInspected, pixelQa, pixelEvidence, and intended handoff operationId. Never fill missing values by inference.",
+      afterHandoffError: "Save TRANSPORT_ERROR with the same attemptId, operationId and exact error. Do not regenerate a valid image because of transport failure.",
+      readBack: "get_visual_image_task.nativeAttemptAudit or get_visual_claim_result.nativeAttemptAudit. Missing evidence remains MISSING. Server Jobs prove server receipt only.",
+      cleanup: "Audit errors must never prevent official failure closure or recovery of an existing valid candidate.",
+    },
     inheritPreviousImage: false, inheritPreviousPrompt: false,
     isolation: "TASK_SCOPED_PROMPT_HOST_EXECUTION_REQUIRED",
     referenceImages: [], referenceSelection: "CURRENT_TASK_VERIFIED_ONLY",

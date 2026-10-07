@@ -1,0 +1,31 @@
+begin;
+do $test$
+declare i public."21_content_pipeline_image"%rowtype;w text:='audit-regression-'||extensions.gen_random_uuid();r uuid:=extensions.gen_random_uuid();a uuid:=extensions.gen_random_uuid();c jsonb;q jsonb;z jsonb;x jsonb;
+begin
+ select * into i from public."21_content_pipeline_image" where generation_contract_hash is not null and not(status='PROCESSING' and claim_expires_at>=now()) order by pipeline_image_id limit 1;
+ if not found then raise exception 'AUDIT_FIXTURE_REQUIRED';end if;
+ -- Fixture stays in this rollback transaction; no generation/dispatch/Storage mutation.
+ update public."21_content_pipeline_image" set status='PROCESSING',handoff_phase='PRODUCING',claimed_by=w,claim_token=a,claim_expires_at=now()+interval '1 hour' where pipeline_image_id=i.pipeline_image_id;
+ insert into public."29_content_pipeline_visual_claim_request"(worker_key,request_id,pipeline_image_id,response) values(w,r,i.pipeline_image_id,jsonb_build_object('pipelineImageId',i.pipeline_image_id,'generationContractHash',i.generation_contract_hash,'claimToken',a,'executionRole','PRODUCER'));
+ q:=jsonb_build_object('contractHash',i.generation_contract_hash,'nativeCall',jsonb_build_object('prompt','A realistic current motorcycle cockpit photograph.'));
+ c:=public.content_pipeline_record_native_attempt_v1(w,r,a,'REQUEST',q);
+ if c->>'recorded'<>'true' then raise exception 'REQUEST_NOT_SAVED';end if;
+ c:=public.content_pipeline_record_native_attempt_v1(w,r,a,'REQUEST',q);if c->>'replayed'<>'true' then raise exception 'REPLAY_FAILED';end if;
+ begin perform public.content_pipeline_record_native_attempt_v1(w,r,a,'REQUEST',q||'{"productionMethod":"changed"}');raise exception 'MUTATION_ALLOWED';exception when others then if sqlerrm<>'NATIVE_ATTEMPT_EVENT_IMMUTABLE' then raise;end if;end;
+ begin perform public.content_pipeline_record_native_attempt_v1('other',r,a,'REQUEST',q);raise exception 'FOREIGN_ALLOWED';exception when others then if sqlerrm<>'NATIVE_ATTEMPT_RECEIPT_REQUIRED' then raise;end if;end;
+ begin
+  update public."21_content_pipeline_image" set generation_contract_hash=repeat('0',64) where pipeline_image_id=i.pipeline_image_id;
+  perform public.content_pipeline_record_native_attempt_v1(w,r,extensions.gen_random_uuid(),'REQUEST',q);raise exception 'STALE_CONTRACT_ALLOWED';
+ exception when others then if sqlerrm<>'NATIVE_ATTEMPT_CURRENT_CONTRACT_MISMATCH' then raise;end if;end;
+ begin perform public.content_pipeline_record_native_attempt_v1(w,r,a,'RESULT',jsonb_build_object('actualNativeCall',q->'nativeCall','outputs',jsonb_build_array('{}'::jsonb),'inspectedOutput','{}'::jsonb,'pixelsInspected',true,'pixelQa','PASS','pixelEvidence','A deliberately invalid empty identity fixture.'));raise exception 'EMPTY_IDENTITY_ALLOWED';exception when others then if sqlerrm<>'INVALID_NATIVE_OUTPUT_IDENTITY' then raise;end if;end;
+ z:=jsonb_build_object('actualNativeCall',jsonb_build_object('prompt','Different bicycle scene.'),'outputs',jsonb_build_array(jsonb_build_object('fileId','file_test')),'pixelQa','PASS','pixelsInspected',true,'inspectedOutput',jsonb_build_object('fileId','file_test'),'pixelEvidence','Inspected actual original current result.');
+ begin perform public.content_pipeline_record_native_attempt_v1(w,r,a,'RESULT',z);raise exception 'MISMATCH_PASS_ALLOWED';exception when others then if sqlerrm<>'NATIVE_PIXEL_PASS_EVIDENCE_REQUIRED' then raise;end if;end;
+ update public."21_content_pipeline_image" set status='RETRY',claim_expires_at=null where pipeline_image_id=i.pipeline_image_id;
+ z:=z||'{"pixelQa":"FAIL"}';perform public.content_pipeline_record_native_attempt_v1(w,r,a,'RESULT',z);
+ x:=public.content_pipeline_native_attempt_audit_v1(w,i.pipeline_image_id,r);
+ if jsonb_array_length(x->'events')<>2 or x->>'serverObservedNativeCall'<>'false' or x->'events'->1->>'requestMatchesActualCall'<>'false' then raise exception 'AUDIT_READ_FAILED: %',x;end if;
+ if public.content_pipeline_native_attempt_audit_v1('other',i.pipeline_image_id,r)->>'coverage'<>'MISSING' then raise exception 'FOREIGN_READ_ALLOWED';end if;
+ begin perform public.content_pipeline_record_native_attempt_v1(w,r,extensions.gen_random_uuid(),'REQUEST',q);raise exception 'CLOSED_REQUEST_ALLOWED';exception when others then if sqlerrm<>'ACTIVE_VISUAL_CLAIM_REQUIRED' then raise;end if;end;
+ if has_function_privilege('authenticated','public.content_pipeline_record_native_attempt_v1(text,uuid,uuid,text,jsonb)','EXECUTE') or has_table_privilege('service_role','public."30_content_pipeline_native_attempt_event"','UPDATE') then raise exception 'AUDIT_GRANT_LEAK';end if;
+end $test$;
+rollback;

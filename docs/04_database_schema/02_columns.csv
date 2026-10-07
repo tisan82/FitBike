@@ -363,3 +363,12 @@ public,27_content_pipeline_source_stage_job,12,failure_code,text,text,null,null,
 public,27_content_pipeline_source_stage_job,13,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
 public,27_content_pipeline_source_stage_job,14,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now()
 public,27_content_pipeline_source_stage_job,15,approved_at,timestamp with time zone,timestamptz,null,null,null,YES,null
+public,30_content_pipeline_native_attempt_event,1,worker_key,text,text,null,null,null,NO,null
+public,30_content_pipeline_native_attempt_event,2,request_id,uuid,uuid,null,null,null,NO,null
+public,30_content_pipeline_native_attempt_event,3,attempt_id,uuid,uuid,null,null,null,NO,null
+public,30_content_pipeline_native_attempt_event,4,attempt_number,integer,int4,null,32,0,NO,null
+public,30_content_pipeline_native_attempt_event,5,phase,text,text,null,null,null,NO,null
+public,30_content_pipeline_native_attempt_event,6,pipeline_image_id,bigint,int8,null,64,0,NO,null
+public,30_content_pipeline_native_attempt_event,7,contract_hash,text,text,null,null,null,NO,null
+public,30_content_pipeline_native_attempt_event,8,evidence,jsonb,jsonb,null,null,null,NO,null
+public,30_content_pipeline_native_attempt_event,9,recorded_at,timestamp with time zone,timestamptz,null,null,null,NO,clock_timestamp()

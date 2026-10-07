@@ -195,3 +195,12 @@ registered pixel QA; QA registration is parent-Job-bound, approval is parent or 
 All new SQL RPCs remain service-role-only with empty search_path, no new public table grants.
 Migration: 20261007013115_visual_production_review_handoff.sql. Source-stage byte ingestion and
 existing approval gates remain authoritative; no external generation model is added.
+
+
+### Native generation attempt evidence (2026-10-07)
+
+`record_visual_generation_attempt(requestId, attemptId, phase, evidence)` appends immutable evidence to internal RLS-protected `30_content_pipeline_native_attempt_event`. UUID attemptId identifies one native call. The authenticated worker and original receipt derive the Task and Contract; callers cannot choose another owner.
+
+Before imagegen, record REQUEST with `contractHash` and `nativeCall` containing the exact intended tool arguments (prompt and only actually used reference options). After the call, record RESULT with `actualNativeCall`, `outputs` (actual fileId/path), `inspectedOutput` (an exact member of outputs), `pixelsInspected`, `pixelQa` (PASS/FAIL/NOT_INSPECTED), `pixelEvidence` and the intended handoff `operationId`. A different actual call can be recorded as FAIL; it cannot assert PASS. Record connector rejection as TRANSPORT_ERROR with `operationId` and exact `error`. Never store connector download URLs or credentials. Each phase is immutable; identical replay succeeds and changed replay fails. Maximum three REQUEST events per receipt.
+
+`get_visual_image_task.nativeAttemptAudit` returns the latest 30 events for the authenticated worker. `get_visual_claim_result.nativeAttemptAudit` restricts to that receipt. Linked `serverReceivedJobs` are read from actual Job records, not operator assertions. Native input SHA, pre-staging source SHA and canonical SHA are distinct. Missing historical evidence is MISSING, never reconstructed. REQUEST is a saved intention; RESULT is operator-reported invocation evidence. The server cannot observe imagegen's internal prompt/session or authenticate a tool transcript. Audit events do not prove context isolation. Late RESULT/error recording is permitted only against a previously saved REQUEST and never renews the lease. Audit failure must not block official Claim release or existing asset recovery. This addition does not certify scheduled Native E2E success.
