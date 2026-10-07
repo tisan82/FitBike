@@ -176,12 +176,13 @@ export function nativeRecoveryPacket(job: RecoveryJob & {job_id?: unknown}, work
   const spec = {
     productionMethod: s.productionMethod, prompt: s.prompt, references: s.references,
     ...(s.inputAssetUrl ? { inputAssetUrl: s.inputAssetUrl } : {}),
-    resumeJobId: job.job_id, transform: s.transform, preflightOnly: true,
+    resumeJobId: job.job_id, transform: s.transform, preflightOnly: claim.executionRole !== "REVIEWER",
   };
   try { validateGenerationSpec(spec); } catch { return null; }
   return {
     spec, sourceSha256: input.sha256, canonicalSha256: r.sha256,
-    nextAction: "INSPECT_PIXELS_RECORD_SOURCE_QA_THEN_SET_PREFLIGHT_FALSE_AND_DISPATCH_NEW_OPERATION",
+    nextAction: visualExecutionProtocol(claim.executionRole).nextAction,
+    executionProtocol: visualExecutionProtocol(claim.executionRole),
     preserveExactly: ["prompt", "references", "productionMethod", "inputAssetUrl"],
     qaStatus: "NOT_EVALUATED", generationCallObservedByServer: false,
   };
@@ -217,4 +218,31 @@ export function nativeGenerationContext(pipelineImageId: number, contractHash: s
       afterExhaustion: "PRESERVE_ACCEPTED_ASSET_OR_FAILURE_EVIDENCE_THEN_RETRY" },
     serverGenerationSupported: false, serverVisionQaSupported: false,
   };
+}
+
+// One role-aware instruction contract for Task/Claim/status/inspection responses.
+// SQL remains the authority for permissions; these instructions never grant them.
+export function visualExecutionProtocol(role: unknown, preflightOnly = true) {
+  const executionRole = role === "PRODUCER" || role === "REVIEWER" ? role : "LEGACY";
+  const qaFields = ["pipelineImageId","contractHash","sourceJobId","sourceSha256","pixelsInspected=true","status=PASS","evidence","mustShowChecks","mustNotShowChecks","inspectionTargetVerified=true","annotationTargetChecks"];
+  const common = {version:"ROLE_PROTOCOL_V1",executionRole,evaluator:"OPERATOR_PIXEL_ATTESTATION",serverVisionSupported:false,
+    checkKeys:"Use exact current Contract strings. expectedSha = inspection.sha256 (canonical); preStagingQa.sourceSha256 = inspection.sourceSha256 (actual gate input), not canonical SHA. Inspect actual pixels before any attestation."};
+  if(executionRole === "PRODUCER") return {...common,
+    phase1:"dispatch spec.preflightOnly=true without annotations; poll STAGED; inspect actual scene and technical Storage/decode/SHA",
+    phase2:"handoff_visual_review(requestId,jobId,expectedSha=inspection.sha256); re-read QA_PENDING and own activeClaim=false",
+    qaFields:[],nativeGenerationAllowed:true,qaRecordingAllowed:false,approvalAllowed:false,successStatus:"QA_PENDING",
+    nextAction:"SCREEN_CURRENT_SCENE_THEN_HANDOFF_VISUAL_REVIEW",
+    forbiddenActions:["record_visual_source_qa","FINAL_PRODUCTION_DISPATCH","approve_visual_source","claim_visual_review"],
+    annotationPolicy:"Final required labels and Annotation QA belong to Reviewer. Unannotated Preflight is the Producer handoff candidate, not a final QA PASS."};
+  if(executionRole === "REVIEWER") return {...common,
+    phase1:preflightOnly ? "inspect stored review candidate; record_visual_source_qa after actual original/390px pixel checks" : "inspect existing lineage-bound final candidate; do not recreate the source",
+    phase2:preflightOnly ? "resume exact same candidate using recorded preStagingQa and unchanged base crop/maxWidth; add required annotations; inspect final pixels/crops; approve" : "perform final pixel/mobile/SEO/required crop/duplicate QA and approve",
+    qaFields,nativeGenerationAllowed:false,qaRecordingAllowed:preflightOnly,approvalAllowed:!preflightOnly,successStatus:"READY_FOR_UPLOAD",
+    nextAction:preflightOnly ? "VIEW_PIXELS_THEN_RECORD_VISUAL_SOURCE_QA_OR_REJECT_VISUAL_SOURCE" : "FINAL_PIXEL_MOBILE_SEO_ROLE_CROP_QA_THEN_APPROVE",
+    forbiddenActions:["NATIVE_GENERATION","NEW_SOURCE_DISPATCH","claim_visual_production"],
+    sourceResumePolicy:"Same stored Job/Contract/Worker and original source SHA. Reuse saved pixels; changed base crop/maxWidth needs preserved raw input and must not be guessed or applied twice."};
+  return {...common,phase1:"dispatch preflight without annotations; inspect actual pixels",
+    phase2:"record source QA then finalize same source/native resume; final QA and approval remain required",qaFields,
+    nativeGenerationAllowed:true,qaRecordingAllowed:true,approvalAllowed:!preflightOnly,successStatus:"READY_FOR_UPLOAD",
+    nextAction:preflightOnly ? "VIEW_PIXELS_THEN_RECORD_VISUAL_SOURCE_QA_OR_REJECT_VISUAL_SOURCE" : "FINAL_PIXEL_QA"};
 }
