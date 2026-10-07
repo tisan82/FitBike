@@ -536,7 +536,7 @@ Final QA는 `IMAGE_READY → QA → QA_PASS`까지만 담당한다. QA_PASS는 P
 
 Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Task의 유일한 생성/확보 입력으로 사용한다. Claim RPC는 broad Writer/Research Artifact 대신 정규화된 Contract와 SHA-256 `generationContractHash`를 반환하고 Run metadata에 동일 계약을 보존한다.
 
-- Contract는 pipeline/content/image/asset 식별자, subject, visual objective, source strategy, generation allowed, must show/not show, fact/safety dependency, text/mobile 요구를 포함한다.
+- 신규 V5 Brief는 CONTENT.md의 최소 의미 schema를 사용한다. Pipeline/Task/asset identity는 Task/Job metadata에서 관리하고 제작/검수 정책은 `visualPolicy`로 별도 파생한다. 기존 V4 Contract의 source/generation/annotation/mobile 제한은 보존한다. V5 Writer는 운영·제작·QA 필드를 작성하지 않는다.
 - 이전 Content, 이전 Image, 이전 생성 결과 또는 대화 컨텍스트의 Visual Prompt를 현재 작업에 상속하지 않는다.
 - `generation_allowed=false`는 레거시 계약에서 Full Generation을 금지한다. 실제 구조를 보존하는 AI Editing 허용 여부는 `ai_edit_allowed`로 별도 판단한다.
 - Contract와 다른 주제의 결과는 `BRIEF_MISMATCH`이며 업로드하지 않는다.
@@ -566,7 +566,7 @@ Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Ta
 
 ## Scheduled Visual Source Strategy
 
-Writer는 Image Brief를 만들 때 **실제 외형 자체가 사용자 답의 Fact인지** 먼저 판단한다.
+V5 Writer는 CONTENT.md에 따라 **실제 외형 자체가 사용자 답의 Fact인지** 판단하여 evidence level만 지정한다. 아래 상세 전략/boolean 작성 규칙은 기존 V4 호환용이다. V5에서는 3-A가 서버 공통 정책 안에서 제작 경로를 선택하고 실제 Job/spec/감사에 기록한다.
 
 - 고객이 실제 바이크에서 찾아야 하는 위치, 실제 부품 형상, UI, 포트, 라벨, 각인, 배선, 마모/손상, 체결·장착 상태처럼 실제 외형 자체가 확인 정보이면 `REAL_ASSET_FIRST` / `generation_allowed=false`를 사용한다.
 - 특정 모델·제품의 정확한 구조가 확인 정보는 아니지만 실제 바이크를 다루는 고객에게 점검 위치·대상·행동·관계를 보여줄 필요가 있으면 `GENERATED_GUIDANCE_VISUAL` / `generation_allowed=true`를 사용할 수 있다. 생성 결과도 실제 바이크 점검 맥락이어야 하며 추상 교육자료·대시보드·카드·보고서·장식 이미지로 만들지 않는다.
@@ -589,7 +589,7 @@ Technical file validation is necessary but not sufficient. Before an Image Task 
 PASS requires all of the following:
 
 1. **Actual Render Inspection** — inspect the final Production asset pixels after conversion/upload.
-2. **Visual Objective Match** — the visible scene directly supports `visual_objective`.
+2. **Visual Objective Context** — use `visual_objective` as context; V5 does not turn abstract meanings absent from `must_show` into independent pixel FAIL gates.
 3. **Must-show Evidence** — every `must_show` item is visibly identifiable in the image at the required mobile viewing size.
 4. **Must-not-show Absence** — no `must_not_show` item is visibly present.
 5. **User Question Test** — when shown without surrounding article text, the image must materially help answer `user_question_supported`. A merely related motorcycle/product/lifestyle photo is FAIL.
@@ -822,3 +822,13 @@ bounded PNG previews. It creates no Claim, Staging, semantic QA or approval. Ins
 pixels before selecting; dispatch the actual extracted raster URL under the current Contract.
 Never pass the HTML page itself as a raster asset or guess sequential image names. Candidate
 fetch/parse failure is distinct from missing Source evidence. JavaScript-only assets are unsupported.
+
+### V5 minimal Brief runtime (2026-10-07)
+
+Stage2 submits only the minimal V5 schema owned by CONTENT.md. Writer completion, image synchronization and build/claim validate V5 without requiring Writer feasibility, composition, annotation or pixel-QA objects. The immutable `generationContractHash` refers to the raw semantic Contract, never the derived `visualPolicy`; server identity remains in Task/Job metadata. `content_pipeline_visual_policy_v1` derives common compatibility policy for V5; V4 returns existing restrictions unchanged.
+
+Producer uses raw scene requirements and `visualPolicy`, selects permitted method and verified source/reference, preserves actual Native audit and stages an unannotated preflight. No reconstruction can satisfy REQUIRED. NATIVE_FULL_GENERATION uses references=[] only where the current V5 NONE policy permits it; no fictional reference is supplied. Producer finishes at review handoff/QA_PENDING and claim release. Reviewer never creates a new image: actual candidate pixel checks, QA attestation, same stored candidate finalization with exact original source identity, final 390px/role crops/SEO/duplicate/SHA checks, approval and READY_FOR_UPLOAD/release.
+
+Before QA attestation, Reviewer selects final annotations and verifies their actual targets; exact chosen label text must appear in annotationTargetChecks. Final Dispatch reuses the identical recorded preStagingQa. New or changed annotation targets require updated inspection/QA record before Dispatch.
+
+V5 does not silently rewrite existing V4 claims, candidates or approved assets. Existing source-stage spec retains selected source/method/transform; Native audit retains actual call and returned file linkage. Annotation choices are verified from actual final pixels and spec, not invented Writer requirements. Missing source/evidence or unavailable Native/file transport remains a truthful failure.

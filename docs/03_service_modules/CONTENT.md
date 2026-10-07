@@ -206,6 +206,26 @@ Autonomous Batch의 부족한 Queue를 채우기 위해 FitBike DB의 모델별 
 - 이미지가 정보 전달에 도움이 되지 않으면 `NO_VISUAL`을 허용한다.
 - 생성 Guidance Visual은 장식·교육자료가 아니라 실제 바이크 점검 맥락에서 고객이 무엇을 보고 어디를 확인할지 안내해야 한다. 실제 기술 구조, 규격, 제조사 사실처럼 오인되게 만들지 않는다.
 
+### Stage 2 Visual Brief V5 and common visual policy
+
+V5의 2단계 책임은 이미지 의미와 사실 경계다. Writer는 `contract_version=5`, `image_id`, `asset_role`, `user_question`, `visual_objective`, `must_show`, `must_not_show`, `evidence_requirement`, `alt_text_draft`만 작성한다. 제작 방식·Source 탐색 순서·구도·Annotation·Crop·별도 QA 문구는 작성하지 않는다. Pipeline/Task/asset 식별자는 서버의 Task/Job metadata에서 관리하며 의미 Contract 원문과 Hash는 제작 결과·파생 정책과 분리한다. 기계 판독 schema는 `scripts/content-factory/visual-brief-v5.schema.json`이다.
+
+`evidence_requirement.level`은 NONE / REFERENCE / REQUIRED다. `fact_ids`는 이미 정의된 CF ID 배열이며 사실을 새로 만드는 필드가 아니다. 선택적 `evidence_ref` 배열은 실제 확보한 HTTPS `source_ref`, 모델·연식 범위 `model_scope`, 확인 가능한 사실 `supports`를 전달한다. URL 존재는 픽셀 확인·Source 확보 성공이 아니다. 특정 모델 범위를 일반화하지 않는다.
+
+| Level | Common production boundary |
+| --- | --- |
+| NONE | 일반 상황 Native full generation 또는 실제 Source 허용. 특정 기술 구조·수치·손상을 사실처럼 만들지 않는다. |
+| REFERENCE | 실제로 검사한 근거 범위의 reference-based reconstruction 또는 실제 Source 허용. 근거 없이 full generation하지 않는다. |
+| REQUIRED | 검증된 실제/공식 Source 기반 최종 자산만 허용. 원본 구조·표시·사실을 보존하는 편집/Crop/Annotation은 허용하지만 생성 재구성으로 대체하지 않는다. |
+
+AI edit는 level과 무관하게 실제 입력 바이너리·Source·편집 사실 연결을 검증한다. 생성은 일반 ChatGPT 내장 도구만 사용한다. 외부 생성 API와 서버 모델은 금지한다. Source 미확보는 level 변경이나 자동 완화 사유가 아니다.
+
+모든 `must_show`는 원본과 해당 390px 뷰에서 식별 가능한 필수 조건이다. `must_not_show`는 실제 금지 조건이다. visual_objective/user_question은 방향성 문맥이며 명시되지 않은 온도·재시동 성공·고장 원인 같은 추상 상태를 독립 FAIL Gate로 추가하지 않는다. 사람/손 등이 필요한 경우 필수 목록에, 금지하는 경우 금지 목록에 명시한다. 공통 기본은 사람 없음이고 사람 필수·금지 충돌은 제출 오류다. 자연어 자동 검사는 제한적인 기본 모순 검사이며 제작 가능성이나 픽셀 PASS를 주장하지 않는다.
+
+390px 식별성·역할별 최종 Card/Hero Crop·ALT/SEO·SHA·중복·출처 동일성은 공통 검수 정책이다. BODY에는 대표 이미지 Crop을 강제하지 않는다. 제작자가 선택한 실제 제작 방식·Source/Reference·확인 사실·transform/Crop/Annotation·Native 호출/반환 자산은 현재 Contract에 결합한 Job/감사 기록으로 전달한다. Annotation은 실제 대상을 정확히 가리키고 최소 factual label을 사용하며 최종 렌더링에서 검증한다. 제작자의 PASS는 Reviewer 승인 증거를 대체하지 않는다.
+
+기존 V4의 명시적 제한과 활성 Claim·저장 후보·Hash는 유지한다. 새 Brief는 V5를 사용하며 기존 Task는 자동 변환하지 않는다. 의미/제한을 바꿀 때 새 Contract/Hash를 발급하며 이전 자산 이력과 승인 결과를 보존한다.
+
 ## Existing Content Remediation
 
 기존에 자동 생성된 `모델명 + 타이어 규격 가이드` 콘텐츠는 새 정책의 기준 콘텐츠로 간주하지 않는다. 별도 정리 단계에서 다음을 검토한다.

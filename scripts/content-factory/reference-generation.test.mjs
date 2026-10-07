@@ -15,3 +15,24 @@ test('native AI edit requires attached original bytes matching inspected source 
 test('URL compatibility requires SHA, conflicting inputs and MIME claims fail',async()=>{const bytes=Uint8Array.from([1,2,3]);const h=harness({bytes,mime:'image/png'});await assert.rejects(h.context.generateAsset({...good,chatFile:{...file,mime_type:'image/jpeg'}},{}),/MIME_MISMATCH/);await assert.rejects(h.context.generateAsset({...good,generatedAssetUrl:'https://files.example.org/a',expectedGeneratedSha:'a'.repeat(64)},{}),/IDENTITY_MISMATCH/);assert.throws(()=>h.context.validateGenerationSpec({...good,chatFile:file,generatedAssetUrl:file.download_url,expectedGeneratedSha:'a'.repeat(64)}),/MULTIPLE_GENERATED_INPUTS/);assert.throws(()=>h.context.validateGenerationSpec({...good,chatFile:file,resumeJobId:'1'.repeat(36)}),/INVALID_GENERATION_RESUME/);});
 
 test('native file with optional SHA accepts matching bytes and rejects mismatches',async()=>{const bytes=Uint8Array.from([1,2,3]);const sha=Buffer.from(await webcrypto.subtle.digest('SHA-256',bytes)).toString('hex');const h=harness({bytes,mime:'image/png'});const r=await h.context.generateAsset({...good,chatFile:file,expectedGeneratedSha:sha},{});assert.equal(r.generation.inputSha256,sha);await assert.rejects(h.context.generateAsset({...good,chatFile:file,expectedGeneratedSha:'a'.repeat(64)},{}),/IDENTITY_MISMATCH/);assert.throws(()=>h.context.validateGenerationSpec({...good,chatFile:file,expectedGeneratedSha:'bad'}),/SHA_REQUIRED/);assert.throws(()=>h.context.validateGenerationSpec({...good,expectedGeneratedSha:sha}),/URL_REQUIRED/);});
+
+test('native full generation permits no references and never invents reference conditioning',async()=>{
+ const bytes=Uint8Array.from([1,2,3]);const h=harness({bytes,mime:'image/png'});
+ const spec={...good,productionMethod:'NATIVE_FULL_GENERATION',references:[],chatFile:file};
+ const result=await h.context.generateAsset(spec);
+ assert.deepEqual(h.calls,[file.download_url]);assert.equal(result.generation.referenceConditioning,'NONE_CURRENT_TASK_SCENE');assert.equal(result.generation.externalApiUsed,false);
+ assert.ok(h.context.generationCapabilities().nativeProductionMethods.includes('NATIVE_FULL_GENERATION'));
+ for(const extra of [{references:good.references},{inputAssetUrl:'https://manufacturer.org/input.jpg'},{inputFile:file}])assert.throws(()=>h.context.validateGenerationSpec({...spec,...extra}));
+ for(const method of ['REFERENCE_BASED_GENERATION','REAL_SOURCE_AI_EDIT'])assert.throws(()=>h.context.validateGenerationSpec({...spec,productionMethod:method}),/INVALID_GENERATION_SPEC/);
+});
+
+
+test('both Edge capabilities declare the deployed visual Contract and common policy versions',()=>{
+ const h=harness();const cap=h.context.generationCapabilities();
+ assert.equal(JSON.stringify(cap.visualContractVersions),JSON.stringify([4,5]));assert.equal(cap.visualPolicyVersion,'VISUAL_COMMON_V1');
+ const mcpSource=readFileSync(new URL('../../supabase/functions/content-pipeline-visual-mcp/generation.ts',import.meta.url),'utf8').replace(/^import .*;$/gm,'').replace(/export /g,'');
+ const mcp={URL,Date,JSON,Array,String,Number,Error,sourceUrl:h.context.sourceUrl};vm.runInNewContext(ts.transpile(mcpSource,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),mcp);
+ const mcpCap=mcp.generationCapabilities();
+ for(const field of ['visualContractVersions','visualPolicyVersion','nativeProductionMethods'])assert.equal(JSON.stringify(mcpCap[field]),JSON.stringify(cap[field]));
+ assert.equal(mcpCap.serverGenerationSupported,false);assert.equal(mcpCap.externalGenerationApiAllowed,false);
+});

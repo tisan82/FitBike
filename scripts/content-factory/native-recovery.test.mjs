@@ -33,3 +33,22 @@ test('recovery instruction follows Producer/Reviewer permissions, never invites 
  const r=context.nativeRecoveryPacket(fixture(),'worker',{...claim,executionRole:'REVIEWER'});
  assert.equal(r.spec.preflightOnly,false);assert.equal(r.executionProtocol.nativeGenerationAllowed,false);assert.equal(r.executionProtocol.successStatus,'READY_FOR_UPLOAD');
 });
+
+test('full-generation native recovery preserves empty references and stored identity',()=>{
+ const job=fixture();job.spec.productionMethod='NATIVE_FULL_GENERATION';job.spec.references=[];
+ const packet=context.nativeRecoveryPacket(job,'worker',{...claim,executionRole:'PRODUCER'});
+ assert.equal(packet.spec.productionMethod,'NATIVE_FULL_GENERATION');assert.equal(packet.spec.references.length,0);assert.equal(packet.sourceSha256,sha);
+});
+test('V5 native scene prompt excludes operational identifiers and evidence metadata',()=>{
+ const packet=context.nativeGenerationContext(2000,'secret-hash',{contract_version:5,image_id:'IMG_03',asset_role:'BODY',user_question:'User editorial question',visual_objective:'Photograph a stationary motorcycle cockpit.',must_show:['right starter switch'],must_not_show:['people'],evidence_requirement:{level:'NONE'},alt_text_draft:'An editorial ALT',pipeline_id:21});
+ assert.match(packet.prompt,/Photograph a stationary motorcycle cockpit/);assert.match(packet.prompt,/right starter switch/);assert.match(packet.prompt,/people/);
+ for(const absent of ['2000','secret-hash','IMG_03','BODY','editorial','evidence_requirement','pipeline_id','Claim','QA'])assert.ok(!packet.prompt.includes(absent),absent);
+ assert.equal(packet.generationContractHash,'secret-hash');assert.equal(packet.pipelineImageId,2000);
+});
+
+
+test('Reviewer selects actual label targets before recording the immutable finalization QA payload',()=>{
+ const protocol=context.visualExecutionProtocol('REVIEWER',true);
+ assert.match(protocol.phase1,/choose final annotations\/labels/);assert.match(protocol.phase1,/annotationTargetChecks keyed by exact selected label text/);
+ assert.match(protocol.phase2,/identical recorded preStagingQa/);assert.match(protocol.phase2,/do not append label checks after recording/);
+});
