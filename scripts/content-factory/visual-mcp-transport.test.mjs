@@ -184,3 +184,13 @@ test("native audit preflight needs no claim/request and delegates only readonly 
  const c=h.calls.at(-1);assert.equal(c.name,"content_pipeline_validate_native_call_v2");assert.deepEqual(JSON.parse(JSON.stringify(c.args)),{p_call:nativeCall});
  assert.equal(h.calls.some(c=>c.name.includes("claim_request_status")),false);
 });
+
+test("nullable native arguments and separate scene instruction pass through without mutation",async()=>{
+ const nativeCall={toolName:"image_gen.text2im",schemaVersion:"RAW_ARGUMENTS_V1",arguments:{prompt:null,size:"1536x1024",n:1,referenced_image_ids:null},sceneInstruction:{text:"A realistic stationary motorcycle cockpit photograph.",location:"CONVERSATION_MESSAGE"}};
+ const h=harness({active:false});await h.send("tools/call",{nativeCall},"validate_visual_generation_call");
+ assert.deepEqual(JSON.parse(JSON.stringify(h.calls.at(-1).args.p_call)),nativeCall);
+ const evidence={contractHash:"a".repeat(64),nativeCall};
+ await h.send("tools/call",{requestId:REQUEST,attemptId:JOB,phase:"REQUEST",evidence},"record_visual_generation_attempt");
+ assert.deepEqual(JSON.parse(JSON.stringify(h.calls.at(-1).args.p_evidence)),evidence);
+ assert.equal(h.calls.some(c=>c.name.includes("dispatch")||c.name.includes("claim_visual_stage")),false);
+});

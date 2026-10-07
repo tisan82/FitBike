@@ -38,7 +38,7 @@ begin
  v:=public.content_pipeline_validate_native_call_v2('{"toolName":"image_gen.text2im","schemaVersion":"RAW_ARGUMENTS_V1","arguments":{"prompt":"Actual current motorcycle instrument photograph.","nested":{"access_token":"secret"}}}');
  if v->>'valid'<>'false' then raise exception 'NESTED_SECRET_ALLOWED';end if;
  select * into i from public."21_content_pipeline_image" where generation_contract_hash is not null and not(status='PROCESSING' and claim_expires_at>=now()) order by pipeline_image_id limit 1;
- update public."21_content_pipeline_image" set status='PROCESSING',claimed_by=w,claim_token=a,claim_expires_at=now()+interval '1 hour' where pipeline_image_id=i.pipeline_image_id;
+ update public."21_content_pipeline_image" set status='PROCESSING',handoff_phase='PRODUCING',claimed_by=w,claim_token=a,claim_expires_at=now()+interval '1 hour' where pipeline_image_id=i.pipeline_image_id;
  insert into public."29_content_pipeline_visual_claim_request"(worker_key,request_id,pipeline_image_id,response) values(w,r,i.pipeline_image_id,jsonb_build_object('pipelineImageId',i.pipeline_image_id,'generationContractHash',i.generation_contract_hash,'claimToken',a,'executionRole','PRODUCER'));
  q:=jsonb_build_object('contractHash',i.generation_contract_hash,'nativeCall','{"toolName":"image_gen.text2im","schemaVersion":"RAW_ARGUMENTS_V1","arguments":{"prompt":"Actual current motorcycle instrument photograph.","size":"1536x1024","n":1}}'::jsonb);
  c:=public.content_pipeline_record_native_attempt_v1(w,r,a,'REQUEST',q);
@@ -46,5 +46,47 @@ begin
  if c->>'recorded'<>'true' then raise exception 'RAW_RESULT_FAILED';end if;
  if has_function_privilege('authenticated','public.content_pipeline_validate_native_call_v2(jsonb)','EXECUTE') then raise exception 'VALIDATOR_GRANT_LEAK';end if;
 end $raw$;
-select 'LEGACY_AND_RAW_AUDIT_REGRESSION_PASS' as result;
+
+do $nullable$
+declare v jsonb; i public."21_content_pipeline_image"%rowtype; w text:='null-audit-test-'||extensions.gen_random_uuid(); r uuid:=extensions.gen_random_uuid(); a uuid:=extensions.gen_random_uuid(); q jsonb; z jsonb; audit jsonb; call jsonb:='{"toolName":"image_gen.text2im","schemaVersion":"RAW_ARGUMENTS_V1","arguments":{"prompt":null,"size":"1536x1024","n":1,"transparent_background":false,"is_style_transfer":false,"referenced_image_ids":null}}';
+begin
+ v:=public.content_pipeline_validate_native_call_v2(call);
+ if v->>'valid'<>'true' or v->>'instructionVisibility'<>'UNOBSERVED' or v->>'runtimeSchemaValidated'<>'false' then raise exception 'NULL_PROMPT_CAPTURE_FAILED';end if;
+ v:=public.content_pipeline_validate_native_call_v2(jsonb_set(call,'{arguments}','{}'));
+ if v->>'valid'<>'true' or v->>'instructionVisibility'<>'UNOBSERVED' then raise exception 'OMITTED_PROMPT_CAPTURE_FAILED';end if;
+ v:=public.content_pipeline_validate_native_call_v2(jsonb_set(call,'{arguments,prompt}','123'));
+ if v->>'valid'<>'false' then raise exception 'NUMERIC_PROMPT_ALLOWED';end if;
+ v:=public.content_pipeline_validate_native_call_v2('{"prompt":null}');
+ if v->>'valid'<>'false' then raise exception 'LEGACY_NULL_ALLOWED';end if;
+ v:=public.content_pipeline_validate_native_call_v2(call||'{"sceneInstruction":{"text":null,"location":"UNOBSERVED"}}');
+ if v->>'valid'<>'true' or v->>'instructionVisibility'<>'UNOBSERVED' then raise exception 'EXPLICIT_UNOBSERVED_FAILED';end if;
+ v:=public.content_pipeline_validate_native_call_v2(call||'{"sceneInstruction":{"text":"A realistic stationary motorcycle cockpit photograph.","location":"TOOL_ARGUMENT"}}');
+ if v->>'valid'<>'false' then raise exception 'FALSE_TOOL_ARGUMENT_ALLOWED';end if;
+ v:=public.content_pipeline_validate_native_call_v2(call||'{"sceneInstruction":{"text":"A realistic stationary motorcycle cockpit photograph.","location":"CONVERSATION_MESSAGE"}}');
+ if v->>'valid'<>'true' or v->>'instructionVisibility'<>'OPERATOR_REPORTED_CONVERSATION' then raise exception 'CONVERSATION_CAPTURE_FAILED';end if;
+ v:=public.content_pipeline_validate_native_call_v2(call||'{"sceneInstruction":{"text":"A realistic stationary motorcycle cockpit photograph.","location":"UNOBSERVED"}}');
+ if v->>'valid'<>'false' then raise exception 'UNOBSERVED_TEXT_ALLOWED';end if;
+ v:=public.content_pipeline_validate_native_call_v2(call||'{"sceneInstruction":{"text":"https://example.com/?token=secret","location":"CONVERSATION_MESSAGE"}}');
+ if v->>'valid'<>'false' then raise exception 'INSTRUCTION_SECRET_ALLOWED';end if;
+ select * into i from public."21_content_pipeline_image" where generation_contract_hash is not null and not(status='PROCESSING' and claim_expires_at>=now()) order by pipeline_image_id limit 1;
+ update public."21_content_pipeline_image" set status='PROCESSING',handoff_phase='PRODUCING',claimed_by=w,claim_token=a,claim_expires_at=now()+interval '1 hour' where pipeline_image_id=i.pipeline_image_id;
+ insert into public."29_content_pipeline_visual_claim_request"(worker_key,request_id,pipeline_image_id,response) values(w,r,i.pipeline_image_id,jsonb_build_object('pipelineImageId',i.pipeline_image_id,'generationContractHash',i.generation_contract_hash,'claimToken',a,'executionRole','PRODUCER'));
+ q:=jsonb_build_object('contractHash',i.generation_contract_hash,'nativeCall',call);
+ perform public.content_pipeline_record_native_attempt_v1(w,r,a,'REQUEST',q);
+ z:=jsonb_build_object('actualNativeCall',call,'outputs','[]'::jsonb,'pixelQa','NOT_INSPECTED');
+ perform public.content_pipeline_record_native_attempt_v1(w,r,a,'RESULT',z);
+ audit:=public.content_pipeline_native_attempt_audit_v1(w,i.pipeline_image_id,r);
+ if audit->'events'->1->'captureValidation'->>'instructionVisibility'<>'UNOBSERVED' or audit->'events'->1->>'requestMatchesActualCall'<>'true' or audit->>'serverObservedNativeCall'<>'false' then raise exception 'NULL_AUDIT_VISIBILITY_FAILED';end if;
+ if (audit->'events'->0->'evidence'->'nativeCall') is distinct from call then raise exception 'RAW_ARGUMENTS_MUTATED';end if;
+ a:=extensions.gen_random_uuid();
+ call:=call||'{"sceneInstruction":{"text":"A realistic stationary motorcycle cockpit photograph.","location":"CONVERSATION_MESSAGE"}}';
+ q:=jsonb_build_object('contractHash',i.generation_contract_hash,'nativeCall',call);
+ perform public.content_pipeline_record_native_attempt_v1(w,r,a,'REQUEST',q);
+ z:=jsonb_build_object('actualNativeCall',call,'outputs',jsonb_build_array(jsonb_build_object('fileId','file_test_nullable')),'inspectedOutput',jsonb_build_object('fileId','file_test_nullable'),'pixelsInspected',true,'pixelQa','PASS','pixelEvidence','Rollback fixture attestation only, no actual image generation.');
+ perform public.content_pipeline_record_native_attempt_v1(w,r,a,'RESULT',z);
+ audit:=public.content_pipeline_native_attempt_audit_v1(w,i.pipeline_image_id,r);
+ if audit->'events'->3->'captureValidation'->>'instructionVisibility'<>'OPERATOR_REPORTED_CONVERSATION' then raise exception 'INSTRUCTION_READBACK_FAILED';end if;
+ if has_function_privilege('anon','public.content_pipeline_validate_native_call_v2(jsonb)','EXECUTE') or has_function_privilege('authenticated','public.content_pipeline_native_attempt_audit_v1(text,bigint,uuid)','EXECUTE') then raise exception 'NULL_AUDIT_GRANT_LEAK';end if;
+end $nullable$;
+select 'LEGACY_RAW_NULLABLE_AUDIT_REGRESSION_PASS' as result;
 rollback;

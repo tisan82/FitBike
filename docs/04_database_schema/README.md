@@ -103,3 +103,5 @@ Before imagegen, record REQUEST with `contractHash` and `nativeCall` containing 
 
 
 Native call capture schema update (2026-10-07): service-only, immutable/invoker `content_pipeline_validate_native_call_v2(jsonb)` validates bounded raw call envelopes without table access or Claim mutation. `content_pipeline_record_native_attempt_v1` reuses that validator while retaining receipt/Contract/lease/immutability/output/PASS guards. Table/column/constraint exports remain unchanged; only function definitions changed. Canonical format and operator-report limits are owned by API.md.
+
+Nullable Native prompt capture: validator accepts raw null/omitted prompt and separately validates sceneInstruction. Record RPC removes its duplicate string-prompt assumption. Audit read RPC adds per-event captureValidation; unchanged service-only grants/ownership/lease/immutable evidence. No table export delta.
