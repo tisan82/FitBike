@@ -3,6 +3,7 @@ import {
   initializeImageMagick,
   MagickFormat,
   MagickGeometry,
+  MagickImage,
 } from "npm:@imagemagick/magick-wasm@0.0.42";
 const wasm = await Deno.readFile(
   new URL(
@@ -78,4 +79,22 @@ export async function inspectPixels(
     canonical,
     mobile,
   };
+}
+
+// Resolver preview is technical decode evidence only, never semantic QA.
+export function probeRaster(bytes: Uint8Array) {
+  const header = MagickImage.create();
+  let width=0, height=0;
+  try {
+    header.ping(bytes);
+    width=header.width; height=header.height;
+    if (width<1 || height<1 || width>12000 || height>12000 || width*height>24000000 || Math.max(width/height,height/width)>20) throw Error("SOURCE_DIMENSIONS_UNSAFE");
+  } finally { header.dispose(); }
+  return ImageMagick.read(bytes, img => {
+    if(img.width!==width || img.height!==height) throw Error("SOURCE_DIMENSIONS_CHANGED");
+    img.resize(new MagickGeometry(390,390));
+    const preview=img.write(MagickFormat.Png, data=>Uint8Array.from(data));
+    if(img.width>390 || img.height>390 || preview.length>1048576) throw Error("SOURCE_PREVIEW_TOO_LARGE");
+    return {width,height,preview};
+  });
 }

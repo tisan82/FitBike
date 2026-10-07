@@ -8,11 +8,11 @@ import ts from 'typescript';
 // Set MAGICK_WASM_MODULE to a separately installed matching package when testing.
 const require=createRequire(import.meta.url);
 const magickPath=process.env.MAGICK_WASM_MODULE ?? require.resolve('@imagemagick/magick-wasm');
-const {ImageMagick,initializeImageMagick,MagickFormat,MagickColors,MagickGeometry}=await import(magickPath);
+const {ImageMagick,initializeImageMagick,MagickFormat,MagickColors,MagickGeometry,MagickImage}=await import(magickPath);
 await initializeImageMagick(readFileSync(new URL('./magick.wasm','file://'+magickPath)));
 const src=readFileSync(new URL('../../supabase/functions/content-pipeline-visual-mcp/inspection.ts',import.meta.url),'utf8');
-const body=src.slice(src.indexOf('export async function')).replace('export ','');
-const ctx={ImageMagick,MagickFormat,MagickGeometry,Uint8Array,TextDecoder,crypto:webcrypto,Error,Math,Array};
+const body=src.slice(src.indexOf('export async function')).replaceAll('export ','');
+const ctx={ImageMagick,MagickFormat,MagickGeometry,MagickImage,Uint8Array,TextDecoder,crypto:webcrypto,Error,Math,Array};
 vm.runInNewContext(ts.transpile(body,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),ctx);
 test('canonical PNG preserves decoded pixels and 390px preview aspect ratio; altered SHA rejected',async()=>{
  const bytes=ImageMagick.read(MagickColors.Red,800,600,img=>img.write(MagickFormat.WebP,d=>Uint8Array.from(d)));
@@ -38,4 +38,12 @@ test('service cover crops remove outer bands and preserve center, without changi
   img.getPixels(p=>{ const center=p.getPixel(Math.floor(w/2),Math.floor(h/2)); assert.ok(center[0]>200 && center[2]<30); });
  });
  assert.equal(r.metadata.sha256,expected.sha256);
+});
+
+test('resolver preview is bounded and extreme source geometry is rejected',()=>{
+ const b=ImageMagick.read(MagickColors.Red,800,1600,img=>img.write(MagickFormat.Png,d=>Uint8Array.from(d)));
+ const r=ctx.probeRaster(b);
+ ImageMagick.read(r.preview,img=>{assert.equal(img.width,195);assert.equal(img.height,390);});
+ const narrow=ImageMagick.read(MagickColors.Red,1,1000,img=>img.write(MagickFormat.Png,d=>Uint8Array.from(d)));
+ assert.throws(()=>ctx.probeRaster(narrow),/SOURCE_DIMENSIONS_UNSAFE/);
 });

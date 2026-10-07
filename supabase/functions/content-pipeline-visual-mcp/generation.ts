@@ -136,6 +136,8 @@ export function generationCapabilities() {
     nativeGenerationAvailability: "CHECK_CURRENT_CHAT",
     nativeFileHandoff: true,
     nativeAttemptAuditSupported: true,
+    sourceAssetResolverSupported: true,
+    sourceAssetResolverTool: "resolve_visual_source_assets",
     nativeAttemptAuditFormat: "RAW_ARGUMENTS_V1",
     nativeAttemptAuditPreflightTool: "validate_visual_generation_call",
     nativeAttemptAuditTool: "record_visual_generation_attempt",

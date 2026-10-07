@@ -790,3 +790,14 @@ handoff and final approval, separately from rollback DB regression and Work reco
 Before imagegen, record REQUEST with `contractHash` and `nativeCall` containing the exact intended tool arguments (prompt and only actually used reference options). After the call, record RESULT with `actualNativeCall`, `outputs` (actual fileId/path), `inspectedOutput` (an exact member of outputs), `pixelsInspected`, `pixelQa` (PASS/FAIL/NOT_INSPECTED), `pixelEvidence` and the intended handoff `operationId`. A different actual call can be recorded as FAIL; it cannot assert PASS. Record connector rejection as TRANSPORT_ERROR with `operationId` and exact `error`. Never store connector download URLs or credentials. Each phase is immutable; identical replay succeeds and changed replay fails. Maximum three REQUEST events per receipt.
 
 `get_visual_image_task.nativeAttemptAudit` returns the latest 30 events for the authenticated worker. `get_visual_claim_result.nativeAttemptAudit` restricts to that receipt. Linked `serverReceivedJobs` are read from actual Job records, not operator assertions. Native input SHA, pre-staging source SHA and canonical SHA are distinct. Missing historical evidence is MISSING, never reconstructed. REQUEST is a saved intention; RESULT is operator-reported invocation evidence. The server cannot observe imagegen's internal prompt/session or authenticate a tool transcript. Audit events do not prove context isolation. Late RESULT/error recording is permitted only against a previously saved REQUEST and never renews the lease. Audit failure must not block official Claim release or existing asset recovery. This addition does not certify scheduled Native E2E success.
+
+### Read-only official HTML image resolution
+
+When an exact official Source is an HTML/XML manual, use `resolve_visual_source_assets`
+with its verified `sourcePageUrl`, optional current section text, and at most five candidates.
+This authenticated server tool parses actual img/src/srcset/lazy attributes and raster links,
+resolves relative URLs, safely downloads candidates and returns original SHA/dimensions plus
+bounded PNG previews. It creates no Claim, Staging, semantic QA or approval. Inspect returned
+pixels before selecting; dispatch the actual extracted raster URL under the current Contract.
+Never pass the HTML page itself as a raster asset or guess sequential image names. Candidate
+fetch/parse failure is distinct from missing Source evidence. JavaScript-only assets are unsupported.
