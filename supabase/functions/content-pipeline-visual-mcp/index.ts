@@ -400,7 +400,7 @@ const tools: VisualTool[] = [
       "Read current image production states without claiming or changing an image. Returns at most 25 images.",
     inputSchema: {
       type: "object",
-      properties: { pipelineId: { type: "integer", minimum: 1 } },
+      properties: { pipelineId: { type: "integer", minimum: 1 }, executionRole: {type:"string",enum:["PRODUCER","REVIEWER"]} },
       additionalProperties: false,
     },
     annotations: {
@@ -428,6 +428,19 @@ const tools: VisualTool[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
+  },
+  ...["claim_visual_production", "claim_visual_review"].map((name): VisualTool => ({
+    name, description: name === "claim_visual_production"
+      ? "Claim one production Task. Store a valid candidate, then handoff_visual_review closes this production Claim without QA approval. Valid QA_PENDING assets are excluded."
+      : "Claim one stored QA_PENDING Task for inspection and approval. Never generates a new image. Uses durable same-contract Job/SHA and a new review lease.",
+    inputSchema: {type:"object",properties:{requestId:{type:"string",format:"uuid"},pipelineImageId:{type:"integer",minimum:1}},required:["requestId"],additionalProperties:false},
+    annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false},
+  })),
+  {
+    name:"handoff_visual_review",
+    description:"Finish production only after a real STAGED candidate passes technical Storage/decode/SHA checks. Atomically queues this exact Job for review and releases own production Claim. Does not assert pixel/mobile/SEO PASS, approve or make READY_FOR_UPLOAD. Reuse the same request/Job/SHA after response loss.",
+    inputSchema:{type:"object",properties:{requestId:{type:"string",format:"uuid"},jobId:{type:"string",format:"uuid"},expectedSha:{type:"string",pattern:"^[a-f0-9]{64}$"}},required:["requestId","jobId","expectedSha"],additionalProperties:false},
+    annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false},
   },
   {
     name: "get_visual_claim_result",
@@ -734,21 +747,22 @@ Deno.serve(async (req) => {
       result = generationCapabilities();
     } else if (name === "get_visual_image_task") {
       if (!Number.isSafeInteger(a.pipelineImageId) || a.pipelineImageId! < 1) throw Error("INVALID_IMAGE_ID");
-      const read = await sb.from("21_content_pipeline_image").select("pipeline_image_id,pipeline_id,image_id,status,handoff_phase,generation_contract,generation_contract_hash,claim_expires_at,next_eligible_at,staging_asset,retry_action").eq("pipeline_image_id", a.pipelineImageId).maybeSingle();
+      const read = await sb.from("21_content_pipeline_image").select("pipeline_image_id,pipeline_id,image_id,status,handoff_phase,generation_contract,generation_contract_hash,claim_expires_at,next_eligible_at,staging_asset,retry_action,visual_phase,review_candidate").eq("pipeline_image_id", a.pipelineImageId).maybeSingle();
       if (read.error || !read.data) throw Error("IMAGE_TASK_NOT_FOUND");
       const image = read.data;
       // Avoid exposing private storage URLs or another worker's token.
       result = { pipelineImageId: image.pipeline_image_id, pipelineId: image.pipeline_id, imageId: image.image_id, status: image.status,
-        handoffPhase: image.handoff_phase, generationContract: image.generation_contract, generationContractHash: image.generation_contract_hash,
+        handoffPhase: image.handoff_phase, visualPhase: image.visual_phase, generationContract: image.generation_contract, generationContractHash: image.generation_contract_hash,
         claimExpiresAt: image.claim_expires_at, nextEligibleAt: image.next_eligible_at,
         stagingSha: image.staging_asset?.sha256 ?? null };
       const recovery = await rpc("content_pipeline_visual_recovery_v1", { p_pipeline_image_id: image.pipeline_image_id });
       result.recoverableStaging = recovery;
+      result.reviewCandidate = await rpc("content_pipeline_review_candidate_v1", {p_image_id:image.pipeline_image_id,p_job_id:image.review_candidate?.jobId ?? null});
       result.stagingSha ??= recovery?.sha256 ?? null;
       result.stagingApproved = !!image.staging_asset;
       result.preStagingProtocol = { phase1: "dispatch with spec.preflightOnly=true and no annotations; poll and inspect actual PNGs", phase2: "dispatch production with preStagingQa, same original source/PDF page or generation resumeJobId; final pixel QA still mandatory",
         qaFields: ["pipelineImageId","contractHash","sourceJobId","sourceSha256","pixelsInspected=true","status=PASS","evidence","mustShowChecks","mustNotShowChecks","inspectionTargetVerified=true","annotationTargetChecks"],
-        checkKeys: "Use exact current Contract strings as keys, each inspected result PASS. SHA is preview result.preStagingSourceSha256 (inspection.sourceSha256), not provenance/source-original SHA.", evaluator:"OPERATOR_PIXEL_ATTESTATION", serverVisionSupported:false,
+        checkKeys: "Use exact current Contract strings as keys, each inspected result PASS. expectedSha is inspection.sha256 (canonical preview). preStagingQa.sourceSha256 is inspection.sourceSha256 (preStagingSourceSha256), not reference-original or canonical SHA.", evaluator:"OPERATOR_PIXEL_ATTESTATION", serverVisionSupported:false,
         rejection: "reject_visual_source after actual semantic FAIL; preserves Claim",
         schemaRefreshRequired: "Discover record_visual_source_qa and reject_visual_source before production. Missing attestation results in an unannotated preview only. Record actual QA, then dispatch same source with NEW operationId (native resumeJobId). Never send fake final-QA PASS to record preliminary checks.", };
       const { nativeGenerationContext } = await import("./generation.ts");
@@ -762,24 +776,27 @@ Deno.serve(async (req) => {
         (!Number.isSafeInteger(a.pipelineId) || a.pipelineId < 1)
       ) throw Error("INVALID_PIPELINE_ID");
       let q = sb.from("21_content_pipeline_image").select(
-        "pipeline_image_id,pipeline_id,image_id,asset_key,status,handoff_phase,claimed_by,claim_expires_at,next_eligible_at,failure_stage,failure_code",
+        "pipeline_image_id,pipeline_id,image_id,asset_key,status,handoff_phase,visual_phase,claimed_by,claim_expires_at,next_eligible_at,failure_stage,failure_code",
       ).in("status", ["PENDING", "RETRY", "PROCESSING", "READY_FOR_UPLOAD"])
         .order("pipeline_id").order("ordinal").limit(25);
+      if (a.executionRole === "REVIEWER") q = q.in("visual_phase",["QA_PENDING","REVIEWING"]);
+      if (a.executionRole === "PRODUCER") q = q.or("visual_phase.is.null,visual_phase.in.(PRODUCTION_PENDING,PRODUCING)");
       if (a.pipelineId !== undefined) q = q.eq("pipeline_id", a.pipelineId);
       const { data, error } = await q;
       if (error) throw Error(error.message);
       result = { images: data, limit: 25, workerKey: worker };
     } else {
       if (!uuid(a.requestId)) throw Error("INVALID_REQUEST_ID");
-      if (name === "claim_visual_image") {
+      if (["claim_visual_image","claim_visual_production","claim_visual_review"].includes(name)) {
         if (
           a.pipelineImageId !== undefined &&
           (!Number.isSafeInteger(a.pipelineImageId) || a.pipelineImageId < 1)
         ) throw Error("INVALID_IMAGE_ID");
-        result = await rpc("content_pipeline_claim_visual_request_v1", {
+        result = await rpc(name === "claim_visual_image" ? "content_pipeline_claim_visual_request_v1" : "content_pipeline_claim_visual_stage_v1", {
           p_worker_key: worker,
           p_request_id: a.requestId,
           p_pipeline_image_id: a.pipelineImageId ?? null,
+          ...(name === "claim_visual_image" ? {} : {p_role:name === "claim_visual_production" ? "PRODUCER" : "REVIEWER"}),
         });
         if (result?.claim) {
           const { nativeGenerationContext } = await import("./generation.ts");
@@ -796,6 +813,10 @@ Deno.serve(async (req) => {
             const { nativeGenerationContext } = await import("./generation.ts");
             result.nativeGenerationContext = nativeGenerationContext(current.claim.pipelineImageId, current.claim.generationContractHash, current.claim.generationContract ?? {});
           }
+        }
+        else if (name === "handoff_visual_review") {
+          result = await rpc("content_pipeline_handoff_visual_review_v1", {p_worker_key:worker,p_request_id:a.requestId,p_job_id:a.jobId,p_expected_sha:a.expectedSha});
+          if (result.activeClaim || result.handoffCompleted !== true) throw Error("REVIEW_HANDOFF_NOT_VERIFIED");
         }
         else if (name === "record_visual_source_qa") {
           result = await rpc("content_pipeline_register_pre_staging_qa_v1", {p_worker_key:worker,p_request_id:a.requestId,p_job_id:a.jobId,p_expected_sha:a.expectedSha,p_qa:a.preStagingQa});
@@ -855,6 +876,7 @@ Deno.serve(async (req) => {
           const allowed = await rpc("content_pipeline_reference_generation_allowed_v1", { p_contract: current.claim.generationContract, p_method: spec.productionMethod });
           if (allowed !== true) throw Error("REFERENCE_GENERATION_CONTRACT_NOT_ALLOWED");
           if (name === "open_visual_file_upload") {
+            if (current.executionRole === "REVIEWER") throw Error("REVIEW_RESUME_REQUIRED");
             if (spec.generatedAssetUrl || spec.resumeJobId) throw Error("UPLOAD_REQUIRES_NEW_NATIVE_FILE");
             result = { requestId: a.requestId, operationId: a.operationId, spec, pipelineImageId: current.claim.pipelineImageId,
               contractHash: current.claim.generationContractHash, requiresInputFile: spec.productionMethod === "REAL_SOURCE_AI_EDIT", nextAction: "SELECT_OR_UPLOAD_NATIVE_CHAT_IMAGE" };
@@ -1290,8 +1312,8 @@ function inactiveClaimError(current: Record<string, unknown>) {
 }
 
 
-function inspectionContentError(metadata: any, content: any[]): string | null {
-  for (const key of ["canonicalImage", "mobile390Image"]) {
+function inspectionContentError(metadata: {sha256?: string; canonicalImage?: {contentIndex:number; derivedFromSha256?:string}; mobile390Image?: {contentIndex:number; derivedFromSha256?:string}}, content: Array<{type:string; mimeType?:string; data?:string}>): string | null {
+  for (const key of ["canonicalImage", "mobile390Image"] as const) {
     const declared = metadata?.[key];
     const block = declared && content[declared.contentIndex];
     if (!declared || !Number.isInteger(declared.contentIndex) ||
@@ -1305,7 +1327,7 @@ function inspectionContentError(metadata: any, content: any[]): string | null {
   }
   return null;
 }
-function inspectionError(id: unknown, metadata: any) {
+function inspectionError(id: unknown, metadata: unknown) {
   return json({ jsonrpc: "2.0", id, result: { isError: true,
     structuredContent: metadata, content: [{ type: "text", text: JSON.stringify(metadata) }] } });
 }

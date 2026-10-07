@@ -77,3 +77,17 @@ new request IDs return BUSY and historical Resume aliases no longer authorize mu
 Service-only recovery, failure and approval RPCs use existing image/job/run receipts. Recovery joins
 same-contract STAGED jobs to existing private Storage objects, and excludes old approved jobs that no
 longer match `staging_asset.sourceJobId`. QA-approved staging semantics and public grants are unchanged.
+
+
+### 2026-10-07 Two-execution visual handoff delta
+
+Migration `20261007013115_visual_production_review_handoff.sql` adds nullable image `visual_phase`
+(text checked to PRODUCTION_PENDING/PRODUCING/QA_PENDING/REVIEWING/APPROVED) and `review_candidate`
+(jsonb). Existing public status/handoff_phase checks, RLS and grants stay unchanged. Request role
+is stored in the existing immutable 29.response.executionRole; no extra receipt table is created.
+Candidate joins current Contract, semantic fences and actual private Storage metadata. Stage Claim,
+handoff, candidate read and role guard RPCs are service-only. Existing NULL phases retain legacy
+compatibility; no bulk data backfill. Production DDL verification and transactional regression are
+required before deployment is reported complete. Rollback restores prior function definitions,
+then removes the two columns/check only after draining split Claims/candidates; never discard a
+live pending candidate to roll back.

@@ -135,6 +135,9 @@ export function generationCapabilities() {
     serverGenerationSupported: false,
     nativeGenerationAvailability: "CHECK_CURRENT_CHAT",
     nativeFileHandoff: true,
+    splitProductionReviewSupported: true,
+    splitClaimTools: ["claim_visual_production","claim_visual_review"],
+    productionFinishTool: "handoff_visual_review",
     fileParamsSupported: true,
     userFileUploadSupported: true,
     generatedAssetUrlHandoff: true,
@@ -150,9 +153,14 @@ export function generationCapabilities() {
 // A task-only packet, not a claim that the host generator supports session isolation.
 // Read-only reconstruction of an existing native intake spec. Never manufactures
 // reference evidence, exports file URLs, or treats this packet as pixel QA.
-export function nativeRecoveryPacket(job: Record<string, any>, worker: string, claim: Record<string, any>) {
+type RecoveryJob = {
+  status?: unknown; pipeline_image_id?: unknown; contract_hash?: unknown;
+  spec?: Partial<GenerationSpec> & {visualMcpOperation?: {workerKey?: string}};
+  result?: {semanticValidation?: {status?: string}; generatedInput?: {bucket?: string; path?: string; sha256?: string}; sha256?: string};
+};
+export function nativeRecoveryPacket(job: RecoveryJob & {job_id?: unknown}, worker: string, claim: Record<string, unknown>) {
   const s = job.spec, r = job.result, input = r?.generatedInput;
-  if (job.status !== "STAGED" || r?.semanticValidation?.status === "FAIL" ||
+  if (!s || job.status !== "STAGED" || r?.semanticValidation?.status === "FAIL" ||
       job.pipeline_image_id !== claim.pipelineImageId || job.contract_hash !== claim.generationContractHash ||
       s?.visualMcpOperation?.workerKey !== worker || !input ||
       input.bucket !== "content-pipeline-staging" || !/^[a-f0-9]{64}$/.test(input.sha256 ?? "") ||

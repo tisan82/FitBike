@@ -20,7 +20,7 @@ function harness({email="operator@example.org",confirmed=true,configured=true,ac
 }
 test("authentication blocks anonymous, invalid, unconfigured and unapproved users",async()=>{for(const [options,token,status] of [[{},"",401],[{},"bad",401],[{configured:false},"valid",503],[{email:"other@example.org"},"valid",403],[{confirmed:false},"valid",403]]){const h=harness(options);assert.equal((await h.send("ping",{},null,token)).status,status);assert.equal(h.calls.length,0);}});
 test("null and arrays are rejected before JSON-RPC access",async()=>{for(const body of ["null","[]"]){assert.equal((await harness().send("ping",{},null,"valid",body)).status,400);}});
-test("tool list includes the complete 3-A boundaries with truthful annotations",async()=>{const b=await(await harness().send()).json();assert.equal(b.result.tools.length,17);assert.equal(b.result.tools.find(t=>t.name==="inspect_visual_source").annotations.readOnlyHint,true);assert.equal(b.result.tools.find(t=>t.name==="dispatch_visual_source").annotations.openWorldHint,true);});
+test("tool list includes the complete 3-A boundaries with truthful annotations",async()=>{const b=await(await harness().send()).json();assert.equal(b.result.tools.length,20);assert.equal(b.result.tools.find(t=>t.name==="inspect_visual_source").annotations.readOnlyHint,true);assert.equal(b.result.tools.find(t=>t.name==="dispatch_visual_source").annotations.openWorldHint,true);});
 test("valid source delegates only bounded named dispatch with server-owned worker",async()=>{const h=harness();const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{sourceAssetUrl:"https://photos.example.org/image.jpg",sourcePageUrl:"https://photos.example.org/page",sourceOwner:"Manufacturer",transform:{maxWidth:780,annotations:[{type:"circle",x:.5,y:.5,radius:.1}]}}},"dispatch_visual_source")).json();assert.equal(b.result.isError,undefined);const call=h.calls.at(-1);assert.equal(call.name,"content_pipeline_dispatch_visual_source_request_v1");assert.equal(call.args.p_worker_key,"mcp-3a-user");});
 test("invalid transform/rights fields and inactive claim never dispatch",async()=>{for(const [options,extra] of [[{}, {circle:{x:.5,y:.5,radius:.1}}],[{active:false},{}]]){const h=harness(options);const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{sourceAssetUrl:"https://photos.example.org/image.jpg",sourcePageUrl:"https://photos.example.org/page",sourceOwner:"Manufacturer",transform:extra}},"dispatch_visual_source")).json();assert.equal(b.result.isError,true);assert.equal(h.calls.some(c=>c.name.includes("dispatch")),false);}});
 test("cross-image inspection is rejected before storage download",async()=>{const h=harness({jobImage:2001});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB},"inspect_visual_source")).json();assert.equal(b.result.isError,true);assert.match(b.result.content[0].text,/ACCESS_DENIED/);});
@@ -159,4 +159,18 @@ test("preflight QA uses dedicated tool and never invokes approval",async()=>{
  const h=harness({staged:true});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB,expectedSha:"a".repeat(64),preStagingQa:{status:"PASS"}},"record_visual_source_qa")).json();
  assert.equal(b.result.isError,undefined);assert.equal(h.calls.at(-1).name,"content_pipeline_register_pre_staging_qa_v1");
  assert.equal(h.calls.some(c=>c.name.includes("approve_visual_request")),false);
+});
+
+
+test("split stage tools expose separate Claims and exact persistent handoff",async()=>{
+ const h=harness();const list=await(await h.send()).json();
+ for(const name of ["claim_visual_production","claim_visual_review","handoff_visual_review"])assert.ok(list.result.tools.find(t=>t.name===name));
+ for(const [name,role] of [["claim_visual_production","PRODUCER"],["claim_visual_review","REVIEWER"]]){
+  const x=harness();await x.send("tools/call",{requestId:REQUEST,pipelineImageId:2000},name);
+  const call=x.calls.find(c=>c.name==="content_pipeline_claim_visual_stage_v1");
+  assert.equal(call.args.p_role,role);assert.equal(call.args.p_worker_key,"mcp-3a-user");assert.equal(call.args.p_pipeline_image_id,2000);
+ }
+ const x=harness();await x.send("tools/call",{requestId:REQUEST,jobId:JOB,expectedSha:"a".repeat(64)},"handoff_visual_review");
+ const c=x.calls.find(c=>c.name==="content_pipeline_handoff_visual_review_v1");assert.equal(c.args.p_job_id,JOB);assert.equal(c.args.p_expected_sha,"a".repeat(64));
+ assert.equal(x.calls.some(c=>c.name.includes("approve")),false);
 });
