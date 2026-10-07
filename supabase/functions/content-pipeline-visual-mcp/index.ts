@@ -325,7 +325,7 @@ const tools: VisualTool[] = [
   {
     name: "inspect_visual_source",
     description:
-      "Download the exact private staged WebP, verify its SHA, bytes, signature and actual decode, then return image content plus a derived 390px preview. Human/model must inspect the returned pixels; technical PASS does not approve semantic QA.",
+      "Download the exact private staged WebP, verify its SHA, bytes, signature and actual decode, then return original, full 390px preview, centered 16:9 Card and Hero display previews. Human/model must inspect the returned pixels; technical PASS does not approve semantic QA.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1029,10 +1029,13 @@ Deno.serve(async (req) => {
               inspectionAccess: await inspectionAccess(r, current.claim),
               canonicalImage: { contentIndex: 1, mimeType: "image/png", width: r.width, height: r.height, derivedFromSha256: r.sha256, transform: "LOSSLESS_DECODE_NO_RESIZE" },
               mobile390Image: { contentIndex: 2, mimeType: "image/png", width: 390, height: Math.max(1, Math.round(r.height * 390 / r.width)), derivedFromSha256: r.sha256 },
-              nextAction: "VIEW_BOTH_IMAGE_CONTENT_BLOCKS_THEN_PERFORM_SEMANTIC_AND_MOBILE_QA",
+              roleCropQa: "NOT_EVALUATED",
+              cardCropImage: { contentIndex: 3, mimeType: "image/png", width: 390, height: 219, derivedFromSha256: r.sha256, sourceCrop: proof.crop, aspectRatio: "16:9", objectFit: "cover", objectPosition: "center", transform: "SERVICE_DISPLAY_PREVIEW_NOT_CANONICAL" },
+              heroCropImage: { contentIndex: 4, mimeType: "image/png", width: 768, height: 432, derivedFromSha256: r.sha256, sourceCrop: proof.crop, aspectRatio: "16:9", objectFit: "cover", objectPosition: "center", transform: "SERVICE_DISPLAY_PREVIEW_NOT_CANONICAL" },
+              nextAction: "VIEW_ALL_IMAGE_CONTENT_BLOCKS_THEN_PERFORM_SEMANTIC_MOBILE_AND_REQUIRED_ROLE_CROP_QA",
               clientRenderingInstruction: "Forward each MCP image block to the model (functions.exec: image(block)). Metadata/decode PASS is not semantic QA. If pixels remain unavailable, preserve this job/SHA and resume inspection; do not regenerate.",
             };
-            if (!proof.canonical?.length || !proof.mobile?.length) {
+            if (!proof.canonical?.length || !proof.mobile?.length || !proof.cardCrop?.length || !proof.heroCrop?.length) {
               result.pixelDeliveryQa = "FAIL";
               result.technicalVerification = "FAIL";
               result.semanticQa = "BLOCKED";
@@ -1049,7 +1052,8 @@ Deno.serve(async (req) => {
               type: "image",
               data: encodeBase64(proof.mobile),
               mimeType: "image/png",
-            }];
+            }, { type: "image", data: encodeBase64(proof.cardCrop), mimeType: "image/png" },
+            { type: "image", data: encodeBase64(proof.heroCrop), mimeType: "image/png" }];
           } else {
             if (
               typeof a.expectedSha !== "string" ||
@@ -1323,12 +1327,12 @@ function inactiveClaimError(current: Record<string, unknown>) {
 }
 
 
-function inspectionContentError(metadata: {sha256?: string; canonicalImage?: {contentIndex:number; derivedFromSha256?:string}; mobile390Image?: {contentIndex:number; derivedFromSha256?:string}}, content: Array<{type:string; mimeType?:string; data?:string}>): string | null {
-  for (const key of ["canonicalImage", "mobile390Image"] as const) {
+function inspectionContentError(metadata: {sha256?: string; canonicalImage?: {contentIndex:number; derivedFromSha256?:string}; mobile390Image?: {contentIndex:number; derivedFromSha256?:string}; cardCropImage?: {contentIndex:number; derivedFromSha256?:string}; heroCropImage?: {contentIndex:number; derivedFromSha256?:string}}, content: Array<{type:string; mimeType?:string; data?:string}>): string | null {
+  for (const key of ["canonicalImage", "mobile390Image", "cardCropImage", "heroCropImage"] as const) {
     const declared = metadata?.[key];
     const block = declared && content[declared.contentIndex];
     if (!declared || !Number.isInteger(declared.contentIndex) ||
-        declared.contentIndex !== (key === "canonicalImage" ? 1 : 2) ||
+        declared.contentIndex !== ({canonicalImage:1,mobile390Image:2,cardCropImage:3,heroCropImage:4}[key]) ||
         block?.type !== "image" || block.mimeType !== "image/png" ||
         typeof block.data !== "string" || block.data.length < 32 ||
         !block.data.startsWith("iVBORw0KGgo") ||

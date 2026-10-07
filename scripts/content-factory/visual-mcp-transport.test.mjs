@@ -13,7 +13,7 @@ function harness({email="operator@example.org",confirmed=true,configured=true,ac
  const context={sourceUrl:value=>{const u=new URL(String(value));if(u.protocol!=="https:")throw Error("SOURCE_URL_UNSAFE");return u;},Date,createClient:()=>sb,Deno:{env:{get:key=>key==="CONTENT_FACTORY_MCP_OPERATOR_EMAILS"?(configured?"operator@example.org":""):"https://example.supabase.co"},serve:fn=>{handler=fn;}},Request,Response,Blob,URL,TextEncoder,Uint8Array,Array,Number,JSON,String,Error,btoa};
  const generation=readFileSync(new URL("../../supabase/functions/content-pipeline-visual-mcp/generation.ts",import.meta.url),"utf8").replace(/^import .*;$/gm,"").replace(/export /g,"");
  vm.runInNewContext(ts.transpile(generation,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),context);
- context.loadInspection=async()=>({inspectPixels:async()=>({metadata:{sha256:"a".repeat(64),decode:"PASS"},canonical:missingPixels?new Uint8Array():Uint8Array.from([137,80,78,71,13,10,26,10,...new Uint8Array(24)]),mobile:Uint8Array.from([137,80,78,71,13,10,26,10,...new Uint8Array(24)])})});
+ context.loadInspection=async()=>({inspectPixels:async()=>({metadata:{sha256:"a".repeat(64),decode:"PASS"},canonical:missingPixels?new Uint8Array():Uint8Array.from([137,80,78,71,13,10,26,10,...new Uint8Array(24)]),mobile:Uint8Array.from([137,80,78,71,13,10,26,10,...new Uint8Array(24)]),cardCrop:Uint8Array.from([137,80,78,71,13,10,26,10,...new Uint8Array(24)]),heroCrop:Uint8Array.from([137,80,78,71,13,10,26,10,...new Uint8Array(24)]),crop:{x:0,y:0,width:1200,height:675}})});
  context.loadGeneration=async()=>({validateGenerationSpec:context.validateGenerationSpec,generationCapabilities:context.generationCapabilities,nativeGenerationContext:context.nativeGenerationContext,nativeRecoveryPacket:context.nativeRecoveryPacket});
  vm.runInNewContext(ts.transpile(source,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),context);
  return {calls,send:async(method="tools/list",args={},name,token="valid",body)=>handler(new Request("https://example.supabase.co/functions/v1/content-pipeline-visual-mcp",{method:"POST",headers:{"content-type":"application/json",...(token?{authorization:`Bearer ${token}`}:{})},body:body??JSON.stringify({jsonrpc:"2.0",id:1,method,params:{name,arguments:args}})}))};
@@ -75,9 +75,9 @@ test("task read exposes the preserved same-contract candidate without promoting 
 test("inspection keeps image content and a fresh verified-path download fallback",async()=>{
  const h=harness({staged:true});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB},"inspect_visual_source")).json();
  assert.equal(b.result.isError,undefined);
- assert.equal(b.result.content.filter(c=>c.type==="image").length,2);
+ assert.equal(b.result.content.filter(c=>c.type==="image").length,4);
  assert.equal(b.result.structuredContent.semanticQa,"NOT_EVALUATED");
- assert.deepEqual(b.result.content.filter(c=>c.type==="image").map(c=>c.mimeType),["image/png","image/png"]);
+ assert.deepEqual(b.result.content.filter(c=>c.type==="image").map(c=>c.mimeType),["image/png","image/png","image/png","image/png"]);
  assert.equal(b.result.structuredContent.canonicalImage.derivedFromSha256,"a".repeat(64));
  assert.equal(b.result.structuredContent.inspectionAccess.available,true);
  assert.equal(b.result.structuredContent.inspectionAccess.expectedSha,"a".repeat(64));
@@ -88,7 +88,7 @@ test("source status renews expired URL; signing failure does not discard image c
  const h=harness({staged:true});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB},"get_visual_source_status")).json();
  assert.equal(b.result.structuredContent.inspectionAccess.available,true);
  const x=harness({staged:true,signedError:true});const r=await(await x.send("tools/call",{requestId:REQUEST,jobId:JOB},"inspect_visual_source")).json();
- assert.equal(r.result.isError,undefined);assert.equal(r.result.content.filter(c=>c.type==="image").length,2);
+ assert.equal(r.result.isError,undefined);assert.equal(r.result.content.filter(c=>c.type==="image").length,4);
  assert.equal(r.result.structuredContent.inspectionAccess.failureCode,"INSPECTION_SIGNED_URL_FAILED");
 });
 test("failure and approval use atomic request-bound server wrappers",async()=>{
@@ -142,7 +142,7 @@ test("inspection reports server content delivery without claiming client display
 test("Storage read failure uses bounded same-asset fallback without source dispatch",async()=>{
  const h=harness({staged:true,storageFailsOnce:true});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB},"inspect_visual_source")).json();
  assert.equal(b.result.isError,undefined);assert.equal(b.result.structuredContent.readbackTransport,"STORAGE_INTERNAL_RETRY");
- assert.equal(b.result.content.filter(c=>c.type==="image").length,2);
+ assert.equal(b.result.content.filter(c=>c.type==="image").length,4);
  assert.equal(h.calls.some(c=>c.name.includes("dispatch")),false);
 });
 
