@@ -28,4 +28,23 @@ begin
  begin perform public.content_pipeline_record_native_attempt_v1(w,r,extensions.gen_random_uuid(),'REQUEST',q);raise exception 'CLOSED_REQUEST_ALLOWED';exception when others then if sqlerrm<>'ACTIVE_VISUAL_CLAIM_REQUIRED' then raise;end if;end;
  if has_function_privilege('authenticated','public.content_pipeline_record_native_attempt_v1(text,uuid,uuid,text,jsonb)','EXECUTE') or has_table_privilege('service_role','public."30_content_pipeline_native_attempt_event"','UPDATE') then raise exception 'AUDIT_GRANT_LEAK';end if;
 end $test$;
+do $raw$
+declare v jsonb; i public."21_content_pipeline_image"%rowtype; w text:='raw-audit-test-'||extensions.gen_random_uuid(); r uuid:=extensions.gen_random_uuid(); a uuid:=extensions.gen_random_uuid(); c jsonb; q jsonb; output jsonb:='{"fileId":"file_test_raw"}';
+begin
+ v:=public.content_pipeline_validate_native_call_v2('{"toolName":"image_gen.text2im","schemaVersion":"RAW_ARGUMENTS_V1","arguments":{"prompt":"Actual current motorcycle instrument photograph.","size":"1536x1024","n":1,"referenced_image_ids":["file_test_reference"]}}');
+ if v->>'valid'<>'true' or v->>'runtimeSchemaValidated'<>'false' then raise exception 'RAW_VALIDATION_FAILED';end if;
+ v:=public.content_pipeline_validate_native_call_v2('{"prompt":"Actual current motorcycle instrument photograph.","size":"1536x1024"}');
+ if v->>'field'<>'nativeCall.size' or v->>'valid'<>'false' then raise exception 'FIELD_DIAGNOSTIC_FAILED';end if;
+ v:=public.content_pipeline_validate_native_call_v2('{"toolName":"image_gen.text2im","schemaVersion":"RAW_ARGUMENTS_V1","arguments":{"prompt":"Actual current motorcycle instrument photograph.","nested":{"access_token":"secret"}}}');
+ if v->>'valid'<>'false' then raise exception 'NESTED_SECRET_ALLOWED';end if;
+ select * into i from public."21_content_pipeline_image" where generation_contract_hash is not null and not(status='PROCESSING' and claim_expires_at>=now()) order by pipeline_image_id limit 1;
+ update public."21_content_pipeline_image" set status='PROCESSING',claimed_by=w,claim_token=a,claim_expires_at=now()+interval '1 hour' where pipeline_image_id=i.pipeline_image_id;
+ insert into public."29_content_pipeline_visual_claim_request"(worker_key,request_id,pipeline_image_id,response) values(w,r,i.pipeline_image_id,jsonb_build_object('pipelineImageId',i.pipeline_image_id,'generationContractHash',i.generation_contract_hash,'claimToken',a,'executionRole','PRODUCER'));
+ q:=jsonb_build_object('contractHash',i.generation_contract_hash,'nativeCall','{"toolName":"image_gen.text2im","schemaVersion":"RAW_ARGUMENTS_V1","arguments":{"prompt":"Actual current motorcycle instrument photograph.","size":"1536x1024","n":1}}'::jsonb);
+ c:=public.content_pipeline_record_native_attempt_v1(w,r,a,'REQUEST',q);
+ c:=public.content_pipeline_record_native_attempt_v1(w,r,a,'RESULT',jsonb_build_object('actualNativeCall',q->'nativeCall','outputs',jsonb_build_array(output),'inspectedOutput',output,'pixelsInspected',true,'pixelQa','PASS','pixelEvidence','Actual test fixture pixels inspected; no actual image generated.'));
+ if c->>'recorded'<>'true' then raise exception 'RAW_RESULT_FAILED';end if;
+ if has_function_privilege('authenticated','public.content_pipeline_validate_native_call_v2(jsonb)','EXECUTE') then raise exception 'VALIDATOR_GRANT_LEAK';end if;
+end $raw$;
+select 'LEGACY_AND_RAW_AUDIT_REGRESSION_PASS' as result;
 rollback;
