@@ -20,3 +20,18 @@ test('real cropped canonical dimensions and bytes preserved; annotation composit
  assert.deepEqual(resumed.bytes,staged.webp);assert.equal(resumed.canonicalSha256,proof.sha256);
  const annotated=await ctx.transformSource(resumed.bytes,'image/webp',{maxWidth:resumed.width,annotations:[{type:'circle',x:.5,y:.5,radius:.15}]});const final=await ctx.inspectWebp(annotated.webp,'image/webp');assert.equal(final.width,390);assert.equal(final.height,234);assert.notEqual(final.sha256,proof.sha256);
 });
+
+
+test('failed preserved Native input is decoded and SHA-verified from real WebP bytes before restaging',async()=>{
+ const png=magick.ImageMagick.read(new magick.MagickColor('#064e3b'),900,600,img=>img.write(magick.MagickFormat.Png,b=>Uint8Array.from(b)));
+ const normalized=await ctx.transformSource(png,'image/png',{maxWidth:900});
+ const proof=await ctx.inspectWebp(normalized.webp,'image/webp');
+ const h={JSON,Error};const helper=readFileSync(new URL('../../supabase/functions/content-pipeline-source-stage/native-resume.ts',import.meta.url),'utf8').replaceAll('export ','');vm.runInNewContext(ts.transpile(helper,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}),h);
+ const spec={productionMethod:'NATIVE_FULL_GENERATION',prompt:'A real codec test only, never content pixel QA.',references:[],preflightOnly:true,visualMcpOperation:{workerKey:'worker'}};
+ const parent={job_id:'input',pipeline_image_id:10,contract_hash:'hash',status:'FAILED',spec,result:{checkpoint:'GENERATED_BINARY_PRESERVED',generatedInput:{...proof,bucket:'content-pipeline-staging',path:`5/10/${proof.sha256}.webp`}}};
+ const current={pipelineId:5,pipelineImageId:10,contractHash:'hash',spec:{...spec,resumeJobId:'input'}},admitted={sourceJobId:'input',sourceSha256:proof.sha256};
+ const read=async()=>({bytes:normalized.webp,mime:'image/webp'});
+ const result=await h.readStoredNativeInput(current,parent,admitted,read,ctx.inspectWebp);
+ assert.deepEqual(result.bytes,normalized.webp);assert.equal((await ctx.inspectWebp(result.bytes,'image/webp')).width,900);
+ await assert.rejects(h.readStoredNativeInput(current,parent,admitted,async()=>({bytes:png,mime:'image/png'}),ctx.inspectWebp),/INVALID_WEBP/);
+});

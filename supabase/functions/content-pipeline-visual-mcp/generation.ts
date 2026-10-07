@@ -12,6 +12,8 @@ type Reference = {
 export type GenerationSpec = {
   productionMethod: "NATIVE_FULL_GENERATION" | "REFERENCE_BASED_GENERATION" | "REAL_SOURCE_AI_EDIT";
   prompt: string;
+  nativeAttemptId?: string;
+  nativeAttemptBinding?: Record<string, unknown>;
   references: Reference[];
   inputAssetUrl?: string;
   generatedAssetUrl?: string;
@@ -28,6 +30,8 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
   const s = raw as GenerationSpec;
   const keys = [
     "resumeJobId",
+    "nativeAttemptId",
+    "nativeAttemptBinding",
     "productionMethod",
     "prompt",
     "references",
@@ -51,6 +55,7 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
     !Array.isArray(s.references) ||
     (s.productionMethod === "NATIVE_FULL_GENERATION" ? s.references.length !== 0 : s.references.length < 1 || s.references.length > 4)
   ) throw Error("INVALID_GENERATION_SPEC");
+  if (s.nativeAttemptId !== undefined && !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(s.nativeAttemptId)) throw Error("INVALID_NATIVE_ATTEMPT_ID");
   for (const r of s.references) {
     if (
       !r || typeof r !== "object" || Array.isArray(r) ||
@@ -139,6 +144,8 @@ export function generationCapabilities() {
     nativeGenerationAvailability: "CHECK_CURRENT_CHAT",
     nativeFileHandoff: true,
     nativeAttemptAuditSupported: true,
+    nativeDispatchAttemptBindingSupported: true,
+    failedNativeInputRecoverySupported: true,
     sourceAssetResolverSupported: true,
     sourceAssetResolverTool: "resolve_visual_source_assets",
     nativeAttemptAuditFormat: "RAW_ARGUMENTS_V1",
@@ -167,11 +174,14 @@ export function generationCapabilities() {
 type RecoveryJob = {
   status?: unknown; pipeline_image_id?: unknown; contract_hash?: unknown;
   spec?: Partial<GenerationSpec> & {visualMcpOperation?: {workerKey?: string}};
-  result?: {semanticValidation?: {status?: string}; generatedInput?: {bucket?: string; path?: string; sha256?: string}; sha256?: string};
+  result?: {semanticValidation?: {status?: string}; checkpoint?: string; generatedInput?: {bucket?: string; path?: string; sha256?: string; bytes?: number; width?: number; height?: number; mime?: string; decode?: string; signature?: string; persistence?: {status?: string}}; sha256?: string};
 };
 export function nativeRecoveryPacket(job: RecoveryJob & {job_id?: unknown}, worker: string, claim: Record<string, unknown>) {
   const s = job.spec, r = job.result, input = r?.generatedInput;
-  if (!s || job.status !== "STAGED" || r?.semanticValidation?.status === "FAIL" ||
+  const inputOnly = job.status === "FAILED";
+  const preserved = input?.persistence?.status === "READ_BACK_VERIFIED" || ["GENERATED_BINARY_PRESERVED", "STORAGE_VERIFIED"].includes(String(r?.checkpoint));
+  if (inputOnly && (claim.executionRole === "REVIEWER" || !preserved || input?.mime !== "image/webp" || input?.decode !== "PASS" || input?.signature !== "RIFF/WEBP" || !Number.isSafeInteger(input?.bytes) || Number(input?.bytes) < 12 || Number(input?.bytes) > 4194304 || !Number.isSafeInteger(input?.width) || Number(input?.width) <= 0 || !Number.isSafeInteger(input?.height) || Number(input?.height) <= 0 || Number(input?.height) * Number(input?.width) > 8000000)) return null;
+  if (!s || !["STAGED", "FAILED"].includes(String(job.status)) || r?.semanticValidation?.status === "FAIL" ||
       job.pipeline_image_id !== claim.pipelineImageId || job.contract_hash !== claim.generationContractHash ||
       s?.visualMcpOperation?.workerKey !== worker || !input ||
       input.bucket !== "content-pipeline-staging" || !/^[a-f0-9]{64}$/.test(input.sha256 ?? "") ||
@@ -179,14 +189,16 @@ export function nativeRecoveryPacket(job: RecoveryJob & {job_id?: unknown}, work
   const spec = {
     productionMethod: s.productionMethod, prompt: s.prompt, references: s.references,
     ...(s.inputAssetUrl ? { inputAssetUrl: s.inputAssetUrl } : {}),
+    ...(s.nativeAttemptId ? { nativeAttemptId: s.nativeAttemptId } : {}),
     resumeJobId: job.job_id, transform: s.transform, preflightOnly: claim.executionRole !== "REVIEWER",
   };
   try { validateGenerationSpec(spec); } catch { return null; }
   return {
-    spec, sourceSha256: input.sha256, canonicalSha256: r.sha256,
-    nextAction: visualExecutionProtocol(claim.executionRole).nextAction,
+    kind: inputOnly ? "INPUT_ONLY" : "STAGED_CANDIDATE",
+    spec, sourceSha256: input.sha256, canonicalSha256: inputOnly ? null : r.sha256,
+    nextAction: inputOnly ? "RESTAGE_PRESERVED_NATIVE_INPUT" : visualExecutionProtocol(claim.executionRole).nextAction,
     executionProtocol: visualExecutionProtocol(claim.executionRole),
-    preserveExactly: ["prompt", "references", "productionMethod", "inputAssetUrl"],
+    preserveExactly: ["prompt", "references", "productionMethod", "inputAssetUrl", "nativeAttemptId"],
     qaStatus: "NOT_EVALUATED", generationCallObservedByServer: false,
   };
 }
@@ -210,7 +222,7 @@ export function nativeGenerationContext(pipelineImageId: number, contractHash: s
     pipelineImageId, generationContractHash: contractHash, prompt,
     attemptEvidenceProtocol: {
       tool: "record_visual_generation_attempt", provenance: "OPERATOR_REPORTED", serverObservedNativeCall: false,
-      beforeCall: "Before Claim, validate_visual_generation_call checks audit capture. Use nativeCall {toolName: actual native tool name, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native arguments, sceneInstruction: {text: actual scene message or null, location: TOOL_ARGUMENT|CONVERSATION_MESSAGE|UNOBSERVED}}. This does not validate the runtime schema. Create attemptId. Save REQUEST evidence: contractHash and nativeCall with the exact intended imagegen arguments. This is intention, not proof of invocation.",
+      beforeCall: "Immediately before the actual native call, validate_visual_generation_call checks the current scene audit capture. Source-only production skips Native audit. Use nativeCall {toolName: actual native tool name, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native arguments, sceneInstruction: {text: actual scene message or null, location: TOOL_ARGUMENT|CONVERSATION_MESSAGE|UNOBSERVED}}. This does not validate the runtime schema. Create attemptId. Save REQUEST evidence: contractHash and nativeCall with the exact intended imagegen arguments. This is intention, not proof of invocation.",
       afterCall: "Save RESULT: actualNativeCall copied from this actual invocation, outputs with actual fileId/path, inspectedOutput, pixelsInspected, pixelQa, pixelEvidence, and intended handoff operationId. Never fill missing values by inference.",
       afterHandoffError: "Save TRANSPORT_ERROR with the same attemptId, operationId and exact error. Do not regenerate a valid image because of transport failure.",
       readBack: "get_visual_image_task.nativeAttemptAudit or get_visual_claim_result.nativeAttemptAudit. Missing evidence remains MISSING. Server Jobs prove server receipt only.",
@@ -254,4 +266,25 @@ export function visualExecutionProtocol(role: unknown, preflightOnly = true) {
     phase2:"record source QA then finalize same source/native resume; final QA and approval remain required",qaFields,
     nativeGenerationAllowed:true,qaRecordingAllowed:true,approvalAllowed:!preflightOnly,successStatus:"READY_FOR_UPLOAD",
     nextAction:preflightOnly ? "VIEW_PIXELS_THEN_RECORD_VISUAL_SOURCE_QA_OR_REJECT_VISUAL_SOURCE" : "FINAL_PIXEL_QA"};
+}
+
+export function bindNativeAttempt(spec: GenerationSpec, audit: {events?: Array<Record<string, unknown>>}, operationId: string, claim: Record<string, unknown>) {
+  if (!spec.nativeAttemptId || spec.resumeJobId) return null;
+  const events = audit?.events ?? [];
+  const result = events.find(e => e.attemptId === spec.nativeAttemptId && e.phase === "RESULT");
+  const request = events.find(e => e.attemptId === spec.nativeAttemptId && e.phase === "REQUEST");
+  if (!result || !request || result.pipelineImageId !== claim.pipelineImageId || result.contractHash !== claim.generationContractHash || request.pipelineImageId !== claim.pipelineImageId || request.contractHash !== claim.generationContractHash) throw Error("NATIVE_ATTEMPT_BINDING_REQUIRED");
+  const evidence = result.evidence as Record<string, unknown>;
+  const intended = request.evidence as Record<string, unknown>;
+  if (evidence.pixelQa !== "PASS" || evidence.pixelsInspected !== true) throw Error("NATIVE_ATTEMPT_PIXEL_SCREEN_REQUIRED");
+  if (evidence.operationId && evidence.operationId !== operationId) throw Error("NATIVE_ATTEMPT_OPERATION_MISMATCH");
+  if (intended.productionMethod && intended.productionMethod !== spec.productionMethod) throw Error("NATIVE_ATTEMPT_METHOD_MISMATCH");
+  const call = evidence.actualNativeCall as {arguments?: {prompt?: unknown}; sceneInstruction?: {text?: unknown}};
+  const actualPrompt = typeof call?.arguments?.prompt === "string" ? call.arguments.prompt : typeof call?.sceneInstruction?.text === "string" ? call.sceneInstruction.text : null;
+  if (actualPrompt !== null && actualPrompt !== spec.prompt) throw Error("NATIVE_ATTEMPT_PROMPT_MISMATCH");
+  const output = evidence.inspectedOutput as {fileId?: string; path?: string; sha256?: string};
+  if (!output || !Array.isArray(evidence.outputs) || !evidence.outputs.some(o => o && typeof o === "object" && Object.keys(o).length === Object.keys(output).length && Object.entries(output).every(([key, value]) => (o as Record<string, unknown>)[key] === value))) throw Error("NATIVE_ATTEMPT_OUTPUT_REQUIRED");
+  if (output.fileId && spec.chatFile && output.fileId !== spec.chatFile.file_id) throw Error("NATIVE_ATTEMPT_FILE_MISMATCH");
+  if (output.sha256 && spec.expectedGeneratedSha && output.sha256 !== spec.expectedGeneratedSha) throw Error("NATIVE_ATTEMPT_SHA_MISMATCH");
+  return {attemptId: spec.nativeAttemptId, provenance: "OPERATOR_REPORTED", serverObservedNativeCall: false, promptLink: actualPrompt === null ? "UNOBSERVED" : "MATCHED_REPORTED_ARGUMENTS", fileLink: output.fileId && spec.chatFile ? "MATCHED_FILE_ID" : output.sha256 && spec.expectedGeneratedSha ? "MATCHED_DECLARED_SHA" : "UNVERIFIED", inspectedOutput: output, operationId};
 }

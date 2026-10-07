@@ -117,7 +117,8 @@ begin
  'references','[]'::jsonb,'transform','{}'::jsonb,'preflightOnly',true,'inputAssetUrl','https://example.org/fixture'));
  raise exception 'FULL_GENERATION_INPUT_SOURCE_ALLOWED';
  exception when others then if sqlerrm<>'INVALID_NATIVE_FULL_GENERATION_INPUT' then raise;end if;end;
- spec:=j.spec||jsonb_build_object('productionMethod','NATIVE_FULL_GENERATION','references','[]'::jsonb,'preflightOnly',true,
+ -- Native or raster borrowed pixels must not carry an ephemeral file input into a resume fixture.
+ spec:=(j.spec-'chatFile'-'inputFile'-'generatedAssetUrl'-'expectedGeneratedSha'-'inputAssetUrl'-'nativeAttemptId'-'nativeAttemptBinding')||jsonb_build_object('productionMethod','NATIVE_FULL_GENERATION','prompt','A realistic current-task scene for rollback protocol validation only.','references','[]'::jsonb,'preflightOnly',true,
  'visualMcpOperation',jsonb_build_object('workerKey',w,'requestId',pr,'operationId',extensions.gen_random_uuid()));
  insert into public."27_content_pipeline_source_stage_job"(job_id,pipeline_image_id,claim_token,contract_hash,spec,status,token_hash,result)
  values(job,i.pipeline_image_id,token,h,spec,'STAGED',extensions.digest('v5-flow','sha256'),j.result||'{"preflightOnly":true}'::jsonb);

@@ -52,3 +52,10 @@ test('Reviewer selects actual label targets before recording the immutable final
  assert.match(protocol.phase1,/choose final annotations\/labels/);assert.match(protocol.phase1,/annotationTargetChecks keyed by exact selected label text/);
  assert.match(protocol.phase2,/identical recorded preStagingQa/);assert.match(protocol.phase2,/do not append label checks after recording/);
 });
+
+test('failed native input recovery requires storage proof, is input-only, and never offers Reviewer regeneration',()=>{
+ const j=fixture();j.status='FAILED';j.result.generatedInput={...j.result.generatedInput,bytes:200,width:1200,height:800,mime:'image/webp',decode:'PASS',signature:'RIFF/WEBP',persistence:{status:'READ_BACK_VERIFIED'}};
+ const packet=context.nativeRecoveryPacket(j,'worker',{...claim,executionRole:'PRODUCER'});assert.equal(packet.kind,'INPUT_ONLY');assert.equal(packet.canonicalSha256,null);assert.equal(packet.nextAction,'RESTAGE_PRESERVED_NATIVE_INPUT');assert.equal(packet.spec.preflightOnly,true);assert.equal(packet.qaStatus,'NOT_EVALUATED');
+ assert.equal(context.nativeRecoveryPacket(j,'worker',{...claim,executionRole:'REVIEWER'}),null);
+ delete j.result.generatedInput.persistence;assert.equal(context.nativeRecoveryPacket(j,'worker',claim),null);j.result.checkpoint='GENERATED_BINARY_PRESERVED';assert.equal(context.nativeRecoveryPacket(j,'worker',claim).kind,'INPUT_ONLY');j.result.generatedInput.bytes=0;assert.equal(context.nativeRecoveryPacket(j,'worker',claim),null);
+});
