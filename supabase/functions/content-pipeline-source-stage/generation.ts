@@ -16,6 +16,8 @@ export type GenerationSpec = {
   inputAssetUrl?: string;
   generatedAssetUrl?: string;
   resumeJobId?: string;
+  nativeAttemptId?: string;
+  nativeAttemptBinding?: Record<string, unknown>;
   expectedGeneratedSha?: string;
   chatFile?: ChatFile;
   inputFile?: ChatFile;
@@ -28,6 +30,8 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
   const s = raw as GenerationSpec;
   const keys = [
     "resumeJobId",
+    "nativeAttemptId",
+    "nativeAttemptBinding",
     "productionMethod",
     "prompt",
     "references",
@@ -102,6 +106,7 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
       throw Error("GENERATED_ASSET_SHA_REQUIRED");
     }
   }
+  if (s.nativeAttemptId !== undefined && !/^[a-f0-9-]{36}$/.test(s.nativeAttemptId)) throw Error("INVALID_ATTEMPT_ID");
   if (s.chatFile) validateChatFile(s.chatFile);
   if (s.inputFile) validateChatFile(s.inputFile);
   if (s.chatFile && s.generatedAssetUrl) throw Error("MULTIPLE_GENERATED_INPUTS");

@@ -8,6 +8,7 @@ import {
 } from "./transform.ts";
 import { downloadSource, sourceUrl } from "./source.ts";
 import { readStoredSourceCandidate } from "./source-resume.ts";
+import { readStoredNativeInput } from "./native-resume.ts";
 import { generateAsset, generationCapabilities } from "./generation.ts";
 import { composeSources, validateComposition } from "./composition.ts";
 const BUCKET = "content-pipeline-staging";
@@ -120,46 +121,22 @@ Deno.serve(async (req) => {
         finalUrl: previous.result.provenance?.finalSourceAssetUrl ?? null,
         redirects: previous.result.provenance?.sourceRedirects ?? [] };
     } else if (generative && s.resumeJobId) {
-      const { data: previous, error } = await sb.from(
-        "27_content_pipeline_source_stage_job",
-      )
-        .select("pipeline_image_id,contract_hash,spec,result").eq(
-          "job_id",
-          s.resumeJobId,
-        ).single();
-      if (
-        error || previous.pipeline_image_id !== j.pipelineImageId ||
-        previous.contract_hash !== j.contractHash ||
-        previous.spec.productionMethod !== s.productionMethod ||
-        previous.spec.inputAssetUrl !== s.inputAssetUrl ||
-        previous.spec.prompt !== s.prompt ||
-        JSON.stringify(previous.spec.references) !==
-          JSON.stringify(s.references) ||
-        previous.spec.visualMcpOperation?.workerKey !==
-          s.visualMcpOperation?.workerKey
-      ) throw Error("GENERATION_RESUME_ACCESS_DENIED");
-      const input = previous.result?.generatedInput;
-      if (
-        !input || input.bucket !== BUCKET ||
-        input.path !==
-          `${j.pipelineId}/${j.pipelineImageId}/${input.sha256}.webp`
-      ) throw Error("GENERATION_RESUME_ASSET_MISSING");
-      const read = await sb.storage.from(BUCKET).download(input.path);
-      if (read.error || !read.data) {
-        throw Error("GENERATION_RESUME_ASSET_MISSING");
+      const { data: previous, error } = await sb.from("27_content_pipeline_source_stage_job")
+        .select("job_id,pipeline_image_id,contract_hash,status,spec,result").eq("job_id",s.resumeJobId).single();
+      if (error || !previous) throw Error("GENERATION_RESUME_ASSET_MISSING");
+      let admitted = null;
+      if (previous.status === "FAILED") {
+        const lookup = await sb.rpc("content_pipeline_owned_native_input_v1", {
+          p_worker_key:s.visualMcpOperation?.workerKey, p_image_id:j.pipelineImageId,
+        });
+        if (lookup.error) throw Error("GENERATION_RESUME_INPUT_NOT_ADMITTED");
+        admitted = lookup.data;
       }
-      const bytes = new Uint8Array(await read.data.arrayBuffer());
-      const proof = await inspectWebp(bytes, read.data.type);
-      if (proof.sha256 !== input.sha256 || proof.bytes !== input.bytes) {
-        throw Error("GENERATION_RESUME_IDENTITY_MISMATCH");
-      }
-      downloaded = {
-        bytes,
-        mime: "image/webp",
-        finalUrl: null,
-        redirects: [],
-        generation: previous.result.generation,
-      };
+      downloaded = await readStoredNativeInput(j,previous,admitted, async path => {
+        const read = await sb.storage.from(BUCKET).download(path);
+        if (read.error || !read.data) throw Error("GENERATION_RESUME_ASSET_MISSING");
+        return {bytes:new Uint8Array(await read.data.arrayBuffer()),mime:read.data.type};
+      },inspectWebp);
     } else {
       if (composite) {
         const unannotated = { ...s.composition, sources: s.composition.sources.map((part: Record<string, unknown>) => { const copy = { ...part }; delete copy.label; return copy; }) };
@@ -202,7 +179,8 @@ Deno.serve(async (req) => {
       if (
         proof.sha256 !== inputProof.sha256 || proof.bytes !== inputProof.bytes
       ) throw Error("GENERATED_BINARY_IDENTITY_MISMATCH");
-      generatedInput = { ...proof, bucket: BUCKET, path: inputPath };
+      generatedInput = { ...proof, bucket: BUCKET, path: inputPath,
+        persistence:{status:"READ_BACK_VERIFIED",verifiedAt:new Date().toISOString()} };
       const { data: saved, error } = await sb.from(
         "27_content_pipeline_source_stage_job",
       ).update({

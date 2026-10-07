@@ -211,3 +211,8 @@ Nullable Native prompt capture (2026-10-07): RAW_ARGUMENTS_V1 preserves null or 
 ### Visual Brief V5 compatibility (2026-10-07)
 
 V5 Task/Claim responses retain the minimal raw `generationContract` and immutable Hash, with separate service-derived `visualPolicy`. Capability reports `visualContractVersions:[4,5]`, `visualPolicyVersion:VISUAL_COMMON_V1` and nativeProductionMethods. Existing tools remain; dispatch_visual_generation adds `NATIVE_FULL_GENERATION` with references=[] only for valid V5 NONE contracts. Reference/Edit retain inspected-reference and actual edit-input requirements. Server/External generation remains prohibited. The selected method/source/transform and original/canonical SHA stay in same-contract Job/audit records; no new public table/RPC exposure. Host tool schema refresh may be needed for the added enum.
+
+
+### Native input recovery / dispatch linkage (2026-10-08)
+
+Additive dispatch `spec.nativeAttemptId` links the authenticated receipt's Native audit to ingest. Internal nativeAttemptBinding is computed server-side and cannot be supplied by clients; legacy calls remain supported. Current Task/claim responses include separate `recoverableNativeInput` from service-only owned-native-input discovery. Its resumeJobId uses verified preserved input bytes for Producer preflight restaging, with no new Native file or Source fetch. Failed input is neither a STAGED candidate nor QA PASS. Storage read-back rechecks normalized SHA, bytes and dimensions; current admission excludes rejected same-input identity. No new table/bucket/public RPC or server generation API is introduced. Refresh connector schema for the optional attempt field and capability flags.

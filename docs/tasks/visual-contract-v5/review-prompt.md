@@ -12,6 +12,8 @@
 
 recoverableStaging이 유효한 같은 후보의 최종 derivative이면 그 자산 검사부터 재개한다. 이미 최종 렌더링된 자산에 Annotation을 다시 적용하지 않는다. Preflight이면 현재 reviewCandidate를 검사한다. 다른 Job의 최신순만으로 후보를 바꾸지 않는다. semantic 무효 자산은 재검사 루프에 넣지 않는다.
 
+Native 입력 저장 확인과 Native 호출 감사는 Reviewer QA PASS를 대신하지 않는다. recoverableNativeInput은 제작자가 Staging해야 하는 입력이며 Reviewer가 승인할 후보가 아니다.
+
 V5의 generationContract는 의미 기준이고 visualPolicy는 서버 공통 기준이다. V4는 기존 제한을 보존한다. 모든 must_show를 검사하고 일부 핵심만 골라 나머지를 PASS 처리하지 않는다. visual_objective/user_question만으로 온도·정상/비정상·재시동 성공·고장 원인 등 명시되지 않은 추상 상태를 FAIL Gate로 추가하지 않는다.
 
 ## 실제 검사와 사전 QA

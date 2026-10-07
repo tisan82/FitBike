@@ -79,8 +79,8 @@ type VisualTool = {
 };
 const tools: VisualTool[] = [
   {name:"resolve_visual_source_assets",description:"Read-only server HTML/XML image resolver before Claim. Extracts actual img/src/srcset/lazy links scoped to a section, resolves relative URLs, validates public HTTPS DNS and redirects, probes bounded raster candidates for MIME/signature/decode/SHA and returns actual 390px previews. Never guesses URLs, changes Contract, claims, stages or asserts semantic QA. Use sourcePageUrl for provenance and the inspected sourceAssetUrl for dispatch.",inputSchema:{type:"object",properties:{sourcePageUrl:{type:"string",maxLength:4096},sectionQuery:{type:"string",maxLength:200},maxCandidates:{type:"integer",minimum:1,maximum:5}},required:["sourcePageUrl"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:true}},
-  { name: "validate_visual_generation_call", description: "Read-only audit input validation before Claim. Pass nativeCall as {toolName: actual native image tool name, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native tool arguments, sceneInstruction: {text: actual scene message or null, location: TOOL_ARGUMENT|CONVERSATION_MESSAGE|UNOBSERVED}}. Preserves raw runtime-specific keys, including null or omitted prompt. instructionVisibility is separate from valid; never infer a scene instruction or runtime validity. Returns field/reason for invalid capture. Does not validate the native runtime schema, generate, record an attempt, claim or approve.", inputSchema: {type:"object",properties:{nativeCall:{type:"object",additionalProperties:true}},required:["nativeCall"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
-  { name: "record_visual_generation_attempt", description: "Append immutable operator-reported native imagegen evidence. Validate with validate_visual_generation_call before Claim. REQUEST contains contractHash and nativeCall {toolName, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native args, optional sceneInstruction: {text, location}}. RESULT uses the identical envelope in actualNativeCall. Legacy four-key calls remain supported. RESULT after calling contains actualNativeCall, outputs, inspectedOutput, pixelsInspected, pixelQa, pixelEvidence and optional operationId. TRANSPORT_ERROR records operationId and exact error. Never generates, approves or renews a claim. Read raw evidence with get_visual_image_task/get_visual_claim_result. The server cannot observe the native tool call.", inputSchema: {type:"object",properties:{requestId:{type:"string",format:"uuid"},attemptId:{type:"string",format:"uuid"},phase:{type:"string",enum:["REQUEST","RESULT","TRANSPORT_ERROR"]},evidence:{type:"object",additionalProperties:true}},required:["requestId","attemptId","phase","evidence"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}},
+  { name: "validate_visual_generation_call", description: "Read-only audit capture validation immediately before an actual native call. Source-only production does not require this validator. Pass nativeCall as {toolName: actual native image tool name, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native tool arguments, sceneInstruction: {text: actual scene message or null, location: TOOL_ARGUMENT|CONVERSATION_MESSAGE|UNOBSERVED}}. Preserves raw runtime-specific keys, including null or omitted prompt. instructionVisibility is separate from valid; never infer a scene instruction or runtime validity. Returns field/reason for invalid capture. Does not validate the native runtime schema, generate, record an attempt, claim or approve.", inputSchema: {type:"object",properties:{nativeCall:{type:"object",additionalProperties:true}},required:["nativeCall"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
+  { name: "record_visual_generation_attempt", description: "Append immutable operator-reported native imagegen evidence. Validate the current scene capture immediately before the actual native call; Source-only production skips Native audit. REQUEST contains contractHash and nativeCall {toolName, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native args, optional sceneInstruction: {text, location}}. RESULT uses the identical envelope in actualNativeCall. Legacy four-key calls remain supported. RESULT after calling contains actualNativeCall, outputs, inspectedOutput, pixelsInspected, pixelQa, pixelEvidence and optional operationId. TRANSPORT_ERROR records operationId and exact error. Never generates, approves or renews a claim. Read raw evidence with get_visual_image_task/get_visual_claim_result. The server cannot observe the native tool call.", inputSchema: {type:"object",properties:{requestId:{type:"string",format:"uuid"},attemptId:{type:"string",format:"uuid"},phase:{type:"string",enum:["REQUEST","RESULT","TRANSPORT_ERROR"]},evidence:{type:"object",additionalProperties:true}},required:["requestId","attemptId","phase","evidence"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}},
 
   {
     name: "get_visual_generation_capabilities",
@@ -150,6 +150,7 @@ const tools: VisualTool[] = [
             },
             inputAssetUrl: { type: "string", format: "uri" },
             generatedAssetUrl: { type: "string", format: "uri" },
+            nativeAttemptId: { type: "string", format: "uuid", description: "Optional current-request Native audit attemptId. Links reported REQUEST/RESULT to this dispatch; server cannot observe the host generation call." },
             resumeJobId: { type: "string", format: "uuid", description: "Use get_visual_source_status.nativeRecovery.spec unchanged for prompt/references/method/inputAssetUrl. Do not rewrite prompt or reference checkedAt. Inspect, record pre-Staging QA, then set preflightOnly=false with a new operationId. Source SHA is normalized input, not final output SHA." },
             expectedGeneratedSha: { type: "string", pattern: "^[a-f0-9]{64}$" },
             transform: transformSchema,
@@ -777,10 +778,11 @@ Deno.serve(async (req) => {
       const { nativeGenerationContext, visualExecutionProtocol } = await import("./generation.ts");
       const readRole = ["QA_PENDING","REVIEWING","APPROVED"].includes(String(image.visual_phase)) ? "REVIEWER" : ["PRODUCTION_PENDING","PRODUCING"].includes(String(image.visual_phase)) ? "PRODUCER" : image.status === "PROCESSING" ? "LEGACY" : "PRODUCER";
       result.recoverableProductionCandidate = await rpc("content_pipeline_owned_visual_candidate_v1", {p_worker_key:worker,p_image_id:image.pipeline_image_id});
+      result.recoverableNativeInput = readRole === "REVIEWER" ? null : await rpc("content_pipeline_owned_native_input_v1", {p_worker_key:worker,p_image_id:image.pipeline_image_id});
       result.executionProtocol = visualExecutionProtocol(readRole, !recovery);
       result.preStagingProtocol = result.executionProtocol;
       if(readRole !== "REVIEWER") result.nativeGenerationContext = nativeGenerationContext(image.pipeline_image_id, image.generation_contract_hash, image.generation_contract ?? {});
-      result.nextAction = image.staging_asset ? "FOLLOW_TASK_STATUS" : readRole === "REVIEWER" ? (recovery ? "INSPECT_EXISTING_STAGED_JOB" : "INSPECT_REVIEW_CANDIDATE") : result.recoverableProductionCandidate ? "RECLAIM_PRODUCTION_THEN_INSPECT_AND_HANDOFF_EXISTING_CANDIDATE" : recovery ? "INSPECT_EXISTING_STAGED_JOB" : image.retry_action === "SOURCE_SELECTION" ? "SELECT_NEW_SOURCE" : "FOLLOW_TASK_STATUS";
+      result.nextAction = image.staging_asset ? "FOLLOW_TASK_STATUS" : readRole === "REVIEWER" ? (recovery ? "INSPECT_EXISTING_STAGED_JOB" : "INSPECT_REVIEW_CANDIDATE") : result.recoverableProductionCandidate ? "RECLAIM_PRODUCTION_THEN_INSPECT_AND_HANDOFF_EXISTING_CANDIDATE" : recovery ? "INSPECT_EXISTING_STAGED_JOB" : result.recoverableNativeInput ? "RECLAIM_PRODUCTION_THEN_RESTAGE_PRESERVED_NATIVE_INPUT" : image.retry_action === "SOURCE_SELECTION" ? "SELECT_NEW_SOURCE" : "FOLLOW_TASK_STATUS";
     } else if (name === "get_visual_maintenance_status") {
       result = await rpc("content_pipeline_staging_maintenance_status_v1", {});
     } else if (name === "get_visual_queue_status") {
@@ -885,11 +887,16 @@ Deno.serve(async (req) => {
           if (!uuid(a.operationId)) throw Error("INVALID_OPERATION_ID");
           const { validateGenerationSpec } = await import("./generation.ts");
           // Only official top-level fileParams can populate these internal fields.
-          if (a.spec && ("chatFile" in a.spec || "inputFile" in a.spec)) throw Error("USE_TOP_LEVEL_FILE_PARAMS");
+          if (a.spec && ("chatFile" in a.spec || "inputFile" in a.spec || "nativeAttemptBinding" in a.spec)) throw Error("USE_TOP_LEVEL_FILE_PARAMS");
           const spec = validateGenerationSpec({ ...a.spec, ...(a.file ? { chatFile: a.file } : {}), ...(a.inputFile ? { inputFile: a.inputFile } : {}) });
           if (name === "dispatch_visual_generation" && !spec.chatFile && !spec.generatedAssetUrl && !spec.resumeJobId) throw Error("NATIVE_GENERATED_FILE_REQUIRED: supply official fileParams or open_visual_file_upload; external API generation is prohibited");
           if (name === "dispatch_visual_generation" && spec.productionMethod === "REAL_SOURCE_AI_EDIT" && !spec.resumeJobId && !spec.inputFile) throw Error("NATIVE_EDIT_INPUT_FILE_REQUIRED");
           validateSpecTransform(spec.transform);
+          if (name === "dispatch_visual_generation" && spec.nativeAttemptId && !spec.resumeJobId) {
+            const audit = await rpc("content_pipeline_native_attempt_audit_v1", {p_worker_key:worker,p_image_id:current.claim.pipelineImageId,p_request_id:a.requestId});
+            const { bindNativeAttempt } = await import("./generation.ts");
+            spec.nativeAttemptBinding = bindNativeAttempt(spec, audit, a.operationId, current.claim) ?? undefined;
+          }
           if (spec.productionMethod === "REAL_SOURCE_AI_EDIT") {
             const usage = await sourceUsage(
               current.claim.pipelineImageId,
@@ -958,11 +965,11 @@ Deno.serve(async (req) => {
             result = await rpc("content_pipeline_source_stage_status_v1", {
               p_job_id: a.jobId,
             });
-            if (result?.status === "STAGED" && result.result) {
-              result.inspectionAccess = await inspectionAccess(result.result, current.claim);
-              const { nativeRecoveryPacket } = await import("./generation.ts");
-              result.nativeRecovery = nativeRecoveryPacket(job, worker, current.claim);
-            }
+            if (result?.status === "STAGED" && result.result) result.inspectionAccess = await inspectionAccess(result.result, current.claim);
+            const { nativeRecoveryPacket } = await import("./generation.ts");
+            const admitted = job.status === "FAILED" ? await rpc("content_pipeline_owned_native_input_v1", {p_worker_key:worker,p_image_id:current.claim.pipelineImageId}) : null;
+            const failedInputAdmitted = job.status !== "FAILED" || (admitted?.sourceJobId === job.job_id && admitted?.inputSha256 === job.result?.generatedInput?.sha256);
+            result.nativeRecovery = failedInputAdmitted ? nativeRecoveryPacket(job, worker, current.claim) : null;
           } else if (name === "inspect_visual_source") {
             if (job.status !== "STAGED" || !job.result) {
               const status = await rpc(
