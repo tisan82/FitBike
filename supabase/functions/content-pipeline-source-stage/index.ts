@@ -314,7 +314,7 @@ Deno.serve(async (req) => {
           references: s.references,
           aiEditingApplied: s.productionMethod === "REAL_SOURCE_AI_EDIT",
           aiGenerationApplied:
-            s.productionMethod === "REFERENCE_BASED_GENERATION",
+            ["REFERENCE_BASED_GENERATION", "NATIVE_FULL_GENERATION"].includes(s.productionMethod),
         }
         : {}),
       transform,

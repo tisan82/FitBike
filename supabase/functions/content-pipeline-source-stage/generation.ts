@@ -10,7 +10,7 @@ type Reference = {
   checkedAt: string;
 };
 export type GenerationSpec = {
-  productionMethod: "REFERENCE_BASED_GENERATION" | "REAL_SOURCE_AI_EDIT";
+  productionMethod: "NATIVE_FULL_GENERATION" | "REFERENCE_BASED_GENERATION" | "REAL_SOURCE_AI_EDIT";
   prompt: string;
   references: Reference[];
   inputAssetUrl?: string;
@@ -43,13 +43,13 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
   ];
   if (
     Object.keys(s).some((k) => !keys.includes(k)) ||
-    !["REFERENCE_BASED_GENERATION", "REAL_SOURCE_AI_EDIT"].includes(
+    !["NATIVE_FULL_GENERATION", "REFERENCE_BASED_GENERATION", "REAL_SOURCE_AI_EDIT"].includes(
       s.productionMethod,
     ) ||
     typeof s.prompt !== "string" || s.prompt.trim().length < 20 ||
     s.prompt.length > 6000 ||
-    !Array.isArray(s.references) || s.references.length < 1 ||
-    s.references.length > 4
+    !Array.isArray(s.references) ||
+    (s.productionMethod === "NATIVE_FULL_GENERATION" ? s.references.length !== 0 : s.references.length < 1 || s.references.length > 4)
   ) throw Error("INVALID_GENERATION_SPEC");
   for (const r of s.references) {
     if (
@@ -129,6 +129,9 @@ export function generationCapabilities() {
     sourceLabelMaxCharacters: 16,
     sourceLabelFontSizeAt390px: { minimum: 14, maximum: 24, default: 16 },
     executionMode: "NATIVE_CHATGPT_FILE_HANDOFF",
+    visualContractVersions: [4, 5],
+    visualPolicyVersion: "VISUAL_COMMON_V1",
+    nativeProductionMethods: ["NATIVE_FULL_GENERATION", "REFERENCE_BASED_GENERATION", "REAL_SOURCE_AI_EDIT"],
     externalGenerationApiAllowed: false,
     referenceBasedGeneration: false,
     realSourceAiEdit: false,
@@ -173,7 +176,7 @@ export async function generateAsset(spec: GenerationSpec) {
       productionMethod: spec.productionMethod,
       inputSha256, inputMime: d.mime, inputSourceSha256,
       fileId: spec.chatFile?.file_id ?? null,
-      referenceConditioning: spec.productionMethod === "REAL_SOURCE_AI_EDIT" ? "OPERATOR_ATTESTED_NATIVE_INPUT_BINARY" : "OPERATOR_VERIFIED_REFERENCE_FACTS",
+      referenceConditioning: spec.productionMethod === "NATIVE_FULL_GENERATION" ? "NONE_CURRENT_TASK_SCENE" : spec.productionMethod === "REAL_SOURCE_AI_EDIT" ? "OPERATOR_ATTESTED_NATIVE_INPUT_BINARY" : "OPERATOR_VERIFIED_REFERENCE_FACTS",
     },
   };
 }

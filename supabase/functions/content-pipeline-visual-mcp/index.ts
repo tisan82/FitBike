@@ -115,13 +115,14 @@ const tools: VisualTool[] = [
             preflightOnly: { type: "boolean", description: "True: unannotated candidate preview only; inspect pixels before production." },
             preStagingQa: { type: "object", description: "Reviewer/legacy finalization attestation only. Producer must omit this and dispatch preflightOnly=true, then handoff_visual_review. Use the current role executionProtocol.", additionalProperties: true },
             productionMethod: {
-              enum: ["REFERENCE_BASED_GENERATION", "REAL_SOURCE_AI_EDIT"],
+              enum: ["NATIVE_FULL_GENERATION", "REFERENCE_BASED_GENERATION", "REAL_SOURCE_AI_EDIT"],
             },
             prompt: { type: "string", minLength: 20, maxLength: 6000 },
             references: {
               type: "array",
-              minItems: 1,
+              minItems: 0,
               maxItems: 4,
+              description: "NATIVE_FULL_GENERATION requires []; reference/edit methods require 1–4 inspected references. Contract permission is verified by the server.",
               items: {
                 type: "object",
                 properties: {
@@ -766,6 +767,7 @@ Deno.serve(async (req) => {
         handoffPhase: image.handoff_phase, visualPhase: image.visual_phase, generationContract: image.generation_contract, generationContractHash: image.generation_contract_hash,
         claimExpiresAt: image.claim_expires_at, nextEligibleAt: image.next_eligible_at,
         stagingSha: image.staging_asset?.sha256 ?? null };
+      if (Number(image.generation_contract?.contract_version) === 5) result.visualPolicy = await rpc("content_pipeline_visual_policy_v1", {p_contract:image.generation_contract});
       const recovery = await rpc("content_pipeline_owned_visual_recovery_v1", {p_worker_key:worker,p_image_id:image.pipeline_image_id});
       result.recoverableStaging = recovery;
       result.nativeAttemptAudit = await rpc("content_pipeline_native_attempt_audit_v1", {p_worker_key:worker,p_image_id:image.pipeline_image_id,p_request_id:null});
@@ -816,6 +818,7 @@ Deno.serve(async (req) => {
           p_pipeline_image_id: a.pipelineImageId ?? null,
           ...(name === "claim_visual_image" ? {} : {p_role:name === "claim_visual_production" ? "PRODUCER" : "REVIEWER"}),
         });
+        if (Number(result?.claim?.generationContract?.contract_version) === 5) result.visualPolicy = await rpc("content_pipeline_visual_policy_v1", {p_contract:result.claim.generationContract});
         if (result?.claim && result.claim.executionRole !== "REVIEWER") {
           const { nativeGenerationContext } = await import("./generation.ts");
           result.nativeGenerationContext = nativeGenerationContext(result.claim.pipelineImageId, result.claim.generationContractHash, result.claim.generationContract ?? {});
@@ -827,6 +830,7 @@ Deno.serve(async (req) => {
         );
         if (name === "get_visual_claim_result") {
           result = current;
+          if (Number(current.claim?.generationContract?.contract_version) === 5) result.visualPolicy = await rpc("content_pipeline_visual_policy_v1", {p_contract:current.claim.generationContract});
           if (current.claim) result.nativeAttemptAudit = await rpc("content_pipeline_native_attempt_audit_v1", {p_worker_key:worker,p_image_id:current.claim.pipelineImageId,p_request_id:a.requestId});
           if (current.claim && current.claim.executionRole !== "REVIEWER") {
             const { nativeGenerationContext } = await import("./generation.ts");
