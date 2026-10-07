@@ -1,0 +1,97 @@
+begin;
+-- Native tool calls are operator-reported. This ledger never claims server observation.
+create table public."30_content_pipeline_native_attempt_event" (
+ worker_key text not null, request_id uuid not null, attempt_id uuid not null, attempt_number integer not null check(attempt_number between 1 and 3),
+ phase text not null check(phase in ('REQUEST','RESULT','TRANSPORT_ERROR')),
+ pipeline_image_id bigint not null references public."21_content_pipeline_image"(pipeline_image_id),
+ contract_hash text not null, evidence jsonb not null, recorded_at timestamptz not null default clock_timestamp(),
+ primary key(worker_key,request_id,attempt_id,phase)
+);
+alter table public."30_content_pipeline_native_attempt_event" enable row level security;
+revoke all on public."30_content_pipeline_native_attempt_event" from public,anon,authenticated,service_role;
+create function public.content_pipeline_record_native_attempt_v1(p_worker_key text,p_request_id uuid,p_attempt_id uuid,p_phase text,p_evidence jsonb)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare c jsonb; r public."29_content_pipeline_visual_claim_request"%rowtype; prior jsonb; req jsonb; h text; nc jsonb; n integer; current_hash text; o jsonb;
+begin
+ if p_attempt_id is null or p_phase not in ('REQUEST','RESULT','TRANSPORT_ERROR') or p_phase is null
+ or jsonb_typeof(p_evidence) is distinct from 'object' or length(p_evidence::text)>12000 then raise exception 'INVALID_NATIVE_ATTEMPT_EVENT'; end if;
+ if exists(select 1 from jsonb_object_keys(p_evidence) k where not(k=any(case p_phase
+  when 'REQUEST' then array['contractHash','nativeCall','productionMethod','references']
+  when 'RESULT' then array['actualNativeCall','outputs','inspectedOutput','pixelsInspected','pixelQa','pixelEvidence','operationId','toolCallId','toolError']
+  else array['operationId','error','code'] end))) then raise exception 'INVALID_NATIVE_EVIDENCE_FIELD';end if;
+ select * into r from public."29_content_pipeline_visual_claim_request" where worker_key=p_worker_key and request_id=p_request_id for update;
+ if not found or r.pipeline_image_id is null or r.response->>'executionRole'='REVIEWER' then raise exception 'NATIVE_ATTEMPT_RECEIPT_REQUIRED'; end if;
+ h:=r.response->>'generationContractHash';
+ if h is null then raise exception 'NATIVE_ATTEMPT_CONTRACT_REQUIRED'; end if;
+ if p_evidence ? 'operationId' and coalesce(p_evidence->>'operationId','') !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then raise exception 'INVALID_NATIVE_OPERATION_ID'; end if;
+ select evidence,attempt_number into prior,n from public."30_content_pipeline_native_attempt_event" where worker_key=p_worker_key and request_id=p_request_id and attempt_id=p_attempt_id and phase=p_phase;
+ if found then
+  if prior<>p_evidence then raise exception 'NATIVE_ATTEMPT_EVENT_IMMUTABLE'; end if;
+  return jsonb_build_object('recorded',true,'replayed',true,'attemptId',p_attempt_id,'attemptNumber',n,'phase',p_phase,'provenance','OPERATOR_REPORTED','serverObservedNativeCall',false);
+ end if;
+ if p_phase in ('REQUEST','RESULT') then
+  nc:=case when p_phase='REQUEST' then p_evidence->'nativeCall' else p_evidence->'actualNativeCall' end;
+  if jsonb_typeof(nc) is distinct from 'object' then raise exception 'NATIVE_CALL_ARGUMENTS_REQUIRED';end if;
+  if exists(select 1 from jsonb_object_keys(nc) k where k not in ('prompt','transparent_background','referenced_image_paths','num_last_images_to_include'))
+   or jsonb_typeof(nc->'prompt') is distinct from 'string' or length(coalesce(nc->>'prompt','')) not between 20 and 6000 then raise exception 'INVALID_NATIVE_CALL_ARGUMENTS';end if;
+   if nc ? 'transparent_background' and jsonb_typeof(nc->'transparent_background')<>'boolean' then raise exception 'INVALID_NATIVE_CALL_ARGUMENTS';end if;
+  if nc ? 'num_last_images_to_include' and (jsonb_typeof(nc->'num_last_images_to_include')<>'number' or nc->>'num_last_images_to_include' !~ '^[1-5]$') then raise exception 'INVALID_NATIVE_CALL_ARGUMENTS';end if;
+  if nc ? 'referenced_image_paths' then
+   if jsonb_typeof(nc->'referenced_image_paths')<>'array' then raise exception 'INVALID_NATIVE_CALL_ARGUMENTS';end if;
+   if jsonb_array_length(nc->'referenced_image_paths') not between 1 and 5 or exists(select 1 from jsonb_array_elements(nc->'referenced_image_paths') v where jsonb_typeof(v)<>'string' or length(v#>>'{}')>1000 or v#>>'{}' !~ '^/') then raise exception 'INVALID_NATIVE_CALL_ARGUMENTS';end if;
+  end if;
+  if nc ? 'referenced_image_paths' and nc ? 'num_last_images_to_include' then raise exception 'INVALID_NATIVE_CALL_ARGUMENTS';end if;
+ end if;
+ if p_phase='REQUEST' then
+  select generation_contract_hash into current_hash from public."21_content_pipeline_image" where pipeline_image_id=r.pipeline_image_id for update;
+  if current_hash is distinct from h then raise exception 'NATIVE_ATTEMPT_CURRENT_CONTRACT_MISMATCH';end if;
+  c:=public.content_pipeline_visual_claim_request_status_v1(p_worker_key,p_request_id);
+  if c->>'activeClaim' is distinct from 'true' then raise exception 'ACTIVE_VISUAL_CLAIM_REQUIRED'; end if;
+  if p_evidence->>'contractHash' is distinct from h or length(coalesce(p_evidence->'nativeCall'->>'prompt','')) not between 20 and 6000
+   or jsonb_typeof(p_evidence->'nativeCall') is distinct from 'object' then raise exception 'NATIVE_REQUEST_ARGUMENTS_REQUIRED'; end if;
+  select count(*)+1 into n from public."30_content_pipeline_native_attempt_event" where worker_key=p_worker_key and request_id=p_request_id and phase='REQUEST';
+  if n>3 then raise exception 'NATIVE_ATTEMPT_LIMIT'; end if;
+ else
+  select evidence,attempt_number into req,n from public."30_content_pipeline_native_attempt_event" where worker_key=p_worker_key and request_id=p_request_id and attempt_id=p_attempt_id and phase='REQUEST';
+  if not found then raise exception 'NATIVE_REQUEST_EVENT_REQUIRED'; end if;
+  -- Late result/error recording is allowed for this immutable receipt only; never renews a lease.
+  if p_phase='RESULT' and (jsonb_typeof(p_evidence->'actualNativeCall') is distinct from 'object'
+    or jsonb_typeof(p_evidence->'outputs') is distinct from 'array'
+    or p_evidence->>'pixelQa' not in ('PASS','FAIL','NOT_INSPECTED') or p_evidence->>'pixelQa' is null) then raise exception 'NATIVE_RESULT_EVIDENCE_REQUIRED'; end if;
+  if p_phase='RESULT' then
+   if jsonb_array_length(p_evidence->'outputs')>5 then raise exception 'INVALID_NATIVE_OUTPUT_IDENTITY';end if;
+   for o in select value from jsonb_array_elements(p_evidence->'outputs') loop
+    if jsonb_typeof(o)<>'object' then raise exception 'INVALID_NATIVE_OUTPUT_IDENTITY';end if;
+    if exists(select 1 from jsonb_object_keys(o) k where k not in ('fileId','path','mimeType','sha256'))
+     or not coalesce(((jsonb_typeof(o->'fileId')='string' and length(o->>'fileId') between 1 and 200) or (jsonb_typeof(o->'path')='string' and length(o->>'path') between 2 and 1000 and o->>'path' ~ '^/')),false) then raise exception 'INVALID_NATIVE_OUTPUT_IDENTITY';end if;
+    if o ? 'path' and (jsonb_typeof(o->'path') is distinct from 'string' or length(coalesce(o->>'path','')) not between 2 and 1000 or coalesce(o->>'path','') !~ '^/') then raise exception 'INVALID_NATIVE_OUTPUT_IDENTITY';end if;
+    if o ? 'fileId' and (jsonb_typeof(o->'fileId') is distinct from 'string' or length(coalesce(o->>'fileId','')) not between 1 and 200) then raise exception 'INVALID_NATIVE_OUTPUT_IDENTITY';end if;
+    if o ? 'sha256' and coalesce(o->>'sha256','') !~ '^[a-f0-9]{64}$' then raise exception 'INVALID_NATIVE_OUTPUT_IDENTITY';end if;
+   end loop;
+  end if;
+  if p_phase='RESULT' and p_evidence->>'pixelQa'='PASS' and
+   (p_evidence->'actualNativeCall' is distinct from req->'nativeCall' or p_evidence->>'pixelsInspected' is distinct from 'true'
+    or jsonb_array_length(p_evidence->'outputs')=0 or not exists(select 1 from jsonb_array_elements(p_evidence->'outputs') checked_output where checked_output=p_evidence->'inspectedOutput')
+    or length(coalesce(p_evidence->>'pixelEvidence',''))<20) then raise exception 'NATIVE_PIXEL_PASS_EVIDENCE_REQUIRED'; end if;
+  if p_phase='TRANSPORT_ERROR' and (length(coalesce(p_evidence->>'error','')) not between 1 and 2000 or nullif(p_evidence->>'operationId','') is null) then raise exception 'NATIVE_TRANSPORT_ERROR_REQUIRED'; end if;
+ end if;
+ -- Never persist connector download capabilities or credentials in operator evidence.
+ if p_evidence::text ~* '"(download_?url|authorization|access_?token|refresh_?token|signed_?url)"\s*:' then raise exception 'NATIVE_AUDIT_SECRET_FIELD_FORBIDDEN'; end if;
+ insert into public."30_content_pipeline_native_attempt_event" values(p_worker_key,p_request_id,p_attempt_id,n,p_phase,r.pipeline_image_id,h,p_evidence,clock_timestamp());
+ return jsonb_build_object('recorded',true,'replayed',false,'attemptId',p_attempt_id,'attemptNumber',n,'phase',p_phase,'pipelineImageId',r.pipeline_image_id,'contractHash',h,'provenance','OPERATOR_REPORTED','serverObservedNativeCall',false);
+end $$;
+create function public.content_pipeline_native_attempt_audit_v1(p_worker_key text,p_image_id bigint,p_request_id uuid default null)
+returns jsonb language sql stable security definer set search_path='' as $$
+select jsonb_build_object('provenance','OPERATOR_REPORTED','serverObservedNativeCall',false,
+ 'coverage',case when count(*)=0 then 'MISSING' else 'RECORDED_EVENTS' end,
+ 'events',coalesce(jsonb_agg(event order by recorded_at),'[]'::jsonb)) from (
+ select e.recorded_at,jsonb_build_object('requestId',e.request_id,'attemptId',e.attempt_id,'attemptNumber',e.attempt_number,'phase',e.phase,'pipelineImageId',e.pipeline_image_id,'contractHash',e.contract_hash,'recordedAt',e.recorded_at,'evidence',e.evidence,'requestMatchesActualCall',case when e.phase='RESULT' then e.evidence->'actualNativeCall'=(select q.evidence->'nativeCall' from public."30_content_pipeline_native_attempt_event" q where q.worker_key=e.worker_key and q.request_id=e.request_id and q.attempt_id=e.attempt_id and q.phase='REQUEST') else null end,
+ 'serverReceivedJobs',coalesce((select jsonb_agg(jsonb_build_object('jobId',j.job_id,'status',j.status,'receivedPrompt',j.spec->>'prompt','receivedFileId',j.spec->'chatFile'->>'file_id','nativeInputSha',j.result->'generation'->>'inputSha256','canonicalSha',j.result->>'sha256','preStagingSourceSha',j.result->>'preStagingSourceSha256')) from public."27_content_pipeline_source_stage_job" j where j.pipeline_image_id=e.pipeline_image_id and j.contract_hash=e.contract_hash and j.spec->'visualMcpOperation'->>'requestId'=e.request_id::text and j.spec->'visualMcpOperation'->>'workerKey'=p_worker_key and j.spec->'visualMcpOperation'->>'operationId'=e.evidence->>'operationId'),'[]'::jsonb)) event
+ from public."30_content_pipeline_native_attempt_event" e where e.worker_key=p_worker_key and e.pipeline_image_id=p_image_id and (p_request_id is null or e.request_id=p_request_id) order by e.recorded_at desc limit 30
+) entries;
+$$;
+revoke all on function public.content_pipeline_record_native_attempt_v1(text,uuid,uuid,text,jsonb) from public,anon,authenticated;
+revoke all on function public.content_pipeline_native_attempt_audit_v1(text,bigint,uuid) from public,anon,authenticated;
+grant execute on function public.content_pipeline_record_native_attempt_v1(text,uuid,uuid,text,jsonb) to service_role;
+grant execute on function public.content_pipeline_native_attempt_audit_v1(text,bigint,uuid) to service_role;
+commit;

@@ -78,6 +78,8 @@ type VisualTool = {
   _meta?: Record<string, unknown>;
 };
 const tools: VisualTool[] = [
+  { name: "record_visual_generation_attempt", description: "Append immutable operator-reported native imagegen evidence. REQUEST before calling imagegen contains contractHash and nativeCall exact arguments. RESULT after calling contains actualNativeCall, outputs, inspectedOutput, pixelsInspected, pixelQa, pixelEvidence and optional operationId. TRANSPORT_ERROR records operationId and exact error. Never generates, approves or renews a claim. Read raw evidence with get_visual_image_task/get_visual_claim_result. The server cannot observe the native tool call.", inputSchema: {type:"object",properties:{requestId:{type:"string",format:"uuid"},attemptId:{type:"string",format:"uuid"},phase:{type:"string",enum:["REQUEST","RESULT","TRANSPORT_ERROR"]},evidence:{type:"object",additionalProperties:true}},required:["requestId","attemptId","phase","evidence"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}},
+
   {
     name: "get_visual_generation_capabilities",
     description:
@@ -632,6 +634,9 @@ Deno.serve(async (req) => {
       uri?: string;
       arguments?: {
         requestId?: string;
+        attemptId?: string;
+        phase?: string;
+        evidence?: Record<string, unknown>;
         operationId?: string;
         pipelineId?: number;
         pipelineImageId?: number;
@@ -684,7 +689,7 @@ Deno.serve(async (req) => {
             ? protocol
             : "2025-06-18",
         capabilities: { tools: {}, resources: {} },
-        serverInfo: { name: "fitbike-visual-operations", version: "1.5.0" },
+        serverInfo: { name: "fitbike-visual-operations", version: "1.6.0" },
       },
     });
   }
@@ -757,6 +762,7 @@ Deno.serve(async (req) => {
         stagingSha: image.staging_asset?.sha256 ?? null };
       const recovery = await rpc("content_pipeline_visual_recovery_v1", { p_pipeline_image_id: image.pipeline_image_id });
       result.recoverableStaging = recovery;
+      result.nativeAttemptAudit = await rpc("content_pipeline_native_attempt_audit_v1", {p_worker_key:worker,p_image_id:image.pipeline_image_id,p_request_id:null});
       result.reviewCandidate = await rpc("content_pipeline_review_candidate_v1", {p_image_id:image.pipeline_image_id,p_job_id:image.review_candidate?.jobId ?? null});
       result.stagingSha ??= recovery?.sha256 ?? null;
       result.stagingApproved = !!image.staging_asset;
@@ -809,10 +815,15 @@ Deno.serve(async (req) => {
         );
         if (name === "get_visual_claim_result") {
           result = current;
+          if (current.claim) result.nativeAttemptAudit = await rpc("content_pipeline_native_attempt_audit_v1", {p_worker_key:worker,p_image_id:current.claim.pipelineImageId,p_request_id:a.requestId});
           if (current.claim) {
             const { nativeGenerationContext } = await import("./generation.ts");
             result.nativeGenerationContext = nativeGenerationContext(current.claim.pipelineImageId, current.claim.generationContractHash, current.claim.generationContract ?? {});
           }
+        }
+        else if (name === "record_visual_generation_attempt") {
+          if (!uuid(a.attemptId)) throw Error("INVALID_ATTEMPT_ID");
+          result = await rpc("content_pipeline_record_native_attempt_v1", {p_worker_key:worker,p_request_id:a.requestId,p_attempt_id:a.attemptId,p_phase:a.phase,p_evidence:a.evidence});
         }
         else if (name === "handoff_visual_review") {
           result = await rpc("content_pipeline_handoff_visual_review_v1", {p_worker_key:worker,p_request_id:a.requestId,p_job_id:a.jobId,p_expected_sha:a.expectedSha});
