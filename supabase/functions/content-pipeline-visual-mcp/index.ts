@@ -78,6 +78,7 @@ type VisualTool = {
   _meta?: Record<string, unknown>;
 };
 const tools: VisualTool[] = [
+  {name:"resolve_visual_source_assets",description:"Read-only server HTML/XML image resolver before Claim. Extracts actual img/src/srcset/lazy links scoped to a section, resolves relative URLs, validates public HTTPS DNS and redirects, probes bounded raster candidates for MIME/signature/decode/SHA and returns actual 390px previews. Never guesses URLs, changes Contract, claims, stages or asserts semantic QA. Use sourcePageUrl for provenance and the inspected sourceAssetUrl for dispatch.",inputSchema:{type:"object",properties:{sourcePageUrl:{type:"string",maxLength:4096},sectionQuery:{type:"string",maxLength:200},maxCandidates:{type:"integer",minimum:1,maximum:5}},required:["sourcePageUrl"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:true}},
   { name: "validate_visual_generation_call", description: "Read-only audit input validation before Claim. Pass nativeCall as {toolName: actual native image tool name, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native tool arguments, sceneInstruction: {text: actual scene message or null, location: TOOL_ARGUMENT|CONVERSATION_MESSAGE|UNOBSERVED}}. Preserves raw runtime-specific keys, including null or omitted prompt. instructionVisibility is separate from valid; never infer a scene instruction or runtime validity. Returns field/reason for invalid capture. Does not validate the native runtime schema, generate, record an attempt, claim or approve.", inputSchema: {type:"object",properties:{nativeCall:{type:"object",additionalProperties:true}},required:["nativeCall"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
   { name: "record_visual_generation_attempt", description: "Append immutable operator-reported native imagegen evidence. Validate with validate_visual_generation_call before Claim. REQUEST contains contractHash and nativeCall {toolName, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native args, optional sceneInstruction: {text, location}}. RESULT uses the identical envelope in actualNativeCall. Legacy four-key calls remain supported. RESULT after calling contains actualNativeCall, outputs, inspectedOutput, pixelsInspected, pixelQa, pixelEvidence and optional operationId. TRANSPORT_ERROR records operationId and exact error. Never generates, approves or renews a claim. Read raw evidence with get_visual_image_task/get_visual_claim_result. The server cannot observe the native tool call.", inputSchema: {type:"object",properties:{requestId:{type:"string",format:"uuid"},attemptId:{type:"string",format:"uuid"},phase:{type:"string",enum:["REQUEST","RESULT","TRANSPORT_ERROR"]},evidence:{type:"object",additionalProperties:true}},required:["requestId","attemptId","phase","evidence"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}},
 
@@ -636,6 +637,9 @@ Deno.serve(async (req) => {
       arguments?: {
         requestId?: string;
         nativeCall?: Record<string, unknown>;
+        sourcePageUrl?: string;
+        sectionQuery?: string;
+        maxCandidates?: number;
         attemptId?: string;
         phase?: string;
         evidence?: Record<string, unknown>;
@@ -793,6 +797,11 @@ Deno.serve(async (req) => {
       const { data, error } = await q;
       if (error) throw Error(error.message);
       result = { images: data, limit: 25, workerKey: worker };
+    } else if (name === "resolve_visual_source_assets") {
+      const {resolveSourceAssets}=await import("./source-resolver.ts");
+      const resolved=await resolveSourceAssets(a.sourcePageUrl,a.sectionQuery,a.maxCandidates);
+      result=resolved.result;
+      images=resolved.images.map(bytes=>({type:"image",data:encodeBase64(bytes),mimeType:"image/png"}));
     } else if (name === "validate_visual_generation_call") {
       result = await rpc("content_pipeline_validate_native_call_v2", {p_call:a.nativeCall});
     } else {

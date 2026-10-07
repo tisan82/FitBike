@@ -92,6 +92,7 @@ async function fetchPinned(
   address: string,
   signal: AbortSignal,
   fileInput = false,
+  documentInput = false,
 ): Promise<Hop> {
   // Dial only the validated address, then authenticate TLS using the source host.
   // startTls preserves hostname verification without re-resolving the socket.
@@ -125,7 +126,7 @@ async function fetchPinned(
     const request = new TextEncoder().encode(
       `GET ${
         u.pathname + u.search
-      } HTTP/1.1\r\nHost: ${u.host}\r\nUser-Agent: FitBike-Source-Stage/2.0\r\nAccept: image/png,image/jpeg,image/webp,application/pdf\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n`,
+      } HTTP/1.1\r\nHost: ${u.host}\r\nUser-Agent: FitBike-Source-Stage/2.0\r\nAccept: ${documentInput ? "text/html,application/xhtml+xml,application/xml,text/xml" : "image/png,image/jpeg,image/webp,application/pdf"}\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n`,
     );
     let written = 0;
     while (written < request.length) {
@@ -198,13 +199,13 @@ async function fetchPinned(
             .toLowerCase();
           if (
             !["image/png", "image/jpeg", "image/webp", "application/pdf"]
-              .includes(mime) && !(fileInput && ["application/octet-stream", ""].includes(mime))
+              .includes(mime) && !(documentInput && ["text/html", "application/xhtml+xml", "application/xml", "text/xml"].includes(mime)) && !(fileInput && ["application/octet-stream", ""].includes(mime))
           ) throw Error("SOURCE_MIME_INVALID");
           if (
             headers["content-encoding"] &&
             headers["content-encoding"] !== "identity"
           ) throw Error("SOURCE_ENCODING_UNSUPPORTED");
-          max = mime === "application/pdf" ? 25165824 : 8388608;
+          max = documentInput ? 2097152 : mime === "application/pdf" ? 25165824 : 8388608;
           if (
             headers["content-length"] &&
             (!/^\d+$/.test(headers["content-length"]) ||
@@ -277,7 +278,7 @@ async function fetchPinned(
       else if (new TextDecoder().decode(bytes.subarray(0,4)) === "RIFF") mime = "image/webp";
       else throw Error("NATIVE_FILE_MUST_BE_IMAGE");
     }
-    verifySourceSignature(bytes, mime);
+    if (!documentInput) verifySourceSignature(bytes, mime);
     return { bytes, mime };
   };
   try {
@@ -287,13 +288,13 @@ async function fetchPinned(
     close();
   }
 }
-export async function downloadSource(value: unknown, fileInput = false): Promise<Download> {
+export async function downloadSource(value: unknown, fileInput = false, documentInput = false): Promise<Download> {
   const signal = AbortSignal.timeout(20000), redirects: string[] = [];
   let u = sourceUrl(value);
   try {
     for (let hop = 0; hop <= 4; hop++) {
       const address = await resolvePublic(u, signal);
-      const result = await fetchPinned(u, address, signal, fileInput);
+      const result = await fetchPinned(u, address, signal, fileInput, documentInput);
       if (result.location) {
         if (hop === 4) throw Error("SOURCE_REDIRECT_LIMIT");
         u = sourceUrl(new URL(result.location, u).href);
