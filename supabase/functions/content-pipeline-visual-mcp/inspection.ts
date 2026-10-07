@@ -2,6 +2,7 @@ import {
   ImageMagick,
   initializeImageMagick,
   MagickFormat,
+  MagickGeometry,
 } from "npm:@imagemagick/magick-wasm@0.0.42";
 const wasm = await Deno.readFile(
   new URL(
@@ -47,7 +48,24 @@ export async function inspectPixels(
     img.resize(390, mobileHeight);
     return img.write(MagickFormat.Png, (d) => Uint8Array.from(d));
   });
+  // Match the public Card/Hero CSS: aspect-video, object-cover, centered.
+  // These are inspection derivatives; never write them into canonical Storage.
+  const cropWidth = Math.min(width, height * 16 / 9);
+  const cropHeight = Math.min(height, width * 9 / 16);
+  const crop = { x: Math.floor((width - cropWidth) / 2), y: Math.floor((height - cropHeight) / 2),
+    width: Math.max(1, Math.round(cropWidth)), height: Math.max(1, Math.round(cropHeight)) };
+  const renderCrop = (targetWidth: number, targetHeight: number) => ImageMagick.read(bytes, img => {
+    img.crop(new MagickGeometry(crop.x, crop.y, crop.width, crop.height));
+    img.resetPage();
+    const size = new MagickGeometry(targetWidth, targetHeight);
+    size.ignoreAspectRatio = true;
+    img.resize(size);
+    return img.write(MagickFormat.Png, d => Uint8Array.from(d));
+  });
+  const cardCrop = renderCrop(390, 219);
+  const heroCrop = renderCrop(768, 432);
   return {
+    cardCrop, heroCrop, crop,
     metadata: {
       sha256,
       bytes: bytes.length,
