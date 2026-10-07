@@ -540,7 +540,7 @@ Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Ta
 - 이전 Content, 이전 Image, 이전 생성 결과 또는 대화 컨텍스트의 Visual Prompt를 현재 작업에 상속하지 않는다.
 - `generation_allowed=false`는 레거시 계약에서 Full Generation을 금지한다. 실제 구조를 보존하는 AI Editing 허용 여부는 `ai_edit_allowed`로 별도 판단한다.
 - Contract와 다른 주제의 결과는 `BRIEF_MISMATCH`이며 업로드하지 않는다.
-- Queue는 PENDING을 RETRY보다 우선할 수 있다. 반복 `BRIEF_MISMATCH` 2회 이상은 해당 Image에 60분 cooldown을 적용해 다른 Image Task가 진행될 수 있게 한다.
+- Queue는 PENDING을 RETRY보다 우선할 수 있다. Image RETRY는 실패 시각부터 3분 cooldown을 적용한다. 반복 `BRIEF_MISMATCH`에도 같은 3분을 적용하며, 다른 eligible Image는 계속 처리할 수 있다.
 - `next_eligible_at` 이전 Task는 Claim 대상이 아니다.
 - Producer 출력에는 Contract hash 일부를 포함해 어떤 입력 계약으로 처리했는지 추적할 수 있게 한다.
 - 예약의 Image Generation 호출은 현재 Image Contract의 단일 콘텐츠 장면만 입력한다. 실행 결과 표, Worker 보고서, QA 대시보드, 이전 대화 이미지 등은 생성 입력이나 Production Asset이 아니다. 보고는 이미지 생성 완료 후 텍스트로만 작성한다.
@@ -674,7 +674,7 @@ Before editing a source in ordinary Chat, use the dedicated MCP `check_visual_so
 
 ### Source Stage async execution and failure diagnosis
 
-Dispatch is not completion: poll the same Job using the returned pollAfterSeconds until STAGED or a confirmed terminal failure. Invoke pixel inspection only after STAGED. timedOut=true is an elapsed-time warning; use actual failureCode/transport evidence instead of inventing STALLED/TIMEOUT. Runtime546 resource failures are reconciled by the service status API documented in API.md. RETRY eligibility uses nextEligibleAt (ordinary failure cooldown5 minutes); Claim SKIP during cooldown is not a recovery defect. Never end normally at RUNNING, duplicate dispatch, infer QA PASS from a checkpoint, or change Task state directly to skip cooldown.
+Dispatch is not completion: poll the same Job using the returned pollAfterSeconds until STAGED or a confirmed terminal failure. Invoke pixel inspection only after STAGED. timedOut=true is an elapsed-time warning; use actual failureCode/transport evidence instead of inventing STALLED/TIMEOUT. Runtime546 resource failures are reconciled by the service status API documented in API.md. RETRY eligibility uses nextEligibleAt (fixed Image RETRY cooldown 3 minutes, including repeated BRIEF_MISMATCH); Claim SKIP during cooldown is not a recovery defect. Never end normally at RUNNING, duplicate dispatch, infer QA PASS from a checkpoint, or change Task state directly to skip cooldown.
 
 ## Native ChatGPT Reference generation and file handoff (2026-10-02)
 

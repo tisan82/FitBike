@@ -380,3 +380,6 @@ Candidate는 다음 조건을 모두 만족한 뒤에만 제작 가능한 `PLANN
 - 가장 가까운 기존 Content와의 차이를 설명함
 - Risk와 Automation Level이 저장됨
 - Priority와 그 근거가 정책에 부합함
+
+
+Image RETRY backoff는 실패 시각부터 고정 3분이다. 반복 BRIEF_MISMATCH도 3분이며, HOLD는 자동 재시도하지 않는다. next_eligible_at 전에는 해당 이미지만 제외하고 다른 eligible 작업을 선택한다. 실패 원인이 해결됐다는 의미는 아니다.
