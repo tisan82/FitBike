@@ -18,10 +18,18 @@ test('recovery preserves exact input identity and separates input/final SHA with
   assert.equal(p.spec.preflightOnly,true);
   assert.equal(p.qaStatus,'NOT_EVALUATED');
   assert.equal(p.generationCallObservedByServer,false);
-  for (const secret of ['download_url','private-id','old-private-request','preStagingQa']) assert.ok(!JSON.stringify(p).includes(secret));
+  for (const secret of ['download_url','private-id','old-private-request']) assert.ok(!JSON.stringify(p).includes(secret));
 });
 test('failed, semantically invalid, cross-task/hash/worker and malformed preserved inputs have no recovery packet', () => {
   for (const change of [j=>j.status='FAILED',j=>j.result.semanticValidation={status:'FAIL'},j=>j.pipeline_image_id=1,j=>j.contract_hash='other',j=>j.spec.visualMcpOperation.workerKey='other',j=>j.result.generatedInput.path='wrong',j=>j.result.generatedInput.sha256='invalid',j=>j.spec.references=[],j=>j.spec.references[0].secret='unsafe']) {
     const j=fixture();change(j);assert.equal(context.nativeRecoveryPacket(j,'worker',claim),null);
   }
+});
+
+test('recovery instruction follows Producer/Reviewer permissions, never invites Producer QA',()=>{
+ const p=context.nativeRecoveryPacket(fixture(),'worker',{...claim,executionRole:'PRODUCER'});
+ assert.equal(p.spec.preflightOnly,true);assert.equal(p.executionProtocol.qaRecordingAllowed,false);assert.equal(p.executionProtocol.successStatus,'QA_PENDING');
+ assert.equal(p.nextAction,'SCREEN_CURRENT_SCENE_THEN_HANDOFF_VISUAL_REVIEW');
+ const r=context.nativeRecoveryPacket(fixture(),'worker',{...claim,executionRole:'REVIEWER'});
+ assert.equal(r.spec.preflightOnly,false);assert.equal(r.executionProtocol.nativeGenerationAllowed,false);assert.equal(r.executionProtocol.successStatus,'READY_FOR_UPLOAD');
 });

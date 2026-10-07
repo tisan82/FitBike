@@ -7,6 +7,7 @@ import {
   validateTransform,
 } from "./transform.ts";
 import { downloadSource, sourceUrl } from "./source.ts";
+import { readStoredSourceCandidate } from "./source-resume.ts";
 import { generateAsset, generationCapabilities } from "./generation.ts";
 import { composeSources, validateComposition } from "./composition.ts";
 const BUCKET = "content-pipeline-staging";
@@ -91,7 +92,34 @@ Deno.serve(async (req) => {
     }
     let composed: Awaited<ReturnType<typeof composeSources>> | undefined;
     let downloaded;
-    if (generative && s.resumeJobId) {
+    let sourceResume: Awaited<ReturnType<typeof readStoredSourceCandidate>> | undefined;
+    const sourceParentId = !generative && !composite && s.preflightOnly !== true
+      ? s.preStagingQa?.sourceJobId : undefined;
+    if (sourceParentId) {
+      const { data: previous, error } = await sb.from("27_content_pipeline_source_stage_job")
+        .select("job_id,pipeline_image_id,contract_hash,status,spec,result")
+        .eq("job_id", sourceParentId).single();
+      if (error || !previous) throw Error("SOURCE_RESUME_ASSET_MISSING");
+      const { data: candidate, error: candidateError } = await sb.rpc("content_pipeline_review_candidate_v1", {
+        p_image_id: j.pipelineImageId, p_job_id: sourceParentId,
+      });
+      if (candidateError || !candidate || candidate.contractHash !== j.contractHash)
+        throw Error("SOURCE_RESUME_CANDIDATE_INVALID");
+      const { data: currentImage, error: imageError } = await sb.from("21_content_pipeline_image")
+        .select("pipeline_id,generation_contract_hash,review_candidate,visual_phase").eq("pipeline_image_id", j.pipelineImageId).single();
+      if (imageError || !currentImage || currentImage.pipeline_id !== j.pipelineId || currentImage.generation_contract_hash !== j.contractHash ||
+          (currentImage.visual_phase === "REVIEWING" && currentImage.review_candidate?.jobId !== sourceParentId))
+        throw Error("SOURCE_RESUME_CANDIDATE_INVALID");
+      sourceResume = await readStoredSourceCandidate(j, { ...previous, pipeline_id: currentImage.pipeline_id },
+        async (path) => {
+          const read = await sb.storage.from(BUCKET).download(path);
+          if (read.error || !read.data) throw Error("SOURCE_RESUME_ASSET_MISSING");
+          return { bytes: new Uint8Array(await read.data.arrayBuffer()), mime: read.data.type };
+        }, inspectWebp);
+      downloaded = { bytes: sourceResume.bytes, mime: "image/webp",
+        finalUrl: previous.result.provenance?.finalSourceAssetUrl ?? null,
+        redirects: previous.result.provenance?.sourceRedirects ?? [] };
+    } else if (generative && s.resumeJobId) {
       const { data: previous, error } = await sb.from(
         "27_content_pipeline_source_stage_job",
       )
@@ -194,7 +222,7 @@ Deno.serve(async (req) => {
     if (j.pipelineImageId) {
       const { data: gate, error: gateError } = await sb.rpc("content_pipeline_pre_staging_gate_v1", {
         p_image_id: j.pipelineImageId, p_contract_hash: j.contractHash,
-        p_spec: s, p_source_sha: await sha256(source),
+        p_spec: s, p_source_sha: sourceResume?.sourceSha256 ?? await sha256(source),
       });
       if (gateError || !gate) throw Error(gateError?.message ?? "PRE_STAGING_VISUAL_QA_REQUIRED");
       preStagingGate = gate;
@@ -207,12 +235,14 @@ Deno.serve(async (req) => {
       const pinned = { ...s.composition, sources: s.composition.sources.map((part: Record<string, unknown>, index: number) => ({ ...part, expectedSourceSha: composed!.provenance[index].sourceSha256 })) };
       composed = await composeSources(pinned, s.transform.maxWidth ?? 1170);
     }
-    const final = composed ?? await transformSource(
+    const final = composed ?? (sourceResume && !transform.annotations?.length
+      ? { webp: source, width: sourceResume.width, height: sourceResume.height }
+      : await transformSource(
         source,
         mime,
-        transform,
-        s.sourcePdfPage,
-      ),
+        sourceResume ? { maxWidth: sourceResume.width, annotations: transform.annotations } : transform,
+        sourceResume ? undefined : s.sourcePdfPage,
+      )),
       proof = await inspectWebp(final.webp, "image/webp");
     const path = j.pipelineImageId
       ? `${j.pipelineId}/${j.pipelineImageId}/${proof.sha256}.webp`
@@ -247,6 +277,7 @@ Deno.serve(async (req) => {
       mobileQa: "PENDING",
       imageSeoQa: "PENDING",
       provenance: {
+        ...(sourceResume ? sourceResume.provenance : {}),
         ...(composed ? { sources: composed.provenance, composition: composed.recipe, editingMethod: "DETERMINISTIC_SIDE_BY_SIDE" } : {}),
         sourceAssetUrl: u?.href ??
           (s.productionMethod === "REAL_SOURCE_AI_EDIT"
@@ -254,15 +285,15 @@ Deno.serve(async (req) => {
             : null),
         finalSourceAssetUrl: composed ? composed.provenance[0].finalSourceAssetUrl : downloaded.finalUrl,
         sourceRedirects: downloaded.redirects,
-        sourceCheckedAt: new Date().toISOString(),
+        sourceCheckedAt: sourceResume?.provenance.sourceCheckedAt ?? new Date().toISOString(),
         sourcePageUrl: s.sourcePageUrl ?? null,
         sourceOwner: s.sourceOwner ?? null,
-        sourceMime: composed ? composed.provenance[0].sourceMime : mime,
+        sourceMime: sourceResume?.provenance.sourceMime ?? (composed ? composed.provenance[0].sourceMime : mime),
         sourceSha256: composed ? composed.provenance[0].sourceSha256 : generative
           ? ("generation" in downloaded
             ? downloaded.generation.inputSourceSha256 ?? null
             : null)
-          : await sha256(source),
+          : sourceResume?.sourceSha256 ?? await sha256(source),
         generatedBinarySha256: generative
           ? ("generation" in downloaded ? downloaded.generation.inputSha256 ?? await sha256(source) : await sha256(source))
           : null,
@@ -295,7 +326,9 @@ Deno.serve(async (req) => {
       probeOnly: !j.pipelineImageId || (s.preflightOnly === true || preStagingGate?.status === "PREFLIGHT_ONLY"),
       preflightOnly: s.preflightOnly === true || preStagingGate?.status === "PREFLIGHT_ONLY",
       preStagingGate,
-      preStagingSourceSha256: await sha256(source),
+      preStagingSourceSha256: sourceResume?.sourceSha256 ?? await sha256(source),
+      ...(sourceResume ? { sourceResume: { sourceJobId: sourceParentId,
+        canonicalSha256: sourceResume.canonicalSha256, strategy: "STORED_PREFLIGHT_ANNOTATION_ONLY" } } : {}),
     };
     // Preserve the verified candidate before the optional legacy inspection bridge.
     // A checkpoint is technical evidence only, never an approval or STAGED receipt.

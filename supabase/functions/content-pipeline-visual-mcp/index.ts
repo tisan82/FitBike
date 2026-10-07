@@ -113,7 +113,7 @@ const tools: VisualTool[] = [
           type: "object",
           properties: {
             preflightOnly: { type: "boolean", description: "True: unannotated candidate preview only; inspect pixels before production." },
-            preStagingQa: { type: "object", description: "Current task/Contract/source Job+SHA pixel attestation. Required for production. Get exact fields from get_visual_image_task.preStagingProtocol.", additionalProperties: true },
+            preStagingQa: { type: "object", description: "Reviewer/legacy finalization attestation only. Producer must omit this and dispatch preflightOnly=true, then handoff_visual_review. Use the current role executionProtocol.", additionalProperties: true },
             productionMethod: {
               enum: ["REFERENCE_BASED_GENERATION", "REAL_SOURCE_AI_EDIT"],
             },
@@ -241,7 +241,7 @@ const tools: VisualTool[] = [
           type: "object",
           properties: {
             preflightOnly: { type: "boolean", description: "True: unannotated candidate preview only; inspect pixels before production." },
-            preStagingQa: { type: "object", description: "Current task/Contract/source Job+SHA pixel attestation. Required for production. Get exact fields from get_visual_image_task.preStagingProtocol.", additionalProperties: true },
+            preStagingQa: { type: "object", description: "Reviewer/legacy finalization attestation only. Producer must omit this and dispatch preflightOnly=true, then handoff_visual_review. Use the current role executionProtocol.", additionalProperties: true },
             sourceAssetUrl: { type: "string" },
             sourcePageUrl: { type: "string" },
             sourceOwner: { type: "string" },
@@ -290,7 +290,7 @@ const tools: VisualTool[] = [
   },
   {
     name: "record_visual_source_qa",
-    description: "Record actual pixel QA for a preflight candidate, bound to the current Task/Contract/source Job+SHA. Never approves or closes the Claim. Supply exact Contract strings in checks. Server validates attestation identity, not automated Vision.",
+    description: "Reviewer or legacy Claim only: record actual pixel QA for a preflight candidate, bound to the current Task/Contract/source Job+SHA. Never approves or closes the Claim. Supply exact Contract strings in checks. Server validates attestation identity, not automated Vision.",
     inputSchema: { type:"object", additionalProperties:false,
       properties: {requestId:{type:"string",format:"uuid"},jobId:{type:"string",format:"uuid"},expectedSha:{type:"string",pattern:"^[a-f0-9]{64}$"},preStagingQa:{type:"object",additionalProperties:true}},
       required:["requestId","jobId","expectedSha","preStagingQa"] },
@@ -766,20 +766,19 @@ Deno.serve(async (req) => {
         handoffPhase: image.handoff_phase, visualPhase: image.visual_phase, generationContract: image.generation_contract, generationContractHash: image.generation_contract_hash,
         claimExpiresAt: image.claim_expires_at, nextEligibleAt: image.next_eligible_at,
         stagingSha: image.staging_asset?.sha256 ?? null };
-      const recovery = await rpc("content_pipeline_visual_recovery_v1", { p_pipeline_image_id: image.pipeline_image_id });
+      const recovery = await rpc("content_pipeline_owned_visual_recovery_v1", {p_worker_key:worker,p_image_id:image.pipeline_image_id});
       result.recoverableStaging = recovery;
       result.nativeAttemptAudit = await rpc("content_pipeline_native_attempt_audit_v1", {p_worker_key:worker,p_image_id:image.pipeline_image_id,p_request_id:null});
       result.reviewCandidate = await rpc("content_pipeline_review_candidate_v1", {p_image_id:image.pipeline_image_id,p_job_id:image.review_candidate?.jobId ?? null});
       result.stagingSha ??= recovery?.sha256 ?? null;
       result.stagingApproved = !!image.staging_asset;
-      result.preStagingProtocol = { phase1: "dispatch with spec.preflightOnly=true and no annotations; poll and inspect actual PNGs", phase2: "dispatch production with preStagingQa, same original source/PDF page or generation resumeJobId; final pixel QA still mandatory",
-        qaFields: ["pipelineImageId","contractHash","sourceJobId","sourceSha256","pixelsInspected=true","status=PASS","evidence","mustShowChecks","mustNotShowChecks","inspectionTargetVerified=true","annotationTargetChecks"],
-        checkKeys: "Use exact current Contract strings as keys, each inspected result PASS. expectedSha is inspection.sha256 (canonical preview). preStagingQa.sourceSha256 is inspection.sourceSha256 (preStagingSourceSha256), not reference-original or canonical SHA.", evaluator:"OPERATOR_PIXEL_ATTESTATION", serverVisionSupported:false,
-        rejection: "reject_visual_source after actual semantic FAIL; preserves Claim",
-        schemaRefreshRequired: "Discover record_visual_source_qa and reject_visual_source before production. Missing attestation results in an unannotated preview only. Record actual QA, then dispatch same source with NEW operationId (native resumeJobId). Never send fake final-QA PASS to record preliminary checks.", };
-      const { nativeGenerationContext } = await import("./generation.ts");
-      result.nativeGenerationContext = nativeGenerationContext(image.pipeline_image_id, image.generation_contract_hash, image.generation_contract ?? {});
-      result.nextAction = recovery && !image.staging_asset ? "INSPECT_EXISTING_STAGED_JOB" : image.retry_action === "SOURCE_SELECTION" ? "SELECT_NEW_SOURCE" : "FOLLOW_TASK_STATUS";
+      const { nativeGenerationContext, visualExecutionProtocol } = await import("./generation.ts");
+      const readRole = ["QA_PENDING","REVIEWING","APPROVED"].includes(String(image.visual_phase)) ? "REVIEWER" : ["PRODUCTION_PENDING","PRODUCING"].includes(String(image.visual_phase)) ? "PRODUCER" : image.status === "PROCESSING" ? "LEGACY" : "PRODUCER";
+      result.recoverableProductionCandidate = await rpc("content_pipeline_owned_visual_candidate_v1", {p_worker_key:worker,p_image_id:image.pipeline_image_id});
+      result.executionProtocol = visualExecutionProtocol(readRole, !recovery);
+      result.preStagingProtocol = result.executionProtocol;
+      if(readRole !== "REVIEWER") result.nativeGenerationContext = nativeGenerationContext(image.pipeline_image_id, image.generation_contract_hash, image.generation_contract ?? {});
+      result.nextAction = image.staging_asset ? "FOLLOW_TASK_STATUS" : readRole === "REVIEWER" ? (recovery ? "INSPECT_EXISTING_STAGED_JOB" : "INSPECT_REVIEW_CANDIDATE") : result.recoverableProductionCandidate ? "RECLAIM_PRODUCTION_THEN_INSPECT_AND_HANDOFF_EXISTING_CANDIDATE" : recovery ? "INSPECT_EXISTING_STAGED_JOB" : image.retry_action === "SOURCE_SELECTION" ? "SELECT_NEW_SOURCE" : "FOLLOW_TASK_STATUS";
     } else if (name === "get_visual_maintenance_status") {
       result = await rpc("content_pipeline_staging_maintenance_status_v1", {});
     } else if (name === "get_visual_queue_status") {
@@ -817,7 +816,7 @@ Deno.serve(async (req) => {
           p_pipeline_image_id: a.pipelineImageId ?? null,
           ...(name === "claim_visual_image" ? {} : {p_role:name === "claim_visual_production" ? "PRODUCER" : "REVIEWER"}),
         });
-        if (result?.claim) {
+        if (result?.claim && result.claim.executionRole !== "REVIEWER") {
           const { nativeGenerationContext } = await import("./generation.ts");
           result.nativeGenerationContext = nativeGenerationContext(result.claim.pipelineImageId, result.claim.generationContractHash, result.claim.generationContract ?? {});
         }
@@ -829,7 +828,7 @@ Deno.serve(async (req) => {
         if (name === "get_visual_claim_result") {
           result = current;
           if (current.claim) result.nativeAttemptAudit = await rpc("content_pipeline_native_attempt_audit_v1", {p_worker_key:worker,p_image_id:current.claim.pipelineImageId,p_request_id:a.requestId});
-          if (current.claim) {
+          if (current.claim && current.claim.executionRole !== "REVIEWER") {
             const { nativeGenerationContext } = await import("./generation.ts");
             result.nativeGenerationContext = nativeGenerationContext(current.claim.pipelineImageId, current.claim.generationContractHash, current.claim.generationContract ?? {});
           }
@@ -1036,7 +1035,8 @@ Deno.serve(async (req) => {
               mobileQa: "NOT_EVALUATED",
               semanticQa: "NOT_EVALUATED",
               preflightOnly: job.result.preflightOnly === true,
-              preStagingNextAction: job.result.preflightOnly ? "VIEW_PIXELS_THEN_RECORD_VISUAL_SOURCE_QA_OR_REJECT_VISUAL_SOURCE" : "FINAL_PIXEL_QA",
+              preStagingNextAction: (await import("./generation.ts")).visualExecutionProtocol(current.claim.executionRole, job.result.preflightOnly === true).nextAction,
+              executionProtocol: (await import("./generation.ts")).visualExecutionProtocol(current.claim.executionRole, job.result.preflightOnly === true),
               mobilePreview: "DERIVED_390PX_NOT_CANONICAL",
               canonicalPath: r.path,
               inspectionAccess: await inspectionAccess(r, current.claim),
@@ -1172,6 +1172,10 @@ Deno.serve(async (req) => {
           }
         }
       }
+    }
+    if (["claim_visual_image","claim_visual_production","claim_visual_review","get_visual_claim_result"].includes(name) && result?.claim) {
+      const {visualExecutionProtocol} = await import("./generation.ts");
+      result.executionProtocol = visualExecutionProtocol(result.executionRole ?? result.claim.executionRole, !result.recoverableStaging);
     }
     const content = [{ type: "text", text: JSON.stringify(result) }, ...images];
     if (name === "inspect_visual_source") {

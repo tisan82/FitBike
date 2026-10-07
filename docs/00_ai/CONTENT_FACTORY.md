@@ -774,6 +774,27 @@ keys; the server does not populate semantic PASS. If inspection/payload fails, p
 and resume review. If pixels fail, reject_visual_source then fail the own review Claim as RETRY;
 review cannot regenerate under that lease. Busy/eligible/TTL/running-Job checks stay image-scoped.
 
+Role-aware execution guidance is canonical in `executionProtocol` (ROLE_PROTOCOL_V1), returned
+by Task/Claim/Inspection. Producer preflight inspection leads directly to handoff_visual_review;
+Producer never records source QA or dispatches final annotations. Reviewer never creates/replaces
+Source or invokes native generation. `preStagingProtocol` mirrors this role-specific guidance for
+compatibility, not the former one-run protocol. A phase-based Task hint is superseded by the exact
+claimed executionRole. No inactive receipt authorizes writes; reclaim through the own role first.
+
+`recoverableProductionCandidate` discovers same-Worker/Task/Contract valid unhanded preflight
+assets. Preserve this identity on technical failure and prioritize it on Producer reclaim, then
+inspect and hand off without re-sourcing. Reviewer recovery selects only the current review
+candidate or a same-Worker attested final derivative before choosing the latest Job. Historical
+unrelated candidates cannot hide or replace a valid current derivative.
+
+For real raster/PDF candidates, Reviewer finalization uses stored SHA-verified canonical pixels
+when source/page/provenance and base crop/maxWidth are unchanged. Required annotations are applied
+in that cropped output coordinate system; never reapply its crop or rerender the PDF. No-annotation
+promotion preserves WebP bytes. Changed base transform is explicitly blocked until preserved raw
+input is available; never silently fetch a replacement or guess coordinates. Native resume and
+multi-source composition retain their existing identity protocols. Source mismatch invalidation
+in discovery and approval uses the same PDF page scope.
+
 Separate schedules must claim from their role-specific queues, one Image Task per execution, not
 call the other role's Claim or 3-B. Handoff replay reports historical completion and current task
 state without changing a later Claim. Existing claim_visual_image remains the legacy full-run path
