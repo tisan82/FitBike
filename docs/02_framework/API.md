@@ -176,3 +176,22 @@ External generation model API calls are prohibited and removed. No image API key
 `open_visual_file_upload(requestId,operationId,spec)` is an authenticated read-only render tool. It requires the same active Claim and permitted Contract, and references MCP resource `ui://fitbike/visual-file-upload-v1.html`. The widget uses the standard MCP Apps bridge for tools/call and optional ChatGPT selectFiles/uploadFile/getFileDownloadUrl for user-selected files. It checks dispatch recovery before submission, never generates/approves, and does not contain credentials. No network/CSP domains are required. Host file helpers unavailable: attach the file in Chat and use official fileParams; unsupported host transport is reported, not assumed. Expired Claims must use normal same-image reclaim before opening a fresh widget.
 
 Service-only `content_pipeline_dispatch_visual_generation_request_v1` retains operator receipt, image/Contract permission, one-running-candidate and idempotent input identity guards. Native file identity excludes short-lived download_url only; changed fileId/prompt/references/method/transform/image/Contract is rejected. The worker scrubs download URLs after preservation or handled failure and never returns them in provenance. Existing source Jobs, inspection/approval APIs and normalized-WebP generatedInput resume protect the same private canonical identity. Generic source ingest still rejects generation specs, preventing permission bypass. No public table/RPC access is added.
+
+
+### Visual production/review handoff (2026-10-07)
+
+Additive MCP tools: `claim_visual_production(requestId,pipelineImageId?)`,
+`claim_visual_review(requestId,pipelineImageId?)`, `handoff_visual_review(requestId,jobId,expectedSha)`.
+Both stage claims retain server-derived user Worker and request idempotency. Role replay conflicts
+are rejected; pending review candidates are excluded from legacy/production claims.
+`get_visual_queue_status` optionally accepts executionRole PRODUCER/REVIEWER; Claim RPC selection
+is authoritative. Task and Claim reads expose visualPhase and verified reviewCandidate (no signed URL).
+
+Production dispatch requires spec.preflightOnly=true and no preStagingQa. Handoff requires current
+producer ownership, same Contract, owned STAGED Job, canonical SHA, actual private Storage metadata,
+decode/read-back proof and absence of semantic invalidation. It releases the lease and queues QA
+without final approval. Review dispatch accepts only the handed-off source/native resume and
+registered pixel QA; QA registration is parent-Job-bound, approval is parent or attested derivative.
+All new SQL RPCs remain service-role-only with empty search_path, no new public table grants.
+Migration: 20261007013115_visual_production_review_handoff.sql. Source-stage byte ingestion and
+existing approval gates remain authoritative; no external generation model is added.

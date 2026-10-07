@@ -739,3 +739,45 @@ Connector tool discovery must expose record_visual_source_qa and reject_visual_s
 ### Image-scoped Visual Claim exclusion
 
 Active leases exclude only the same pipelineImageId, regardless of Worker. A Worker may serve multiple execution requestIds on different eligible images. Same-request replay preserves its owned token; a new request must never resume or mutate another request's lease. Explicit occupied targets return BUSY/TARGET_IMAGE_OWNS_ACTIVE_CLAIM with CLAIM_NEXT_ELIGIBLE_IMAGE. Queue claims retain per-image FOR UPDATE SKIP LOCKED. Worker advisory transaction locks serialize short receipt creation only; they must not block the full production lifetime.
+
+
+### Two-execution 3-A production and review (2026-10-07)
+
+3-A can run as two independent scheduled executions through the same authenticated FitBike operator.
+`claim_visual_production` owns creation/source acquisition and unannotated preflight ingest only.
+After actual generated/source scene screening and STAGED technical verification, call
+`handoff_visual_review(requestId,jobId,expectedSha)` with the canonical preview SHA. The server
+atomically stores the current-contract candidate, finishes the production run, releases the producer
+lease and sets `visual_phase=QA_PENDING`. This is not final QA PASS or READY_FOR_UPLOAD.
+
+`claim_visual_review` claims one stored QA_PENDING candidate with a new requestId/lease. It performs
+actual original/390px inspection, source QA recording, the existing same-source/native resume final
+transform, final pixel/mobile/SEO/role crop/duplicate QA and approval. Production role cannot record
+QA or approve; review role cannot accept a new Native file or a different Source. Both schedules use
+the same authenticated user's worker identity so existing native input access checks remain intact.
+The review execution reads database Job/Contract/SHA and never depends on another chat's text or
+local file path. External generation APIs remain prohibited.
+
+Existing image statuses and handoff_phase keep their transport meaning. `visual_phase` is internal:
+PRODUCTION_PENDING → PRODUCING → QA_PENDING → REVIEWING → APPROVED. QA_PENDING uses PENDING;
+active creation/review use PROCESSING; technical errors use RETRY/HOLD with candidate retained;
+actual semantic rejection preserves bytes/history, clears the review candidate and returns to
+PRODUCTION_PENDING. Only final approval sets READY_FOR_UPLOAD. An existing untouched row may have
+NULL visual_phase and continues to use the legacy full 3-A protocol. Existing valid owned Staging
+can be adopted by a producer Claim and handoff without regeneration; migration never bulk-approves,
+invalidates or rewrites current tasks. Changed Contract/missing Storage/invalid semantic evidence
+excludes review; the production selector can reclaim these through normal eligibility rules.
+
+Canonical QA mapping: record_visual_source_qa.expectedSha = inspection.sha256;
+preStagingQa.sourceSha256 = inspection.sourceSha256. Exact current Contract strings are inspection
+keys; the server does not populate semantic PASS. If inspection/payload fails, preserve candidate
+and resume review. If pixels fail, reject_visual_source then fail the own review Claim as RETRY;
+review cannot regenerate under that lease. Busy/eligible/TTL/running-Job checks stay image-scoped.
+
+Separate schedules must claim from their role-specific queues, one Image Task per execution, not
+call the other role's Claim or 3-B. Handoff replay reports historical completion and current task
+state without changing a later Claim. Existing claim_visual_image remains the legacy full-run path
+and excludes valid pending review candidates. Do not activate both legacy and split schedules for
+the same intended workload during rollout. A split deployment does not prove Native context
+isolation or connector egress reliability. Acceptance requires actual production-to-review scheduled
+handoff and final approval, separately from rollback DB regression and Work recovery.
