@@ -78,7 +78,8 @@ type VisualTool = {
   _meta?: Record<string, unknown>;
 };
 const tools: VisualTool[] = [
-  { name: "record_visual_generation_attempt", description: "Append immutable operator-reported native imagegen evidence. REQUEST before calling imagegen contains contractHash and nativeCall exact arguments. RESULT after calling contains actualNativeCall, outputs, inspectedOutput, pixelsInspected, pixelQa, pixelEvidence and optional operationId. TRANSPORT_ERROR records operationId and exact error. Never generates, approves or renews a claim. Read raw evidence with get_visual_image_task/get_visual_claim_result. The server cannot observe the native tool call.", inputSchema: {type:"object",properties:{requestId:{type:"string",format:"uuid"},attemptId:{type:"string",format:"uuid"},phase:{type:"string",enum:["REQUEST","RESULT","TRANSPORT_ERROR"]},evidence:{type:"object",additionalProperties:true}},required:["requestId","attemptId","phase","evidence"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}},
+  { name: "validate_visual_generation_call", description: "Read-only audit input validation before Claim. Pass nativeCall as {toolName: actual native image tool name, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native tool arguments}. Preserves raw runtime-specific keys. Returns field/reason for invalid capture. Does not validate the native runtime schema, generate, record an attempt, claim or approve.", inputSchema: {type:"object",properties:{nativeCall:{type:"object",additionalProperties:true}},required:["nativeCall"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
+  { name: "record_visual_generation_attempt", description: "Append immutable operator-reported native imagegen evidence. Validate with validate_visual_generation_call before Claim. REQUEST contains contractHash and nativeCall {toolName, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native args}. RESULT uses the identical envelope in actualNativeCall. Legacy four-key calls remain supported. RESULT after calling contains actualNativeCall, outputs, inspectedOutput, pixelsInspected, pixelQa, pixelEvidence and optional operationId. TRANSPORT_ERROR records operationId and exact error. Never generates, approves or renews a claim. Read raw evidence with get_visual_image_task/get_visual_claim_result. The server cannot observe the native tool call.", inputSchema: {type:"object",properties:{requestId:{type:"string",format:"uuid"},attemptId:{type:"string",format:"uuid"},phase:{type:"string",enum:["REQUEST","RESULT","TRANSPORT_ERROR"]},evidence:{type:"object",additionalProperties:true}},required:["requestId","attemptId","phase","evidence"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}},
 
   {
     name: "get_visual_generation_capabilities",
@@ -634,6 +635,7 @@ Deno.serve(async (req) => {
       uri?: string;
       arguments?: {
         requestId?: string;
+        nativeCall?: Record<string, unknown>;
         attemptId?: string;
         phase?: string;
         evidence?: Record<string, unknown>;
@@ -791,6 +793,8 @@ Deno.serve(async (req) => {
       const { data, error } = await q;
       if (error) throw Error(error.message);
       result = { images: data, limit: 25, workerKey: worker };
+    } else if (name === "validate_visual_generation_call") {
+      result = await rpc("content_pipeline_validate_native_call_v2", {p_call:a.nativeCall});
     } else {
       if (!uuid(a.requestId)) throw Error("INVALID_REQUEST_ID");
       if (["claim_visual_image","claim_visual_production","claim_visual_review"].includes(name)) {

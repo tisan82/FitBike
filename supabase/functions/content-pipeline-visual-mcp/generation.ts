@@ -136,6 +136,8 @@ export function generationCapabilities() {
     nativeGenerationAvailability: "CHECK_CURRENT_CHAT",
     nativeFileHandoff: true,
     nativeAttemptAuditSupported: true,
+    nativeAttemptAuditFormat: "RAW_ARGUMENTS_V1",
+    nativeAttemptAuditPreflightTool: "validate_visual_generation_call",
     nativeAttemptAuditTool: "record_visual_generation_attempt",
     nativeAttemptAuditProvenance: "OPERATOR_REPORTED",
     serverObservedNativeCall: false,
@@ -196,7 +198,7 @@ export function nativeGenerationContext(pipelineImageId: number, contractHash: s
     pipelineImageId, generationContractHash: contractHash, prompt,
     attemptEvidenceProtocol: {
       tool: "record_visual_generation_attempt", provenance: "OPERATOR_REPORTED", serverObservedNativeCall: false,
-      beforeCall: "Create attemptId. Save REQUEST evidence: contractHash and nativeCall with the exact intended imagegen arguments. This is intention, not proof of invocation.",
+      beforeCall: "Before Claim, validate_visual_generation_call checks audit capture. Use nativeCall {toolName: actual native tool name, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native arguments}. This does not validate the runtime schema. Create attemptId. Save REQUEST evidence: contractHash and nativeCall with the exact intended imagegen arguments. This is intention, not proof of invocation.",
       afterCall: "Save RESULT: actualNativeCall copied from this actual invocation, outputs with actual fileId/path, inspectedOutput, pixelsInspected, pixelQa, pixelEvidence, and intended handoff operationId. Never fill missing values by inference.",
       afterHandoffError: "Save TRANSPORT_ERROR with the same attemptId, operationId and exact error. Do not regenerate a valid image because of transport failure.",
       readBack: "get_visual_image_task.nativeAttemptAudit or get_visual_claim_result.nativeAttemptAudit. Missing evidence remains MISSING. Server Jobs prove server receipt only.",
