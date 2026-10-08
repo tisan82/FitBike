@@ -1,0 +1,46 @@
+begin;
+set local lock_timeout='3s';
+set local statement_timeout='30s';
+do $preflight$
+declare i public."21_content_pipeline_image"%rowtype; w text:='result-preflight-test-'||extensions.gen_random_uuid(); r uuid:=extensions.gen_random_uuid(); a uuid:=extensions.gen_random_uuid(); q jsonb; z jsonb; v jsonb; original_count bigint; after_count bigint;
+begin
+ select * into i from public."21_content_pipeline_image" where generation_contract_hash is not null and not(status='PROCESSING' and claim_expires_at>=now()) order by pipeline_image_id limit 1;
+ if not found then raise exception 'RESULT_TEST_FIXTURE_REQUIRED'; end if;
+ update public."21_content_pipeline_image" set status='PROCESSING',handoff_phase='PRODUCING',claimed_by=w,claim_token=a,claim_expires_at=now()+interval '1 hour' where pipeline_image_id=i.pipeline_image_id;
+ insert into public."29_content_pipeline_visual_claim_request"(worker_key,request_id,pipeline_image_id,response) values(w,r,i.pipeline_image_id,jsonb_build_object('pipelineImageId',i.pipeline_image_id,'generationContractHash',i.generation_contract_hash,'claimToken',a,'executionRole','PRODUCER'));
+ q:=jsonb_build_object('contractHash',i.generation_contract_hash,'nativeCall','{"toolName":"image_gen.imagegen","schemaVersion":"RAW_ARGUMENTS_V1","arguments":{"prompt":"A realistic current motorcycle cockpit photograph.","transparent_background":false}}'::jsonb);
+ perform public.content_pipeline_record_native_attempt_v1(w,r,a,'REQUEST',q);
+ z:=jsonb_build_object('actualNativeCall',q->'nativeCall','outputs','[{"fileId":"file_preflight_test"}]'::jsonb,'inspectedOutput','{"fileId":"file_preflight_test"}'::jsonb,'pixelsInspected',true,'pixelQa','PASS','pixelEvidence','Rollback fixture attestation only; no actual image generated.');
+ select count(*) into original_count from public."30_content_pipeline_native_attempt_event" where worker_key=w;
+ v:=public.content_pipeline_validate_native_result_v1(w,r,a,z);
+ if v->>'valid'<>'true' or v->>'recorded'<>'false' then raise exception 'PREFLIGHT_VALID_RESULT_FAILED: %',v;end if;
+ select count(*) into after_count from public."30_content_pipeline_native_attempt_event" where worker_key=w;
+ if after_count<>original_count then raise exception 'PREFLIGHT_PERSISTED';end if;
+ v:=public.content_pipeline_validate_native_result_v1(w,r,a,z||'{"unknown":true}');
+ if v->>'code'<>'INVALID_NATIVE_EVIDENCE_FIELD' or v->>'field'<>'evidence.unknown' then raise exception 'UNKNOWN_FIELD_DIAGNOSTIC_FAILED: %',v;end if;
+ v:=public.content_pipeline_validate_native_result_v1(w,r,a,jsonb_set(z,'{outputs}','[{}]'));
+ if v->>'code'<>'INVALID_NATIVE_OUTPUT_IDENTITY' or v->>'field'<>'evidence.outputs' then raise exception 'OUTPUT_DIAGNOSTIC_FAILED';end if;
+ v:=public.content_pipeline_validate_native_result_v1(w,r,a,jsonb_set(z,'{pixelsInspected}','"true"'));
+ if v->>'code'<>'NATIVE_PIXEL_PASS_EVIDENCE_REQUIRED' then raise exception 'STRING_BOOLEAN_PASSED';end if;
+ v:=public.content_pipeline_validate_native_result_v1(w,r,a,jsonb_set(z,'{pixelEvidence}','123456789012345678901234567890'));
+ if v->>'code'<>'NATIVE_PIXEL_PASS_EVIDENCE_REQUIRED' then raise exception 'NUMERIC_EVIDENCE_PASSED';end if;
+ v:=public.content_pipeline_validate_native_result_v1(w,r,a,z||'{"operationId":"bad"}');
+ if v->>'code'<>'INVALID_NATIVE_OPERATION_ID' then raise exception 'INVALID_UUID_PASSED';end if;
+ v:=public.content_pipeline_validate_native_result_v1(w,r,extensions.gen_random_uuid(),z);
+ if v->>'code'<>'NATIVE_REQUEST_EVENT_REQUIRED' then raise exception 'MISSING_REQUEST_PASSED';end if;
+ v:=public.content_pipeline_validate_native_result_v1('foreign',r,a,z);
+ if v->>'code'<>'NATIVE_ATTEMPT_RECEIPT_REQUIRED' then raise exception 'FOREIGN_OWNER_PASSED';end if;
+ update public."21_content_pipeline_image" set status='RETRY',claim_expires_at=null where pipeline_image_id=i.pipeline_image_id;
+ v:=public.content_pipeline_validate_native_result_v1(w,r,a,z);
+ if v->>'valid'<>'true' then raise exception 'LATE_RESULT_PREFLIGHT_FAILED';end if;
+ v:=public.content_pipeline_record_native_attempt_v1(w,r,a,'RESULT',z);
+ if v->>'recorded'<>'true' then raise exception 'RESULT_RECORD_FAILED';end if;
+ v:=public.content_pipeline_validate_native_result_v1(w,r,a,z);
+ if v->>'valid'<>'true' or v->>'recorded'<>'false' or v->>'replayed'<>'true' then raise exception 'PREFLIGHT_REPLAY_FAILED';end if;
+ v:=public.content_pipeline_validate_native_result_v1(w,r,a,z||'{"pixelQa":"FAIL"}');
+ if v->>'code'<>'NATIVE_ATTEMPT_EVENT_IMMUTABLE' then raise exception 'IMMUTABLE_CHANGE_PASSED';end if;
+ if has_function_privilege('anon','public.content_pipeline_validate_native_result_v1(text,uuid,uuid,jsonb)','EXECUTE')
+ or has_function_privilege('authenticated','public.content_pipeline_native_attempt_core_v1(text,uuid,uuid,text,jsonb,boolean)','EXECUTE') then raise exception 'RESULT_PREFLIGHT_GRANT_LEAK';end if;
+end $preflight$;
+select 'RESULT_PREFLIGHT_REGRESSION_PASS' as result;
+rollback;

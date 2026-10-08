@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { nativeAuditDiagnostic } from "./native-audit.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 const url = Deno.env.get("SUPABASE_URL")!;
 const endpoint = url + "/functions/v1/content-pipeline-visual-mcp";
@@ -80,7 +81,8 @@ type VisualTool = {
 const tools: VisualTool[] = [
   {name:"resolve_visual_source_assets",description:"Read-only server HTML/XML image resolver before Claim. Extracts actual img/src/srcset/lazy links scoped to a section, resolves relative URLs, validates public HTTPS DNS and redirects, probes bounded raster candidates for MIME/signature/decode/SHA and returns actual 390px previews. Never guesses URLs, changes Contract, claims, stages or asserts semantic QA. Use sourcePageUrl for provenance and the inspected sourceAssetUrl for dispatch.",inputSchema:{type:"object",properties:{sourcePageUrl:{type:"string",maxLength:4096},sectionQuery:{type:"string",maxLength:200},maxCandidates:{type:"integer",minimum:1,maximum:5}},required:["sourcePageUrl"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:true}},
   { name: "validate_visual_generation_call", description: "Read-only audit capture validation immediately before an actual native call. Source-only production does not require this validator. Pass nativeCall as {toolName: actual native image tool name, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native tool arguments, sceneInstruction: {text: actual scene message or null, location: TOOL_ARGUMENT|CONVERSATION_MESSAGE|UNOBSERVED}}. Preserves raw runtime-specific keys, including null or omitted prompt. instructionVisibility is separate from valid; never infer a scene instruction or runtime validity. Returns field/reason for invalid capture. Does not validate the native runtime schema, generate, record an attempt, claim or approve.", inputSchema: {type:"object",properties:{nativeCall:{type:"object",additionalProperties:true}},required:["nativeCall"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
-  { name: "record_visual_generation_attempt", description: "Append immutable operator-reported native imagegen evidence. Validate the current scene capture immediately before the actual native call; Source-only production skips Native audit. REQUEST contains contractHash and nativeCall {toolName, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native args, optional sceneInstruction: {text, location}}. RESULT uses the identical envelope in actualNativeCall. Legacy four-key calls remain supported. RESULT after calling contains actualNativeCall, outputs, inspectedOutput, pixelsInspected, pixelQa, pixelEvidence and optional operationId. TRANSPORT_ERROR records operationId and exact error. Never generates, approves or renews a claim. Read raw evidence with get_visual_image_task/get_visual_claim_result. The server cannot observe the native tool call.", inputSchema: {type:"object",properties:{requestId:{type:"string",format:"uuid"},attemptId:{type:"string",format:"uuid"},phase:{type:"string",enum:["REQUEST","RESULT","TRANSPORT_ERROR"]},evidence:{type:"object",additionalProperties:true}},required:["requestId","attemptId","phase","evidence"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}},
+  { name: "validate_visual_generation_result", description: "Read-only RESULT preflight for this authenticated Producer receipt and saved REQUEST. Uses the same validation as record_visual_generation_attempt without inserting evidence, renewing Claim, generating or approving. Pass exact RESULT evidence including actualNativeCall, outputs and actual pixel screen. Returns valid/code/field/reason; validation is not storage or native runtime proof. On valid=true save identical RESULT, then read back.", inputSchema: {type:"object",properties:{requestId:{type:"string",format:"uuid"},attemptId:{type:"string",format:"uuid"},evidence:{type:"object",additionalProperties:true}},required:["requestId","attemptId","evidence"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
+  { name: "record_visual_generation_attempt", description: "Append immutable operator-reported native imagegen evidence. Validate the current scene capture immediately before the actual native call; Source-only production skips Native audit. REQUEST contains contractHash and nativeCall {toolName, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native args, optional sceneInstruction: {text, location}}. RESULT uses the identical envelope in actualNativeCall. Legacy four-key calls remain supported. Before saving RESULT, call validate_visual_generation_result with identical evidence and require valid=true. RESULT after calling contains actualNativeCall, outputs, inspectedOutput, pixelsInspected, pixelQa, pixelEvidence and optional operationId. TRANSPORT_ERROR records operationId and exact error. Never generates, approves or renews a claim. Read raw evidence with get_visual_image_task/get_visual_claim_result. The server cannot observe the native tool call.", inputSchema: {type:"object",properties:{requestId:{type:"string",format:"uuid"},attemptId:{type:"string",format:"uuid"},phase:{type:"string",enum:["REQUEST","RESULT","TRANSPORT_ERROR"]},evidence:{type:"object",additionalProperties:true}},required:["requestId","attemptId","phase","evidence"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}},
 
   {
     name: "get_visual_generation_capabilities",
@@ -697,7 +699,7 @@ Deno.serve(async (req) => {
             ? protocol
             : "2025-06-18",
         capabilities: { tools: {}, resources: {} },
-        serverInfo: { name: "fitbike-visual-operations", version: "1.6.0" },
+        serverInfo: { name: "fitbike-visual-operations", version: "1.7.0" },
       },
     });
   }
@@ -752,6 +754,7 @@ Deno.serve(async (req) => {
     });
   }
   const worker = "mcp-3a-" + data.user.id;
+  const traceId = crypto.randomUUID();
   try {
     let result;
     let images: Array<{ type: string; data: string; mimeType: string }> = [];
@@ -807,6 +810,15 @@ Deno.serve(async (req) => {
       images=resolved.images.map(bytes=>({type:"image",data:encodeBase64(bytes),mimeType:"image/png"}));
     } else if (name === "validate_visual_generation_call") {
       result = await rpc("content_pipeline_validate_native_call_v2", {p_call:a.nativeCall});
+    } else if (name === "validate_visual_generation_result") {
+      if (!uuid(a.requestId)) throw Error("INVALID_REQUEST_ID");
+      if (!uuid(a.attemptId)) throw Error("INVALID_ATTEMPT_ID");
+      result = await rpc("content_pipeline_validate_native_result_v1", {p_worker_key:worker,p_request_id:a.requestId,p_attempt_id:a.attemptId,p_evidence:a.evidence});
+      result.traceId = traceId;
+      if (result.valid === false) console.warn(JSON.stringify({
+        ...nativeAuditDiagnostic(Error(String(result.code) + ": " + String(result.field)), {traceId,tool:name,requestId:a.requestId,attemptId:a.attemptId,phase:"RESULT"}),
+        field: result.field,
+      }));
     } else {
       if (!uuid(a.requestId)) throw Error("INVALID_REQUEST_ID");
       if (["claim_visual_image","claim_visual_production","claim_visual_review"].includes(name)) {
@@ -842,6 +854,7 @@ Deno.serve(async (req) => {
         else if (name === "record_visual_generation_attempt") {
           if (!uuid(a.attemptId)) throw Error("INVALID_ATTEMPT_ID");
           result = await rpc("content_pipeline_record_native_attempt_v1", {p_worker_key:worker,p_request_id:a.requestId,p_attempt_id:a.attemptId,p_phase:a.phase,p_evidence:a.evidence});
+          result.traceId = traceId;
         }
         else if (name === "handoff_visual_review") {
           result = await rpc("content_pipeline_handoff_visual_review_v1", {p_worker_key:worker,p_request_id:a.requestId,p_job_id:a.jobId,p_expected_sha:a.expectedSha});
@@ -1199,14 +1212,18 @@ Deno.serve(async (req) => {
     }
     return json({ jsonrpc: "2.0", id, result: { content, structuredContent: result } });
   } catch (e) {
+    const auditError = ["record_visual_generation_attempt","validate_visual_generation_result"].includes(name);
+    const diagnostic = auditError ? nativeAuditDiagnostic(e, {traceId,tool:name,requestId:a.requestId,attemptId:a.attemptId,phase:name === "validate_visual_generation_result" ? "RESULT" : a.phase}) : null;
+    if (diagnostic) console.error(JSON.stringify(diagnostic));
     return json({
       jsonrpc: "2.0",
       id,
       result: {
         isError: true,
+        ...(diagnostic ? {structuredContent: diagnostic} : {}),
         content: [{
           type: "text",
-          text: e instanceof Error ? e.message : "VISUAL_OPERATION_FAILED",
+          text: diagnostic ? JSON.stringify(diagnostic) : e instanceof Error ? e.message : "VISUAL_OPERATION_FAILED",
         }],
       },
     });
