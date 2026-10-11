@@ -23,3 +23,8 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run test:admin-boundary
       - run: npm run test:content-api-boundary
+
+      - name: Visual inspection delivery regression
+        run: |
+          npm install --prefix "$RUNNER_TEMP/fitbike-visual-tests" --no-package-lock --ignore-scripts @electric-sql/pglite@0.3.14 @imagemagick/magick-wasm@0.0.42
+          MAGICK_WASM_MODULE="$RUNNER_TEMP/fitbike-visual-tests/node_modules/@imagemagick/magick-wasm/dist/index.js" PGLITE_MODULE="$RUNNER_TEMP/fitbike-visual-tests/node_modules/@electric-sql/pglite/dist/index.js" node --test scripts/content-factory/inspection-delivery.test.mjs scripts/content-factory/visual-mcp-transport.test.mjs scripts/content-factory/visual-inspection-pixels.test.mjs scripts/content-factory/visual-delivery-sql.test.mjs scripts/content-factory/visual-deploy.test.mjs

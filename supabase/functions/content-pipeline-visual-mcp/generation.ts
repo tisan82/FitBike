@@ -144,6 +144,16 @@ export function generationCapabilities() {
     nativeGenerationAvailability: "CHECK_CURRENT_CHAT",
     nativeFileHandoff: true,
     nativeAttemptAuditSupported: true,
+    inspectionDeliveryVersion: "PIXEL_DELIVERY_V1",
+    inspectionSplitViewsSupported: true,
+    inspectionViews: ["ALL","CANONICAL","MOBILE390","CARD","HERO","METADATA"],
+    inspectionResponseByteLimit: 4194304,
+    inspectionDeliveryTools: ["probe_visual_inspection_delivery","record_visual_inspection_delivery","get_visual_inspection_delivery_status"],
+    clientPixelDeliveryAdvisoryIsFailure: false,
+    serverObservedClientPixels: false,
+    deliveryClaimGate: "OPTIONAL_RUNTIME_REQUIRES_FRESH_PROBE",
+    deliveryClientAdapter: "scripts/content-factory/inspection-client.mjs",
+    claimResponseLossRecovery: "READ_OWN_REQUEST_BEFORE_IDENTICAL_REPLAY",
     nativeResultPreflightSupported: true,
     nativeResultPreflightTool: "validate_visual_generation_result",
     nativeAuditErrorTracingSupported: true,
@@ -292,3 +302,4 @@ export function bindNativeAttempt(spec: GenerationSpec, audit: {events?: Array<R
   if (output.sha256 && spec.expectedGeneratedSha && output.sha256 !== spec.expectedGeneratedSha) throw Error("NATIVE_ATTEMPT_SHA_MISMATCH");
   return {attemptId: spec.nativeAttemptId, provenance: "OPERATOR_REPORTED", serverObservedNativeCall: false, promptLink: actualPrompt === null ? "UNOBSERVED" : "MATCHED_REPORTED_ARGUMENTS", fileLink: output.fileId && spec.chatFile ? "MATCHED_FILE_ID" : output.sha256 && spec.expectedGeneratedSha ? "MATCHED_DECLARED_SHA" : "UNVERIFIED", inspectedOutput: output, operationId};
 }
+

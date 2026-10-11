@@ -15,6 +15,7 @@ await initializeImageMagick(wasm);
 export async function inspectPixels(
   bytes: Uint8Array,
   expected: { sha256: string; bytes: number; width: number; height: number },
+  views: string[] = ["canonical", "mobile390", "card", "hero"],
 ) {
   if (
     bytes.length < 12 || bytes.length > 4194304 ||
@@ -41,11 +42,12 @@ export async function inspectPixels(
       width * height > 3200000
     ) throw Error("WEBP_DECODE_OR_DIMENSIONS_MISMATCH");
     const mobileHeight = Math.max(1, Math.round(height * 390 / width));
-    if (mobileHeight > 4000 || 390 * mobileHeight > 1560000) {
+    if (views.includes("mobile390") && (mobileHeight > 4000 || 390 * mobileHeight > 1560000)) {
       throw Error("MOBILE_PREVIEW_ASPECT_RATIO_UNSUPPORTED");
     }
     // PNG is a lossless display transport; canonical storage/SHA remain WebP.
-    canonical = img.write(MagickFormat.Png, (d) => Uint8Array.from(d));
+    if (views.includes("canonical")) canonical = img.write(MagickFormat.Png, (d) => Uint8Array.from(d));
+    if (!views.includes("mobile390")) return new Uint8Array();
     img.resize(390, mobileHeight);
     return img.write(MagickFormat.Png, (d) => Uint8Array.from(d));
   });
@@ -63,8 +65,8 @@ export async function inspectPixels(
     img.resize(size);
     return img.write(MagickFormat.Png, d => Uint8Array.from(d));
   });
-  const cardCrop = renderCrop(390, 219);
-  const heroCrop = renderCrop(768, 432);
+  const cardCrop = views.includes("card") ? renderCrop(390, 219) : new Uint8Array();
+  const heroCrop = views.includes("hero") ? renderCrop(768, 432) : new Uint8Array();
   return {
     cardCrop, heroCrop, crop,
     metadata: {
@@ -98,3 +100,4 @@ export function probeRaster(bytes: Uint8Array) {
     return {width,height,preview};
   });
 }
+

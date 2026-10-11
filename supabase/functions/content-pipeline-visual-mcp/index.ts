@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { DELIVERY_VERSION, INSPECTION_VIEWS, normalizeInspectionResponse, deliveryDiagnostic } from "./inspection-delivery.mjs";
 import { nativeAuditDiagnostic } from "./native-audit.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 const url = Deno.env.get("SUPABASE_URL")!;
@@ -508,6 +509,21 @@ tools.push({
   _meta: { ui: { resourceUri: UPLOAD_RESOURCE }, "openai/outputTemplate": UPLOAD_RESOURCE },
 } as typeof generationTool);
 
+// Additive protocol: legacy callers keep the four-image response and receipt contract.
+const inspectionTool = tools.find(t => t.name === "inspect_visual_source")!;
+Object.assign(inspectionTool.inputSchema.properties, {
+  view: {type:"string",enum:["ALL","CANONICAL","MOBILE390","CARD","HERO","METADATA"]},
+  transport: {type:"string",enum:["MCP_IMAGE_CONTENT","CANONICAL_DOWNLOAD"]},
+  expectedSha: {type:"string",pattern:"^[a-f0-9]{64}$"},
+});
+inspectionTool.description += " Optional view selects one image or METADATA; ALL preserves legacy response. Use METADATA to refresh canonical download access, verify SHA before rendering, or CANONICAL_DOWNLOAD to read the same file via signed URL. clientPixelDelivery is advisory, not a failure. Never infer semantic PASS.";
+for (const tool of tools.filter(t => ["claim_visual_production","claim_visual_review","handoff_visual_review"].includes(t.name))) {
+  tool.inputSchema.properties.runtime = {type:"string",enum:["WORK","CHAT","SCHEDULED"]};
+}
+tools.push({name:"probe_visual_inspection_delivery",description:"Before Claim, return a small PNG through the actual image channel and create an expiring server-issued probe. Forward it to the model and describe its pixels using record_visual_inspection_delivery. A server image response is not client rendering proof. A failed probe never claims a Task.",inputSchema:{type:"object",properties:{runtime:{type:"string",enum:["WORK","CHAT","SCHEDULED"]}},required:["runtime"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}});
+tools.push({name:"get_visual_inspection_delivery_status",description:"Read this authenticated operator/runtime delivery health before Claim. Only operator-reported actual pixel inspection of a server-issued probe establishes expiring runtime readiness. WORK never proves SCHEDULED. No Claim or regeneration.",inputSchema:{type:"object",properties:{runtime:{type:"string",enum:["WORK","CHAT","SCHEDULED"]}},required:["runtime"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}});
+tools.push({name:"record_visual_inspection_delivery",description:"Record a bounded operator-reported client delivery observation; never semantic approval or Claim renewal. ENVIRONMENT requires issued probeId. CANDIDATE requires owned requestId, same Job and expectedSha. Separate CLIENT_PARSE, CLIENT_IMAGE_OUTPUT, PIXELS_INSPECTED. PASS at PIXELS_INSPECTED requires pixelsInspected=true and actual evidence; for a candidate also pixelQa PASS/FAIL. Do not put raw errors, image bytes or URLs in evidence. Reuse eventId after response loss.",inputSchema:{type:"object",properties:{event:{type:"object",additionalProperties:true}},required:["event"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}});
+
 function json(b: unknown, s = 200, h: Record<string, string> = {}) {
   return new Response(JSON.stringify(b), {
     status: s,
@@ -639,6 +655,10 @@ Deno.serve(async (req) => {
       name?: string;
       uri?: string;
       arguments?: {
+        runtime?: string;
+        view?: string;
+        transport?: string;
+        event?: Record<string, unknown>;
         requestId?: string;
         nativeCall?: Record<string, unknown>;
         sourcePageUrl?: string;
@@ -755,12 +775,28 @@ Deno.serve(async (req) => {
   }
   const worker = "mcp-3a-" + data.user.id;
   const traceId = crypto.randomUUID();
+  const startedAt = Date.now();
+  let deliveryStage = def.annotations.readOnlyHint ? "SERVER_REQUEST" : "CLAIM_MUTATION";
+  let deliveryResponseBytes: number | null = null;
+  let inspectionResult: Record<string, unknown> | null = null;
   try {
     let result;
     let images: Array<{ type: string; data: string; mimeType: string }> = [];
     if (name === "get_visual_generation_capabilities") {
       const { generationCapabilities } = await import("./generation.ts");
       result = generationCapabilities();
+    } else if (name === "probe_visual_inspection_delivery") {
+      if (!["WORK","CHAT","SCHEDULED"].includes(String(a.runtime))) throw Error("INVALID_DELIVERY_RUNTIME");
+      const probeId = crypto.randomUUID();
+      const { deliveryProbe } = await import("./inspection-probe.ts");
+      const probe = await deliveryProbe();
+      await rpc("content_pipeline_record_visual_delivery_v1", {p_worker_key:worker,p_server:true,p_event:{eventId:probeId,probeId,runtime:a.runtime,scope:"ENVIRONMENT",stage:"SERVER_IMAGE_BLOCKS",outcome:"PASS",code:"PASS",expectedSha:probe.sha256,traceId}});
+      images = [{type:"image",mimeType:"image/png",data:encodeBase64(probe.bytes)}];
+      result = {probeId,runtime:a.runtime,deliveryVersion:DELIVERY_VERSION,traceId,sha256:probe.sha256,serverImageBlocks:"CREATED",clientPixelsInspected:"NOT_REPORTED",nextAction:"FORWARD_IMAGE_BLOCK_THEN_DESCRIBE_ACTUAL_PIXELS_AND_REPORT",claimCreated:false};
+    } else if (name === "get_visual_inspection_delivery_status") {
+      result = await rpc("content_pipeline_visual_delivery_health_v1", {p_worker_key:worker,p_runtime:a.runtime});
+    } else if (name === "record_visual_inspection_delivery") {
+      result = await rpc("content_pipeline_record_visual_delivery_v1", {p_worker_key:worker,p_server:false,p_event:a.event});
     } else if (name === "get_visual_image_task") {
       if (!Number.isSafeInteger(a.pipelineImageId) || a.pipelineImageId! < 1) throw Error("INVALID_IMAGE_ID");
       const read = await sb.from("21_content_pipeline_image").select("pipeline_image_id,pipeline_id,image_id,status,handoff_phase,generation_contract,generation_contract_hash,claim_expires_at,next_eligible_at,staging_asset,retry_action,visual_phase,review_candidate").eq("pipeline_image_id", a.pipelineImageId).maybeSingle();
@@ -826,11 +862,12 @@ Deno.serve(async (req) => {
           a.pipelineImageId !== undefined &&
           (!Number.isSafeInteger(a.pipelineImageId) || a.pipelineImageId < 1)
         ) throw Error("INVALID_IMAGE_ID");
-        result = await rpc(name === "claim_visual_image" ? "content_pipeline_claim_visual_request_v1" : "content_pipeline_claim_visual_stage_v1", {
+        deliveryStage = "CLAIM_MUTATION";
+        result = await rpc(name === "claim_visual_image" ? "content_pipeline_claim_visual_request_v1" : a.runtime !== undefined ? "content_pipeline_claim_visual_delivery_v1" : "content_pipeline_claim_visual_stage_v1", {
           p_worker_key: worker,
           p_request_id: a.requestId,
           p_pipeline_image_id: a.pipelineImageId ?? null,
-          ...(name === "claim_visual_image" ? {} : {p_role:name === "claim_visual_production" ? "PRODUCER" : "REVIEWER"}),
+          ...(name === "claim_visual_image" ? {} : {p_role:name === "claim_visual_production" ? "PRODUCER" : "REVIEWER",...(a.runtime !== undefined ? {p_runtime:a.runtime} : {})}),
         });
         if (Number(result?.claim?.generationContract?.contract_version) === 5) result.visualPolicy = await rpc("content_pipeline_visual_policy_v1", {p_contract:result.claim.generationContract});
         if (result?.claim && result.claim.executionRole !== "REVIEWER") {
@@ -857,6 +894,10 @@ Deno.serve(async (req) => {
           result.traceId = traceId;
         }
         else if (name === "handoff_visual_review") {
+          const deliveryRuntime = current.claim?.deliveryRuntime ?? a.runtime;
+          if (a.runtime !== undefined && current.claim?.deliveryRuntime && a.runtime !== current.claim.deliveryRuntime) throw Error("VISUAL_REQUEST_INPUT_CONFLICT");
+          if (deliveryRuntime !== undefined) await rpc("content_pipeline_require_visual_pixel_report_v1", {p_worker_key:worker,p_request_id:a.requestId,p_job_id:a.jobId,p_sha:a.expectedSha,p_runtime:deliveryRuntime});
+          deliveryStage = "CLAIM_MUTATION";
           result = await rpc("content_pipeline_handoff_visual_review_v1", {p_worker_key:worker,p_request_id:a.requestId,p_job_id:a.jobId,p_expected_sha:a.expectedSha});
           if (result.activeClaim || result.handoffCompleted !== true) throw Error("REVIEW_HANDOFF_NOT_VERIFIED");
         }
@@ -998,6 +1039,12 @@ Deno.serve(async (req) => {
               );
             }
             const r = job.result;
+            const view = a.view ?? "ALL";
+            if (!["ALL","CANONICAL","MOBILE390","CARD","HERO","METADATA"].includes(view)) throw Error("INVALID_INSPECTION_VIEW");
+            if (a.transport !== undefined && !["MCP_IMAGE_CONTENT","CANONICAL_DOWNLOAD"].includes(a.transport)) throw Error("INVALID_INSPECTION_TRANSPORT");
+            if (a.expectedSha !== undefined && a.expectedSha !== r.sha256) throw Error("STAGING_IDENTITY_MISMATCH");
+            const selectedViews = view === "ALL" ? [...INSPECTION_VIEWS] : view === "METADATA" ? [] : [({CANONICAL:"canonical",MOBILE390:"mobile390",CARD:"card",HERO:"hero"} as Record<string,string>)[view]!];
+            deliveryStage = "SERVER_STORAGE_READ";
             const expectedPath =
               `${current.claim.pipelineId}/${current.claim.pipelineImageId}/${r.sha256}.webp`;
             if (
@@ -1005,18 +1052,19 @@ Deno.serve(async (req) => {
               r.path !== expectedPath || !/^[a-f0-9]{64}$/.test(r.sha256) ||
               r.bytes < 12 || r.bytes > 4194304
             ) throw Error("STAGING_METADATA_INVALID");
-            const { data: blob, error: readError } = await sb.storage.from(
+            const { data: blob, error: readError } = a.transport === "CANONICAL_DOWNLOAD" ? {data:null,error:null} : await sb.storage.from(
               "content-pipeline-staging",
             ).download(r.path);
             let canonicalBlob = blob;
             let readbackTransport = "STORAGE_INTERNAL";
-            if (readError || !canonicalBlob) {
+            if (readError || !canonicalBlob || a.transport === "CANONICAL_DOWNLOAD") {
               // Download only the server-generated URL for this validated private path.
               const access = await inspectionAccess(r, current.claim);
               try {
                 if (!access?.available) throw Error("INSPECTION_SIGNED_URL_UNAVAILABLE");
                 const signed = new URL(access.canonicalDownloadUrl);
                 if (signed.origin !== new URL(url).origin) throw Error("INSPECTION_URL_ORIGIN_MISMATCH");
+                deliveryStage = "SERVER_SIGNED_DOWNLOAD";
                 const res = await fetch(signed, { redirect: "error", signal: AbortSignal.timeout(15000) });
                 if (!res.ok || !res.body) throw Error("INSPECTION_SIGNED_DOWNLOAD_FAILED");
                 const reader = res.body.getReader();
@@ -1045,17 +1093,20 @@ Deno.serve(async (req) => {
             }
             const bytes = new Uint8Array(await canonicalBlob.arrayBuffer());
             const { inspectPixels } = await import("./inspection.ts");
-            const proof = await inspectPixels(bytes, r);
+            deliveryStage = "SERVER_DECODE";
+            const proof = await inspectPixels(bytes, r, selectedViews);
             result = {
               jobId: a.jobId,
               sourceSha256: r.preStagingSourceSha256 ?? r.provenance?.sourceSha256 ?? null,
               ...proof.metadata,
               technicalVerification: "PASS",
               technicalQa: "PASS",
-              pixelDeliveryQa: "PASS",
+              pixelDeliveryQa: selectedViews.length ? "PASS" : "NOT_REQUESTED",
               pixelDeliveryScope: "SERVER_MCP_RESPONSE",
               readbackTransport,
               clientPixelDelivery: "UNVERIFIED_REQUIRES_RENDERING",
+              deliveryVersion: DELIVERY_VERSION, traceId, selectedViews,
+              deliveryStages: {serverStorageRead:"PASS",serverDecode:"PASS",serverImageBlocks:selectedViews.length?"CREATED":"NOT_REQUESTED",clientReceived:"NOT_REPORTED",clientParsed:"NOT_REPORTED",clientImageOutput:"NOT_REPORTED",clientPixelsInspected:"NOT_REPORTED"},
               mobileQa: "NOT_EVALUATED",
               semanticQa: "NOT_EVALUATED",
               preflightOnly: job.result.preflightOnly === true,
@@ -1070,27 +1121,24 @@ Deno.serve(async (req) => {
               cardCropImage: { contentIndex: 3, mimeType: "image/png", width: 390, height: 219, derivedFromSha256: r.sha256, sourceCrop: proof.crop, aspectRatio: "16:9", objectFit: "cover", objectPosition: "center", transform: "SERVICE_DISPLAY_PREVIEW_NOT_CANONICAL" },
               heroCropImage: { contentIndex: 4, mimeType: "image/png", width: 768, height: 432, derivedFromSha256: r.sha256, sourceCrop: proof.crop, aspectRatio: "16:9", objectFit: "cover", objectPosition: "center", transform: "SERVICE_DISPLAY_PREVIEW_NOT_CANONICAL" },
               nextAction: "VIEW_ALL_IMAGE_CONTENT_BLOCKS_THEN_PERFORM_SEMANTIC_MOBILE_AND_REQUIRED_ROLE_CROP_QA",
-              clientRenderingInstruction: "Forward each MCP image block to the model (functions.exec: image(block)). Metadata/decode PASS is not semantic QA. If pixels remain unavailable, preserve this job/SHA and resume inspection; do not regenerate.",
+              clientRenderingInstruction: "Normalize documented result wrapper first. Read content/content_items only when Array.isArray is true; malformed shape and missing image are distinct errors. Forward every actual image block with functions.exec image(block). UNVERIFIED_REQUIRES_RENDERING is advisory. Metadata/decode PASS is not semantic QA. On delivery failure request one view or METADATA/download same canonical with SHA verification. Preserve Job/SHA; do not regenerate.",
             };
-            if (!proof.canonical?.length || !proof.mobile?.length || !proof.cardCrop?.length || !proof.heroCrop?.length) {
-              result.pixelDeliveryQa = "FAIL";
-              result.technicalVerification = "FAIL";
-              result.semanticQa = "BLOCKED";
-              result.mobileQa = "BLOCKED";
-              result.failureCode = "INSPECTION_IMAGE_BLOCK_MISSING";
-              result.nextAction = "RECOVER_SAME_JOB_PIXELS_USING_INSPECTION_ACCESS";
-              return inspectionError(id, result);
+            // Descriptor indices refer only to the blocks actually emitted.
+            const descriptors: Record<string,{contentIndex:number|null}> = {canonical:result.canonicalImage,mobile390:result.mobile390Image,card:result.cardCropImage,hero:result.heroCropImage};
+            const buffers: Record<string,Uint8Array> = {canonical:proof.canonical,mobile390:proof.mobile,card:proof.cardCrop,hero:proof.heroCrop};
+            images = selectedViews.map((view, index) => {
+              descriptors[view].contentIndex = index + 1;
+              return {type:"image",data:encodeBase64(buffers[view]),mimeType:"image/png"};
+            });
+            for (const view of INSPECTION_VIEWS) if (!selectedViews.includes(view)) descriptors[view].contentIndex = null;
+            inspectionResult = result;
+            deliveryStage = "SERVER_IMAGE_BLOCKS";
+            if (selectedViews.some(view => !buffers[view]?.length)) {
+              result.pixelDeliveryQa = "FAIL"; result.technicalVerification = "FAIL";
+              result.semanticQa = "BLOCKED"; result.mobileQa = "BLOCKED";
+              throw Error("INSPECTION_IMAGE_BLOCK_MISSING");
             }
-            images = [{
-              type: "image",
-              data: encodeBase64(proof.canonical),
-              mimeType: "image/png",
-            }, {
-              type: "image",
-              data: encodeBase64(proof.mobile),
-              mimeType: "image/png",
-            }, { type: "image", data: encodeBase64(proof.cardCrop), mimeType: "image/png" },
-            { type: "image", data: encodeBase64(proof.heroCrop), mimeType: "image/png" }];
+
           } else {
             if (
               typeof a.expectedSha !== "string" ||
@@ -1182,6 +1230,7 @@ Deno.serve(async (req) => {
           ) throw Error("INVALID_FAILURE");
           if (!current.activeClaim) result = current;
           else {
+            deliveryStage = "CLAIM_MUTATION";
             await rpc("content_pipeline_fail_visual_request_v1", {
               p_worker_key: worker, p_request_id: a.requestId,
               p_status: a.status, p_stage: a.stage, p_code: a.code, p_error: a.error,
@@ -1193,6 +1242,8 @@ Deno.serve(async (req) => {
             if (result.activeClaim || result.status !== a.status) {
               throw Error("FAIL_CLOSE_READBACK_FAILED");
             }
+            await rpc("content_pipeline_visual_delivery_backoff_v1", {p_worker_key:worker,p_request_id:a.requestId});
+            result = await rpc("content_pipeline_visual_claim_request_status_v1", {p_worker_key:worker,p_request_id:a.requestId});
           }
         }
       }
@@ -1201,29 +1252,40 @@ Deno.serve(async (req) => {
       const {visualExecutionProtocol} = await import("./generation.ts");
       result.executionProtocol = visualExecutionProtocol(result.executionRole ?? result.claim.executionRole, !result.recoverableStaging);
     }
-    const content = [{ type: "text", text: JSON.stringify(result) }, ...images];
+    let content = [{ type: "text", text: JSON.stringify(result) }, ...images];
     if (name === "inspect_visual_source") {
       const code = inspectionContentError(result, content);
-      if (code) {
-        return inspectionError(id, { ...result, technicalVerification: "FAIL", pixelDeliveryQa: "FAIL",
-          semanticQa: "BLOCKED", mobileQa: "BLOCKED", failureCode: code,
-          nextAction: "RECOVER_SAME_JOB_PIXELS_USING_INSPECTION_ACCESS" });
+      if (code) throw Error(code);
+      deliveryResponseBytes = new TextEncoder().encode(JSON.stringify({jsonrpc:"2.0",id,result:{content,structuredContent:result}})).length;
+      if (deliveryResponseBytes > 4194304) {
+        result.pixelDeliveryQa = "FAIL";
+        result.nextAction = "FETCH_SINGLE_VIEW_OR_METADATA_DOWNLOAD_SAME_JOB_SHA";
+        throw Error("INSPECTION_RESPONSE_TOO_LARGE");
       }
+      result.deliveryStages.serverImageBlocks = images.length ? "VALIDATED" : "NOT_REQUESTED";
     }
-    return json({ jsonrpc: "2.0", id, result: { content, structuredContent: result } });
+    result.traceId ??= traceId;
+    content = [{type:"text",text:JSON.stringify(result)},...images];
+    const response = json({ jsonrpc: "2.0", id, result: { content, structuredContent: result } });
+    if (["inspect_visual_source","probe_visual_inspection_delivery"].includes(name)) console.warn(JSON.stringify({traceId,tool:name,requestId:a.requestId??null,jobId:a.jobId??null,stage:"SERVER_RESPONSE",code:"PASS",elapsedMs:Date.now()-startedAt,responseBytes:new TextEncoder().encode(JSON.stringify({content,structuredContent:result})).length,imageCount:images.length,clientPixelsInspected:"NOT_REPORTED"}));
+    return response;
   } catch (e) {
     const auditError = ["record_visual_generation_attempt","validate_visual_generation_result"].includes(name);
     const diagnostic = auditError ? nativeAuditDiagnostic(e, {traceId,tool:name,requestId:a.requestId,attemptId:a.attemptId,phase:name === "validate_visual_generation_result" ? "RESULT" : a.phase}) : null;
     if (diagnostic) console.error(JSON.stringify(diagnostic));
+    const delivery = !auditError ? deliveryDiagnostic(e,{traceId,tool:name,requestId:a.requestId,jobId:a.jobId,stage:deliveryStage,startedAt,responseBytes:deliveryResponseBytes}) : null;
+    if (delivery) console.error(JSON.stringify(delivery));
+    const deliveryTool = ["inspect_visual_source","probe_visual_inspection_delivery","record_visual_inspection_delivery","get_visual_inspection_delivery_status"].includes(name);
+    const safeResult = deliveryTool ? {...inspectionResult,...delivery,technicalQa:inspectionResult?.technicalQa??"NOT_EVALUATED",pixelDeliveryQa:"FAIL",semanticQa:"BLOCKED",mobileQa:"BLOCKED",failureCode:delivery?.code,nextAction:inspectionResult?.nextAction??"READ_SAME_JOB_STATUS_THEN_RECOVER_PIXELS_NO_REGENERATION"} : delivery;
     return json({
       jsonrpc: "2.0",
       id,
       result: {
         isError: true,
-        ...(diagnostic ? {structuredContent: diagnostic} : {}),
+        ...((diagnostic || safeResult) ? {structuredContent: diagnostic ?? safeResult} : {}),
         content: [{
           type: "text",
-          text: diagnostic ? JSON.stringify(diagnostic) : e instanceof Error ? e.message : "VISUAL_OPERATION_FAILED",
+          text: diagnostic ? JSON.stringify(diagnostic) : deliveryTool ? JSON.stringify(safeResult) : e instanceof Error ? e.message : "VISUAL_OPERATION_FAILED",
         }],
       },
     });
@@ -1372,22 +1434,15 @@ function inactiveClaimError(current: Record<string, unknown>) {
 }
 
 
-function inspectionContentError(metadata: {sha256?: string; canonicalImage?: {contentIndex:number; derivedFromSha256?:string}; mobile390Image?: {contentIndex:number; derivedFromSha256?:string}; cardCropImage?: {contentIndex:number; derivedFromSha256?:string}; heroCropImage?: {contentIndex:number; derivedFromSha256?:string}}, content: Array<{type:string; mimeType?:string; data?:string}>): string | null {
-  for (const key of ["canonicalImage", "mobile390Image", "cardCropImage", "heroCropImage"] as const) {
-    const declared = metadata?.[key];
-    const block = declared && content[declared.contentIndex];
-    if (!declared || !Number.isInteger(declared.contentIndex) ||
-        declared.contentIndex !== ({canonicalImage:1,mobile390Image:2,cardCropImage:3,heroCropImage:4}[key]) ||
-        block?.type !== "image" || block.mimeType !== "image/png" ||
-        typeof block.data !== "string" || block.data.length < 32 ||
-        !block.data.startsWith("iVBORw0KGgo") ||
-        declared.derivedFromSha256 !== metadata.sha256) {
-      return "INSPECTION_IMAGE_BLOCK_MISSING";
-    }
+function inspectionContentError(metadata: {selectedViews?:string[];sha256?:string;[key:string]:unknown}, content: Array<{type:string; mimeType?:string; data?:string}>): string | null {
+  try { normalizeInspectionResponse({content,structuredContent:metadata},{requireImages:metadata.selectedViews?.length !== 0}); }
+  catch (error) { return error instanceof Error ? error.message : "RESPONSE_SHAPE_INVALID"; }
+  const selected = metadata.selectedViews ?? INSPECTION_VIEWS;
+  const fields:Record<string,string> = {canonical:"canonicalImage",mobile390:"mobile390Image",card:"cardCropImage",hero:"heroCropImage"};
+  for (const [index, view] of selected.entries()) {
+    const declared = metadata[fields[view]] as {contentIndex:number;derivedFromSha256?:string} | undefined, block = declared && content[declared.contentIndex];
+    if (!declared || declared.contentIndex !== index + 1 || block?.type !== "image" || block.mimeType !== "image/png" || !block.data?.startsWith("iVBORw0KGgo") || declared.derivedFromSha256 !== metadata.sha256) return "INSPECTION_IMAGE_BLOCK_MISSING";
   }
   return null;
 }
-function inspectionError(id: unknown, metadata: unknown) {
-  return json({ jsonrpc: "2.0", id, result: { isError: true,
-    structuredContent: metadata, content: [{ type: "text", text: JSON.stringify(metadata) }] } });
-}
+
