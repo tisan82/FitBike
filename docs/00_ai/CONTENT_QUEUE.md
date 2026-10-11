@@ -384,6 +384,9 @@ Candidate는 다음 조건을 모두 만족한 뒤에만 제작 가능한 `PLANN
 
 Image RETRY backoff는 실패 시각부터 고정 3분이다. 반복 BRIEF_MISMATCH도 3분이며, HOLD는 자동 재시도하지 않는다. next_eligible_at 전에는 해당 이미지만 제외하고 다른 eligible 작업을 선택한다. 실패 원인이 해결됐다는 의미는 아니다.
 
+PIXEL_DELIVERY_V1 배포 후 새 관찰 프로토콜을 사용하는 경우, 동일 worker/runtime/역할/Task/Contract/candidate SHA/view/단계/오류의 서로 다른 3개 Claim receipt 전달 실패는 후보별 30분 cooldown을 적용한다. 환경 probe 2회 실패는 해당 worker/runtime의 새 Claim 전에 10분 차단하며 probe 재검증은 허용한다. 다른 SHA·Contract·runtime에는 실패 그룹을 재사용하지 않는다. 기본 3분, semantic 반려, HOLD 및 Queue 순서 정책은 그 외 경우 유지한다. 배포와 실제 예약 검증 전에는 이 조건을 성공으로 보고하지 않는다.
+
 ### V5 visual brief compatibility
 
 New Stage2 image briefs use the minimal semantic V5 contract defined by CONTENT.md; server validation and common policy replace Writer-authored feasibility/QA fields. V4 active claims and review candidates retain their exact Contract/Hash and queue semantics. A V5 NONE/REFERENCE/REQUIRED evidence level never bypasses eligibility, ownership, source evidence or final approval. Existing Task conversion is explicit and not part of normal scheduled processing.
+

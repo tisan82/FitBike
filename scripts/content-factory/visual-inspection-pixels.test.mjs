@@ -47,3 +47,16 @@ test('resolver preview is bounded and extreme source geometry is rejected',()=>{
  const narrow=ImageMagick.read(MagickColors.Red,1,1000,img=>img.write(MagickFormat.Png,d=>Uint8Array.from(d)));
  assert.throws(()=>ctx.probeRaster(narrow),/SOURCE_DIMENSIONS_UNSAFE/);
 });
+
+
+test('single-view and metadata-only inspection avoid unrequested PNG derivatives', async()=>{
+ const bytes=ImageMagick.read(MagickColors.Red,800,600,img=>img.write(MagickFormat.WebP,d=>Uint8Array.from(d)));
+ const expected={sha256:Buffer.from(await webcrypto.subtle.digest('SHA-256',bytes)).toString('hex'),bytes:bytes.length,width:800,height:600};
+ for(const [view,key] of [['canonical','canonical'],['mobile390','mobile'],['card','cardCrop'],['hero','heroCrop']]) {
+  const result=await ctx.inspectPixels(bytes,expected,[view]);
+  for(const field of ['canonical','mobile','cardCrop','heroCrop']) assert.equal(result[field].length>0,field===key);
+  assert.equal(result.metadata.sha256,expected.sha256);
+ }
+ const result=await ctx.inspectPixels(bytes,expected,[]);
+ assert.equal(result.metadata.decode,'PASS');assert.equal(result.canonical.length+result.mobile.length+result.cardCrop.length+result.heroCrop.length,0);
+});

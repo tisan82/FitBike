@@ -119,3 +119,8 @@ Audit Job linkage adds `jobAccepted`, `binaryReceipt=CONFIRMED|UNKNOWN`, normali
 ## 2026-10-08 Native RESULT validation delta
 
 Migration 20261008040920_native_result_preflight_error_tracing extracts existing receipt/audit guards into service-only content_pipeline_native_attempt_core_v1(...,p_validate_only boolean). The existing record RPC delegates with false; content_pipeline_validate_native_result_v1(worker,request,attempt,evidence) delegates RESULT with true and returns before INSERT. No table/column/constraint/public grant changes. Strict PASS uses JSON boolean pixelsInspected and string pixelEvidence. Canonical behavior and error trace limitations are owned by API.md.
+
+
+## Pending inspection delivery migration
+
+`20261011022649_visual_inspection_delivery.sql` defines service-only RLS-protected `content_pipeline_visual_delivery_event` and invoker RPCs for bounded observations, runtime health, candidate backoff, latest pixel-report gate and atomic runtime-bound Claim. It stores safe identifiers/codes/metrics only; no signed URL, image binary or raw evidence. Existing tables/statuses remain; cooldown uses existing next_eligible_at and Claim binding adds additive deliveryRuntime/version receipt metadata. PUBLIC/anon/authenticated privileges are revoked. This migration has not been applied: Supabase writes returned Invalid or expired requestState; Production integration/DDL read-back remains required. Existing exports are not asserted to include this pending object.
