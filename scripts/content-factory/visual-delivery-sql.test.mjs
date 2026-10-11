@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { migrationTransaction } from './deploy-visual-delivery.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 // Explicit test dependency; production and application dependencies are unchanged.
@@ -15,7 +16,9 @@ create function public.content_pipeline_visual_claim_request_status_v1(text,uuid
  select coalesce((select jsonb_build_object('claim',response,'result','CLOSED','activeClaim',false) from public."29_content_pipeline_visual_claim_request" where worker_key=$1 and request_id=$2),jsonb_build_object('result','NOT_FOUND')) $stub$;
 create function public.content_pipeline_claim_visual_stage_v1(text,uuid,text,bigint) returns jsonb language sql as $stub$ select '{}'::jsonb $stub$;
 `;
-const db=await PGlite.create(); await db.exec(setup); await db.exec(migration);
+const db=await PGlite.create(); await db.exec(setup);
+await db.exec('create schema supabase_migrations; create table supabase_migrations.schema_migrations(version text primary key,name text,statements text[]);');
+await db.exec(migrationTransaction(migration));
 const rpc=async(name,...args)=>(await db.query(`select public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) as result`,args)).rows[0].result;
 const record=event=>rpc('content_pipeline_record_visual_delivery_v1','worker',JSON.stringify(event),false);
 const sha='a'.repeat(64), job=randomUUID(), hash='contract';

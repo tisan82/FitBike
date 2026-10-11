@@ -45,20 +45,25 @@ function cli(stage, args) {
   console.log(`${stage}: PASS`);
 }
 
-export async function deploy() {
-  if (!process.env.SUPABASE_ACCESS_TOKEN) throw new Error('SUPABASE_ACCESS_TOKEN: MISSING');
-  if (process.env.SUPABASE_PROJECT_REF !== projectRef) throw new Error('SUPABASE_PROJECT_REF: MISSING_OR_WRONG_PROJECT');
-  if (process.env.GITHUB_REF !== 'refs/heads/main') throw new Error('PRODUCTION_REQUIRES_MAIN');
+async function requireCurrentMain() {
   const response = await fetch('https://api.github.com/repos/tisan82/FitBike/git/ref/heads/main', {
     headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(30000),
   });
   if (!response.ok || (await response.json()).object?.sha !== process.env.GITHUB_SHA) throw new Error('PRODUCTION_HEAD_MOVED_OR_UNREADABLE');
+}
+
+export async function deploy() {
+  if (!process.env.SUPABASE_ACCESS_TOKEN) throw new Error('SUPABASE_ACCESS_TOKEN: MISSING');
+  if (process.env.SUPABASE_PROJECT_REF !== projectRef) throw new Error('SUPABASE_PROJECT_REF: MISSING_OR_WRONG_PROJECT');
+  if (process.env.GITHUB_REF !== 'refs/heads/main') throw new Error('PRODUCTION_REQUIRES_MAIN');
+  await requireCurrentMain();
   const dir = mkdtempSync(join(tmpdir(), 'fitbike-visual-release-'));
   try {
     const file = join(dir, 'migration.sql');
     writeFileSync(file, migrationTransaction(readFileSync(migrationPath, 'utf8')), { mode: 0o600 });
     cli('TARGET_MIGRATION', ['db', 'query', '--project-ref', projectRef, '--file', file]);
     cli('TRANSACTIONAL_REGRESSION', ['db', 'query', '--project-ref', projectRef, '--file', 'scripts/content-factory/visual-delivery-regression.sql']);
+    await requireCurrentMain();
     // JWT verification is already disabled in deployed v35. The function retains
     // its existing custom worker authentication; no auth policy change here.
     cli('EDGE_DEPLOY', ['functions', 'deploy', 'content-pipeline-visual-mcp', '--project-ref', projectRef, '--use-api', '--no-verify-jwt']);
