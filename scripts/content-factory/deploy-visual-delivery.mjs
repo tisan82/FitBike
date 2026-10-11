@@ -39,8 +39,23 @@ function cli(stage, args) {
   if (result.error || result.status !== 0) {
     const diagnostic = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
     const known = diagnostic.match(/VISUAL_[A-Z_]+|DELIVERY_[A-Z_]+|PIXEL_DELIVERY_[A-Z_]+|VALID_STORED_FIXTURE_REQUIRED|GATED_CLAIM_FAILED|STALE_PIXEL_PASS_ALLOWED|FOREIGN_RECEIPT_ALLOWED|CANDIDATE_CIRCUIT_[A-Z_]+/);
-    const category = known?.[0] ?? (/401|Unauthorized|Invalid access token/i.test(diagnostic) ? 'AUTHENTICATION_FAILED' : /403|Forbidden/i.test(diagnostic) ? 'AUTHORIZATION_FAILED' : /timeout|timed out/i.test(diagnostic) ? 'TIMEOUT' : 'CLI_FAILED');
-    throw new Error(`${stage}: ${category} (exit=${result.status ?? 'none'})`);
+    const categories = [
+      [/401|Unauthorized|Invalid access token|invalid token format/i, 'AUTHENTICATION_FAILED'],
+      [/403|Forbidden|permission denied/i, 'AUTHORIZATION_FAILED'],
+      [/timeout|timed out/i, 'TIMEOUT'],
+      [/config.toml|supabase init|project ref.*link/i, 'CLI_CONFIG_REQUIRED'],
+      [/unknown flag|unknown command|unexpected argument/i, 'CLI_ARGUMENT_INVALID'],
+      [/SQLSTATE.?42601|syntax error/i, 'SQL_SYNTAX_ERROR'],
+      [/SQLSTATE.?42703|column.*does not exist/i, 'SQL_COLUMN_MISSING'],
+      [/SQLSTATE.?42P01|relation.*does not exist/i, 'SQL_RELATION_MISSING'],
+      [/SQLSTATE.?42883|function.*does not exist/i, 'SQL_FUNCTION_MISSING'],
+      [/SQLSTATE.?23505|duplicate key|already exists/i, 'SQL_OBJECT_CONFLICT'],
+      [/429|rate limit/i, 'RATE_LIMITED'],
+      [/unmarshal|decode.*response|unexpected.*response/i, 'CLI_RESPONSE_INVALID'],
+      [/read.only|read-only|readonly/i, 'QUERY_READ_ONLY'],
+    ];
+    const category = known?.[0] ?? categories.find(([pattern]) => pattern.test(diagnostic))?.[1] ?? 'CLI_FAILED';
+    throw new Error(`${stage}: ${category} (exit=${result.status ?? 'none'}, stdoutBytes=${Buffer.byteLength(result.stdout ?? '')}, stderrBytes=${Buffer.byteLength(result.stderr ?? '')})`);
   }
   console.log(`${stage}: PASS`);
 }
