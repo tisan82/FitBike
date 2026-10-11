@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { migrationTransaction, migrationVersion } from './deploy-visual-delivery.mjs';
+import { migrationTransaction, migrationVersion, queryProject, projectRef } from './deploy-visual-delivery.mjs';
 const { PGlite } = await import(process.env.PGLITE_MODULE ?? '@electric-sql/pglite');
 
 test('target migration/history are atomic, exact, replayable and leave old history untouched', async () => {
@@ -16,4 +16,20 @@ test('target migration/history are atomic, exact, replayable and leave old histo
     await db.exec('rollback;');
     assert.equal((await db.query("select statements[1] as s from supabase_migrations.schema_migrations where version='old'")).rows[0].s, 'legacy SQL');
   } finally { await db.close(); }
+});
+
+test('scoped Management query preserves SQL and does not expose error payloads', async () => {
+  let request;
+  await queryProject('FIXTURE', 'begin; select 1; rollback;', async (url, options) => {
+    request = { url, options };
+    return new Response('[]', { status: 201 });
+  });
+  assert.equal(request.url, `https://api.supabase.com/v1/projects/${projectRef}/database/query`);
+  assert.equal(request.options.redirect, 'error');
+  assert.deepEqual(JSON.parse(request.options.body), { query: 'begin; select 1; rollback;' });
+  await assert.rejects(queryProject('FIXTURE', 'select 1', async () => new Response('{"message":"private input and URL must remain hidden"}', { status: 403 })), error => {
+    assert.match(error.message, /HTTP_403/);
+    assert.doesNotMatch(error.message, /private input|URL/);
+    return true;
+  });
 });

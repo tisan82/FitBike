@@ -1,6 +1,4 @@
-import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
@@ -60,6 +58,26 @@ function cli(stage, args) {
   console.log(`${stage}: PASS`);
 }
 
+export async function queryProject(stage, sql, fetcher = fetch) {
+  // The CLI's linked-query preflight resolves an unused TCP database connection.
+  // Use the same documented Management API endpoint directly for scoped SQL.
+  // CLI remains responsible for Edge bundling/deployment.
+  const response = await fetcher(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
+    method: 'POST', redirect: 'error', signal: AbortSignal.timeout(90000),
+    headers: { Authorization: `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: sql }),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    const known = body.match(/VISUAL_[A-Z_]+|DELIVERY_[A-Z_]+|PIXEL_DELIVERY_[A-Z_]+|VALID_STORED_FIXTURE_REQUIRED|GATED_CLAIM_FAILED|STALE_PIXEL_PASS_ALLOWED|FOREIGN_RECEIPT_ALLOWED|CANDIDATE_CIRCUIT_[A-Z_]+/);
+    const sqlState = body.match(/SQLSTATE[^A-Z0-9]*([0-9A-Z]{5})/i)?.[1];
+    // Emit codes/metrics only; API errors can contain SQL and sensitive values.
+    throw new Error(`${stage}: HTTP_${response.status}${known ? ':' + known[0] : ''}${sqlState ? ':SQLSTATE_' + sqlState : ''} (responseBytes=${Buffer.byteLength(body)})`);
+  }
+  await response.arrayBuffer();
+  console.log(`${stage}: PASS`);
+}
+
 async function requireCurrentMain() {
   const response = await fetch('https://api.github.com/repos/tisan82/FitBike/git/ref/heads/main', {
     headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(30000),
@@ -72,19 +90,14 @@ export async function deploy() {
   if (process.env.SUPABASE_PROJECT_REF !== projectRef) throw new Error('SUPABASE_PROJECT_REF: MISSING_OR_WRONG_PROJECT');
   if (process.env.GITHUB_REF !== 'refs/heads/main') throw new Error('PRODUCTION_REQUIRES_MAIN');
   await requireCurrentMain();
-  const dir = mkdtempSync(join(tmpdir(), 'fitbike-visual-release-'));
-  try {
-    const file = join(dir, 'migration.sql');
-    writeFileSync(file, migrationTransaction(readFileSync(migrationPath, 'utf8')), { mode: 0o600 });
-    cli('TARGET_MIGRATION', ['db', 'query', '--linked', '--project-ref', projectRef, '--file', file]);
-    cli('TRANSACTIONAL_REGRESSION', ['db', 'query', '--linked', '--project-ref', projectRef, '--file', 'scripts/content-factory/visual-delivery-regression.sql']);
+    await queryProject('TARGET_MIGRATION', migrationTransaction(readFileSync(migrationPath, 'utf8')));
+    await queryProject('TRANSACTIONAL_REGRESSION', readFileSync('scripts/content-factory/visual-delivery-regression.sql', 'utf8'));
     await requireCurrentMain();
     // JWT verification is already disabled in deployed v35. The function retains
     // its existing custom worker authentication; no auth policy change here.
     cli('EDGE_DEPLOY', ['functions', 'deploy', 'content-pipeline-visual-mcp', '--project-ref', projectRef, '--use-api', '--no-verify-jwt']);
     console.log(`RELEASE_COMMIT: ${process.env.GITHUB_SHA}`);
     console.log('SCHEDULED_PIXEL_INSPECTION: NOT_VERIFIED; NATIVE_HANDOFF: NOT_VERIFIED');
-  } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
