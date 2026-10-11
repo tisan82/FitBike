@@ -1,0 +1,46 @@
+name: Supabase Visual Delivery
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/content-pipeline-visual-mcp/**'
+      - 'supabase/functions/content-pipeline-source-stage/source.ts'
+      - 'supabase/migrations/20261011022649_visual_inspection_delivery.sql'
+      - 'scripts/content-factory/deploy-visual-delivery.mjs'
+      - 'scripts/content-factory/visual-delivery-regression.sql'
+      - '.github/workflows/supabase-visual-delivery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fitbike-supabase-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+      - name: Visual regression tests
+        run: |
+          npm install --prefix "$RUNNER_TEMP/fitbike-visual-tests" --no-package-lock --ignore-scripts @electric-sql/pglite@0.3.14 @imagemagick/magick-wasm@0.0.42
+          MAGICK_WASM_MODULE="$RUNNER_TEMP/fitbike-visual-tests/node_modules/@imagemagick/magick-wasm/dist/index.js" PGLITE_MODULE="$RUNNER_TEMP/fitbike-visual-tests/node_modules/@electric-sql/pglite/dist/index.js" node --test scripts/content-factory/inspection-delivery.test.mjs scripts/content-factory/visual-mcp-transport.test.mjs scripts/content-factory/visual-inspection-pixels.test.mjs scripts/content-factory/visual-delivery-sql.test.mjs scripts/content-factory/visual-deploy.test.mjs
+      - name: Apply exact migration, verify RPCs, deploy Edge
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/content-factory/deploy-visual-delivery.mjs
