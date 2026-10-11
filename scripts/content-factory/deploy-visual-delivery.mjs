@@ -76,8 +76,8 @@ export async function deploy() {
   try {
     const file = join(dir, 'migration.sql');
     writeFileSync(file, migrationTransaction(readFileSync(migrationPath, 'utf8')), { mode: 0o600 });
-    cli('TARGET_MIGRATION', ['db', 'query', '--project-ref', projectRef, '--file', file]);
-    cli('TRANSACTIONAL_REGRESSION', ['db', 'query', '--project-ref', projectRef, '--file', 'scripts/content-factory/visual-delivery-regression.sql']);
+    cli('TARGET_MIGRATION', ['db', 'query', '--linked', '--project-ref', projectRef, '--file', file]);
+    cli('TRANSACTIONAL_REGRESSION', ['db', 'query', '--linked', '--project-ref', projectRef, '--file', 'scripts/content-factory/visual-delivery-regression.sql']);
     await requireCurrentMain();
     // JWT verification is already disabled in deployed v35. The function retains
     // its existing custom worker authentication; no auth policy change here.
