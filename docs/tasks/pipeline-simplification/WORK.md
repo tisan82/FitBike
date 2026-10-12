@@ -66,3 +66,16 @@ DB DROP 후보는 단계별 레거시 consumer 제거와 외부 작성자 확인
 ## 2026-10-12 후속 결정
 
 1·2단계는 일반 채팅에서 통합하며 예약은 3-A부터 시작한다. 1·2단계 통합 때문에 예약을 바꾸지 않는다. 신규 실행은 claim_authoring → 한 산출물 → complete_authoring을 사용한다. 구형 경로의 범위·현재 서버 호환 상태와 전체 검증 순서는 [RETIREMENT_SCOPE.md](RETIREMENT_SCOPE.md)를 따른다. 범위 확정과 API 서버 차단/물리 삭제는 서로 다른 조치다. 이번 후속 문서 변경은 신규 API 차단이나 DROP을 실행한 것으로 보고하지 않는다.
+
+## 역할 연결과 실제 Work E2E 확인 (2026-10-12 KST)
+
+- 공식 표준: Producer_02=PRODUCER(26도구), Reviewer_01=REVIEWER(22도구). capability 실호출과 현재 callable 목록 확인. 기존 Producer_01/Reviewer_02 SHARED는 신규 표준에서 제외; 기존 App URL 편집/삭제를 수행했다고 보고하지 않음.
+- 기존 작성 콘텐츠 pipeline68 `motorcycle-fuel-octane-selection-guide`의 마지막 이미지43019를 실제 완결. 기존 본문/기획/근거/Contract는 보존했고 최종 assembly에서 H2 level·승인 이미지 배치·접힌 공식자료 영역을 적용.
+- 내장 Native1회, REQUEST/RESULT exact reported argument read-back, official fileParams 첫 전달 PASS. 원본 PNG SHA `d08ee7a855830d2c93b70c7ec5313d442620636acec8801b4531afa1e7608caf`; 서버 보존 입력 SHA `33c79fb35724c69fbb2b9e3e48786a39e67ef0f428b62a4b2b976331aa0fef5a`.
+- Producer receipt `bc1dfb70-1874-4c6c-b35f-07441153045f`: STAGED Job `32bec281-d921-41c4-a8a0-a7c6e09d07c5`의 canonical/390px 실제 관찰·최소 이벤트 저장 → QA_PENDING 인계 → activeClaim=false.
+- Reviewer receipt `a91f6780-a6f2-42c5-b7f0-2b61d6540054`: 같은 후보 검사·QA기록 → 저장 입력 재사용으로 최종화 Job `b6b8b098-b33f-4ad0-acba-b4a70a364bac` → final canonical/390px 재검사·승인 → READY_FOR_UPLOAD/Reviewer activeClaim=false.
+- 승인/Production SHA 동일 `0cd0a35e960f1e75c2ee9377561d577b7062cb8e29859c0009b9f15bfe9ff512`. 3-B run1474가 ticket-bound 서버 업로드·read-back 후 DONE/claim 해제. 모든4이미지 DONE → IMAGE_READY.
+- 최종 QA run355 PASS; Publish run356에서 Content172 게시 후 HTTP200, canonical, 단일H1, H2, 실제4이미지·각 public binary SHA, ALT, 접힌 참고 공식자료, Article/Breadcrumb JSON-LD 확인 → COMPLETE/ownership COMPLETE/활성 image Claim0.
+- 공개 결과: https://fitbike.co.kr/contents/motorcycle-fuel-octane-selection-guide . 이번 두 Source Stage Job의 구형 table28 조각은0행.
+- 범위: Work에서 실제 기존 콘텐츠의 후속 제작·검수·업로드·게시 성공. 예약/SCHEDULED, 장애 후 FAILED native 입력 복구, 새 통합 authoring의 실제 콘텐츠 신규 저장, 두 Task의 실제 예약 동시 실행은 이 결과로 인증하지 않음. 통합 authoring SQL은 앞선 운영 rollback 회귀로 검증됨.
+- 구형 신규 실행 지시 범위는 확정; 호환 SQL 서버 차단·테이블/컬럼 DROP은 아직 미실행. 예약/ Supabase 프롬프트 변경 없음.
