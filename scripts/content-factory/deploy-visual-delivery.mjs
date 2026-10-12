@@ -9,7 +9,9 @@ const migrationPath = `supabase/migrations/${migrationVersion}_${migrationName}.
 
 // The repository has historical migration drift. Apply precisely this release,
 // atomically with its true history entry; never repair or replay other versions.
-export function migrationTransaction(sql) {
+export function migrationTransaction(sql, options = {}) {
+  const version = options.version ?? migrationVersion;
+  const name = options.name ?? migrationName;
   const literal = value => "'" + value.replaceAll("'", "''") + "'";
   return `begin;
 set local lock_timeout='5s';
@@ -18,14 +20,14 @@ do $fitbike_release$
 declare prior text[];
 begin
   perform pg_advisory_xact_lock(hashtextextended('fitbike-visual-delivery-release',0));
-  select statements into prior from supabase_migrations.schema_migrations where version=${literal(migrationVersion)};
+  select statements into prior from supabase_migrations.schema_migrations where version=${literal(version)};
   if found then
     if prior is distinct from array[${literal(sql)}]::text[] then raise exception 'VISUAL_MIGRATION_HISTORY_CONFLICT'; end if;
     if to_regclass('public.content_pipeline_visual_delivery_event') is null then raise exception 'VISUAL_MIGRATION_SCHEMA_MISSING'; end if;
   else
-    if to_regclass('public.content_pipeline_visual_delivery_event') is not null then raise exception 'VISUAL_SCHEMA_WITHOUT_HISTORY'; end if;
+    if ${options.followUp ? "to_regclass('public.content_pipeline_visual_delivery_event') is null" : "to_regclass('public.content_pipeline_visual_delivery_event') is not null"} then raise exception '${options.followUp ? 'VISUAL_BASE_SCHEMA_MISSING' : 'VISUAL_SCHEMA_WITHOUT_HISTORY'}'; end if;
     execute ${literal(sql)};
-    insert into supabase_migrations.schema_migrations(version,name,statements) values(${literal(migrationVersion)},${literal(migrationName)},array[${literal(sql)}]);
+    insert into supabase_migrations.schema_migrations(version,name,statements) values(${literal(version)},${literal(name)},array[${literal(sql)}]);
   end if;
 end $fitbike_release$;
 commit;`;
@@ -91,6 +93,7 @@ export async function deploy() {
   if (process.env.GITHUB_REF !== 'refs/heads/main') throw new Error('PRODUCTION_REQUIRES_MAIN');
   await requireCurrentMain();
     await queryProject('TARGET_MIGRATION', migrationTransaction(readFileSync(migrationPath, 'utf8')));
+    await queryProject('SIMPLIFICATION_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012012704_simplify_visual_inspection_contract.sql', 'utf8'), {version:'20261012012704',name:'simplify_visual_inspection_contract',followUp:true}));
     await queryProject('TRANSACTIONAL_REGRESSION', readFileSync('scripts/content-factory/visual-delivery-regression.sql', 'utf8'));
     await requireCurrentMain();
     // JWT verification is already disabled in deployed v35. The function retains

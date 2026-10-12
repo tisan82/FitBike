@@ -222,6 +222,7 @@ export function nativeGenerationContext(pipelineImageId: number, contractHash: s
   const forbidden = Array.isArray(contract?.must_not_show) ? contract.must_not_show : [];
   const prompt = Number(contract.contract_version) === 5
     ? [
+      "CURRENT TASK ONLY. Create the scene below; inspection probes and earlier images are not generation references. Do not inherit previous Task images or prompts.",
       String(contract.visual_objective ?? ""),
       "Required visible scene elements: " + required.map(String).join("; "),
       "Forbidden visible scene elements: " + forbidden.map(String).join("; "),

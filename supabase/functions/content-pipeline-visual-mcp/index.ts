@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { DELIVERY_VERSION, INSPECTION_VIEWS, normalizeInspectionResponse, deliveryDiagnostic } from "./inspection-delivery.mjs";
+import { deliveryEventSchema, validateDeliveryEvent, InspectionInputError, toolAllowedForRole, inspectionRecovery, pixelViews, roleToolDefinition } from "./inspection-contract.mjs";
 import { nativeAuditDiagnostic } from "./native-audit.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 const url = Deno.env.get("SUPABASE_URL")!;
@@ -522,7 +523,12 @@ for (const tool of tools.filter(t => ["claim_visual_production","claim_visual_re
 }
 tools.push({name:"probe_visual_inspection_delivery",description:"Before Claim, return a small PNG through the actual image channel and create an expiring server-issued probe. Forward it to the model and describe its pixels using record_visual_inspection_delivery. A server image response is not client rendering proof. A failed probe never claims a Task.",inputSchema:{type:"object",properties:{runtime:{type:"string",enum:["WORK","CHAT","SCHEDULED"]}},required:["runtime"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}});
 tools.push({name:"get_visual_inspection_delivery_status",description:"Read this authenticated operator/runtime delivery health before Claim. Only operator-reported actual pixel inspection of a server-issued probe establishes expiring runtime readiness. WORK never proves SCHEDULED. No Claim or regeneration.",inputSchema:{type:"object",properties:{runtime:{type:"string",enum:["WORK","CHAT","SCHEDULED"]}},required:["runtime"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}});
-tools.push({name:"record_visual_inspection_delivery",description:"Record a bounded operator-reported client delivery observation; never semantic approval or Claim renewal. ENVIRONMENT requires issued probeId. CANDIDATE requires owned requestId, same Job and expectedSha. Separate CLIENT_PARSE, CLIENT_IMAGE_OUTPUT, PIXELS_INSPECTED. PASS at PIXELS_INSPECTED requires pixelsInspected=true and actual evidence; for a candidate also pixelQa PASS/FAIL. Do not put raw errors, image bytes or URLs in evidence. Reuse eventId after response loss.",inputSchema:{type:"object",properties:{event:{type:"object",additionalProperties:true}},required:["event"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}});
+tools.push({name:"record_visual_inspection_delivery",description:"Record a bounded operator-reported client delivery observation; never semantic approval or Claim renewal. ENVIRONMENT requires issued probeId. CANDIDATE requires owned requestId, same Job and expectedSha. Separate CLIENT_PARSE, CLIENT_IMAGE_OUTPUT, PIXELS_INSPECTED. PASS at PIXELS_INSPECTED requires pixelsInspected=true and actual evidence; for a candidate also pixelQa PASS/FAIL. Do not put raw errors, image bytes or URLs in evidence. Reuse eventId after response loss.",inputSchema:{type:"object",properties:{event:deliveryEventSchema},required:["event"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}});
+
+
+tools.push({name:"record_visual_pixel_inspection",description:"Minimal same-receipt pixel observation. The server derives runtime, canonical SHA, Task and role from your owned Claim/Job. Supply actual evidence only after rendering this view. Requires a runtime-bound receipt (Claim with runtime); legacy unbound receipts must use the typed legacy event tool. Same eventId replays identical content; get_visual_inspection_event reads a lost reply. This is not Reviewer approval.",inputSchema:{type:"object",properties:{eventId:{type:"string",format:"uuid"},requestId:{type:"string",format:"uuid"},jobId:{type:"string",format:"uuid"},view:{type:"string",enum:pixelViews},pixelQa:{type:"string",enum:["PASS","FAIL"]},evidence:{type:"string",minLength:20,maxLength:1000}},required:["eventId","requestId","jobId","view","pixelQa","evidence"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}});
+tools.push({name:"get_visual_inspection_event",description:"Read only this operator's exact eventId after a lost recording response. Returns recorded=false for absent or foreign events. Does not claim, renew, inspect or approve.",inputSchema:{type:"object",properties:{eventId:{type:"string",format:"uuid"}},required:["eventId"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}});
+tools.push({name:"get_visual_inspection_recovery",description:"Read owned request checkpoint and latest per-view records for the same Job/SHA. New Claims must re-inspect; old pixel PASS is never silently inherited. Closed receipts require official role reclaim before writes. No regeneration or Claim mutation.",inputSchema:{type:"object",properties:{requestId:{type:"string",format:"uuid"}},required:["requestId"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}});
 
 function json(b: unknown, s = 200, h: Record<string, string> = {}) {
   return new Response(JSON.stringify(b), {
@@ -601,7 +607,10 @@ async function rpc(name: string, args: Record<string, unknown>) {
   return data;
 }
 Deno.serve(async (req) => {
-  const path = new URL(req.url).pathname;
+  const requestUrl = new URL(req.url);
+  const path = requestUrl.pathname;
+  const endpointRole = requestUrl.searchParams.get("role");
+  if (endpointRole && !["PRODUCER", "REVIEWER"].includes(endpointRole)) return json({error:"INVALID_ENDPOINT_ROLE"},400);
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -666,7 +675,9 @@ Deno.serve(async (req) => {
         maxCandidates?: number;
         attemptId?: string;
         phase?: string;
-        evidence?: Record<string, unknown>;
+        evidence?: Record<string, unknown> | string;
+        eventId?: string;
+        pixelQa?: string;
         operationId?: string;
         pipelineId?: number;
         pipelineImageId?: number;
@@ -719,7 +730,7 @@ Deno.serve(async (req) => {
             ? protocol
             : "2025-06-18",
         capabilities: { tools: {}, resources: {} },
-        serverInfo: { name: "fitbike-visual-operations", version: "1.7.0" },
+        serverInfo: { name: "fitbike-visual-operations", version: "1.8.0" },
       },
     });
   }
@@ -729,8 +740,9 @@ Deno.serve(async (req) => {
       jsonrpc: "2.0",
       id,
       result: {
-        tools: tools.map((t) => ({
+        tools: tools.filter(t => toolAllowedForRole(t.name, endpointRole)).map(t => roleToolDefinition(t,endpointRole)).map((t) => ({
           ...t,
+
           securitySchemes: [{ type: "oauth2", scopes: ["email"] }],
           _meta: { ...t._meta, securitySchemes: [{ type: "oauth2", scopes: ["email"] }] },
         })),
@@ -762,6 +774,7 @@ Deno.serve(async (req) => {
       error: { code: -32602, message: "Invalid tool arguments" },
     });
   }
+  if (!toolAllowedForRole(name, endpointRole)) return json({jsonrpc:"2.0",id,result:{isError:true,content:[{type:"text",text:JSON.stringify({code:"ROLE_TOOL_FORBIDDEN",stage:"SERVER_REQUEST",mutationOutcome:"NOT_ATTEMPTED"})}]} });
   const keys = Object.keys(def.inputSchema.properties);
   if (
     Object.keys(a).some((k) => !keys.includes(k)) ||
@@ -780,11 +793,15 @@ Deno.serve(async (req) => {
   let deliveryResponseBytes: number | null = null;
   let inspectionResult: Record<string, unknown> | null = null;
   try {
+    if (endpointRole && !def.annotations.readOnlyHint && a.requestId) {
+      const owned = await rpc("content_pipeline_visual_claim_request_status_v1", {p_worker_key:worker,p_request_id:a.requestId});
+      if (owned.claim && (owned.executionRole ?? owned.claim.executionRole) !== endpointRole) throw Error("ROLE_CLAIM_MISMATCH");
+    }
     let result;
     let images: Array<{ type: string; data: string; mimeType: string }> = [];
     if (name === "get_visual_generation_capabilities") {
       const { generationCapabilities } = await import("./generation.ts");
-      result = generationCapabilities();
+      result = {...generationCapabilities(),inspectionRecordingVersion:"PIXEL_RECORD_V2",candidateInspectionRecordTool:"record_visual_pixel_inspection",inspectionEventLookupTool:"get_visual_inspection_event",inspectionRecoveryTool:"get_visual_inspection_recovery",connectedRole:endpointRole??"SHARED",roleEndpointsSupported:true};
     } else if (name === "probe_visual_inspection_delivery") {
       if (!["WORK","CHAT","SCHEDULED"].includes(String(a.runtime))) throw Error("INVALID_DELIVERY_RUNTIME");
       const probeId = crypto.randomUUID();
@@ -796,7 +813,45 @@ Deno.serve(async (req) => {
     } else if (name === "get_visual_inspection_delivery_status") {
       result = await rpc("content_pipeline_visual_delivery_health_v1", {p_worker_key:worker,p_runtime:a.runtime});
     } else if (name === "record_visual_inspection_delivery") {
-      result = await rpc("content_pipeline_record_visual_delivery_v1", {p_worker_key:worker,p_server:false,p_event:a.event});
+      deliveryStage = "REQUEST_VALIDATION";
+      const event = validateDeliveryEvent(a.event);
+      if (endpointRole && event.scope === "CANDIDATE") {
+        const owned = await rpc("content_pipeline_visual_claim_request_status_v1", {p_worker_key:worker,p_request_id:event.requestId});
+        if ((owned.executionRole ?? owned.claim?.executionRole) !== endpointRole) throw Error("ROLE_CLAIM_MISMATCH");
+      }
+      deliveryStage = "DB_RECORD";
+      result = await rpc("content_pipeline_record_visual_delivery_v1", {p_worker_key:worker,p_server:false,p_event:event});
+    } else if (name === "get_visual_inspection_event") {
+      if (!uuid(a.eventId)) throw new InspectionInputError("eventId","UUID");
+      const {data:event,error} = await sb.from("content_pipeline_visual_delivery_event").select("event_id,request_id,job_id,runtime,scope,stage,outcome,code,view_name,pixels_inspected,pixel_qa,canonical_sha,execution_role,created_at").eq("worker_key",worker).eq("event_id",a.eventId).maybeSingle();
+      if (error) throw Error("DELIVERY_EVENT_READ_FAILED");
+      result = event && (!endpointRole || event.scope === "ENVIRONMENT" || event.execution_role === endpointRole) ? {recorded:true,eventId:a.eventId,event} : {recorded:false,eventId:a.eventId,result:"NOT_FOUND"};
+    } else if (["record_visual_pixel_inspection","get_visual_inspection_recovery"].includes(name)) {
+      deliveryStage = "REQUEST_VALIDATION";
+      if (!uuid(a.requestId)) throw new InspectionInputError("requestId","UUID");
+      const current = await rpc("content_pipeline_visual_claim_request_status_v1", {p_worker_key:worker,p_request_id:a.requestId});
+      if (!current.claim) throw Error("VISUAL_CLAIM_RECEIPT_REQUIRED");
+      if (endpointRole && (current.executionRole ?? current.claim.executionRole) !== endpointRole) throw Error("ROLE_CLAIM_MISMATCH");
+      const candidate = current.recoverableStaging ?? (current.executionRole === "REVIEWER" ? current.reviewCandidate : current.recoverableProductionCandidate);
+      const selectedJobId = name === "record_visual_pixel_inspection" ? a.jobId : candidate?.jobId;
+      if (!selectedJobId) { result = {requestId:a.requestId,activeClaim:current.activeClaim,resumeFrom:current.resumeFrom,nextAction:current.nextAction,jobId:null,views:[],regenerate:false}; }
+      else {
+        if (!uuid(selectedJobId)) throw new InspectionInputError("jobId","UUID");
+        const {data:job,error} = await sb.from("27_content_pipeline_source_stage_job").select("pipeline_image_id,contract_hash,status,result,spec").eq("job_id",selectedJobId).maybeSingle();
+        if (error || !job || job.spec?.visualMcpOperation?.workerKey !== worker || job.pipeline_image_id !== current.claim.pipelineImageId || job.contract_hash !== current.claim.generationContractHash || job.status !== "STAGED" || !/^[a-f0-9]{64}$/.test(job.result?.sha256 ?? "")) throw Error("SOURCE_JOB_ACCESS_DENIED");
+        if (name === "record_visual_pixel_inspection") {
+          if (!current.claim.deliveryRuntime) throw Error("DELIVERY_RUNTIME_BINDING_REQUIRED");
+          // Receipt-closed exact replay remains supported by the DB. A new event
+          // is fenced below in the DB against active ownership/expiry.
+          const event = validateDeliveryEvent({eventId:a.eventId,requestId:a.requestId,jobId:selectedJobId,scope:"CANDIDATE",runtime:current.claim.deliveryRuntime,expectedSha:job.result.sha256,view:a.view,stage:"PIXELS_INSPECTED",outcome:"PASS",code:"PASS",pixelsInspected:true,pixelQa:a.pixelQa,evidence:a.evidence});
+          deliveryStage = "DB_RECORD";
+          result = await rpc("content_pipeline_record_visual_delivery_v1", {p_worker_key:worker,p_server:false,p_event:event});
+        } else {
+          const {data:events,error} = await sb.from("content_pipeline_visual_delivery_event").select("event_id,view_name,stage,outcome,pixels_inspected,pixel_qa").eq("worker_key",worker).eq("request_id",a.requestId).eq("job_id",selectedJobId).eq("canonical_sha",job.result.sha256).order("sequence_no",{ascending:false}).limit(100);
+          if (error) throw Error("DELIVERY_EVENT_READ_FAILED");
+          result = inspectionRecovery(current,selectedJobId,job.result.sha256,events ?? []);
+        }
+      }
     } else if (name === "get_visual_image_task") {
       if (!Number.isSafeInteger(a.pipelineImageId) || a.pipelineImageId! < 1) throw Error("INVALID_IMAGE_ID");
       const read = await sb.from("21_content_pipeline_image").select("pipeline_image_id,pipeline_id,image_id,status,handoff_phase,generation_contract,generation_contract_hash,claim_expires_at,next_eligible_at,staging_asset,retry_action,visual_phase,review_candidate").eq("pipeline_image_id", a.pipelineImageId).maybeSingle();
@@ -879,6 +934,8 @@ Deno.serve(async (req) => {
           "content_pipeline_visual_claim_request_status_v1",
           { p_worker_key: worker, p_request_id: a.requestId },
         );
+        const receiptRole = current.executionRole ?? current.claim?.executionRole;
+        if (!def.annotations.readOnlyHint && ['PRODUCER','REVIEWER'].includes(receiptRole) && !toolAllowedForRole(name,receiptRole)) throw Error("ROLE_CLAIM_MISMATCH");
         if (name === "get_visual_claim_result") {
           result = current;
           if (Number(current.claim?.generationContract?.contract_version) === 5) result.visualPolicy = await rpc("content_pipeline_visual_policy_v1", {p_contract:current.claim.generationContract});
@@ -939,6 +996,10 @@ Deno.serve(async (req) => {
         } else if (name === "dispatch_visual_generation" || name === "open_visual_file_upload") {
           if (!current.activeClaim) throw inactiveClaimError(current);
           if (!uuid(a.operationId)) throw Error("INVALID_OPERATION_ID");
+          if ((current.executionRole ?? current.claim?.executionRole) === "REVIEWER") {
+            const allowedJobs = [current.reviewCandidate?.jobId,current.recoverableStaging?.jobId].filter(Boolean);
+            if (name !== "dispatch_visual_generation" || !a.spec || !uuid(a.spec.resumeJobId) || !allowedJobs.includes(a.spec.resumeJobId) || a.spec.preflightOnly !== false || a.file || a.inputFile || a.spec.chatFile || a.spec.inputFile || a.spec.generatedAssetUrl) throw Error("REVIEW_RESUME_REQUIRED");
+          }
           const { validateGenerationSpec } = await import("./generation.ts");
           // Only official top-level fileParams can populate these internal fields.
           if (a.spec && ("chatFile" in a.spec || "inputFile" in a.spec || "nativeAttemptBinding" in a.spec)) throw Error("USE_TOP_LEVEL_FILE_PARAMS");
@@ -1274,9 +1335,13 @@ Deno.serve(async (req) => {
     const diagnostic = auditError ? nativeAuditDiagnostic(e, {traceId,tool:name,requestId:a.requestId,attemptId:a.attemptId,phase:name === "validate_visual_generation_result" ? "RESULT" : a.phase}) : null;
     if (diagnostic) console.error(JSON.stringify(diagnostic));
     const delivery = !auditError ? deliveryDiagnostic(e,{traceId,tool:name,requestId:a.requestId,jobId:a.jobId,stage:deliveryStage,startedAt,responseBytes:deliveryResponseBytes}) : null;
+    const deliveryTool = ["inspect_visual_source","probe_visual_inspection_delivery","record_visual_inspection_delivery","get_visual_inspection_delivery_status","record_visual_pixel_inspection","get_visual_inspection_event","get_visual_inspection_recovery"].includes(name);
+    const inputFailure = e instanceof InspectionInputError;
+    if (inputFailure && delivery) Object.assign(delivery,{code:e.code,field:e.field,reason:e.reason,stage:"REQUEST_VALIDATION",mutationOutcome:"NOT_ATTEMPTED"});
+    if (delivery && ["ROLE_TOOL_FORBIDDEN","ROLE_CLAIM_MISMATCH","DELIVERY_REQUEST_INVALID","DELIVERY_RUNTIME_BINDING_REQUIRED","VISUAL_CLAIM_RECEIPT_REQUIRED","SOURCE_JOB_ACCESS_DENIED"].includes(delivery.code)) delivery.mutationOutcome="NOT_ATTEMPTED";
     if (delivery) console.error(JSON.stringify(delivery));
-    const deliveryTool = ["inspect_visual_source","probe_visual_inspection_delivery","record_visual_inspection_delivery","get_visual_inspection_delivery_status"].includes(name);
-    const safeResult = deliveryTool ? {...inspectionResult,...delivery,technicalQa:inspectionResult?.technicalQa??"NOT_EVALUATED",pixelDeliveryQa:"FAIL",semanticQa:"BLOCKED",mobileQa:"BLOCKED",failureCode:delivery?.code,nextAction:inspectionResult?.nextAction??"READ_SAME_JOB_STATUS_THEN_RECOVER_PIXELS_NO_REGENERATION"} : delivery;
+    const recordTool = ["record_visual_inspection_delivery","record_visual_pixel_inspection"].includes(name);
+    const safeResult = deliveryTool ? {...inspectionResult,...delivery,technicalQa:inspectionResult?.technicalQa??"NOT_EVALUATED",pixelDeliveryQa:recordTool?"NOT_EVALUATED":"FAIL",semanticQa:"BLOCKED",mobileQa:"BLOCKED",failureCode:delivery?.code,nextAction:inputFailure?"FIX_REQUEST_FIELDS_NO_REGENERATION":inspectionResult?.nextAction??"READ_EVENT_ID_AND_SAME_JOB_STATUS_NO_REGENERATION"} : delivery;
     return json({
       jsonrpc: "2.0",
       id,
