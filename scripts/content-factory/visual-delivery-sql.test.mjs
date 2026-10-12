@@ -10,21 +10,26 @@ const setup=`
 create role anon; create role authenticated; create role service_role;
 create table public."21_content_pipeline_image"(pipeline_image_id bigint primary key,generation_contract_hash text,status text,claim_token uuid,claim_expires_at timestamptz,next_eligible_at timestamptz);
 create table public."29_content_pipeline_visual_claim_request"(worker_key text,request_id uuid,pipeline_image_id bigint,response jsonb,created_at timestamptz default clock_timestamp(),primary key(worker_key,request_id));
-create table public."27_content_pipeline_source_stage_job"(job_id uuid primary key,pipeline_image_id bigint,contract_hash text,status text,result jsonb);
+create table public."27_content_pipeline_source_stage_job"(job_id uuid primary key,pipeline_image_id bigint,contract_hash text,status text,result jsonb,spec jsonb);
 -- Existing RPC boundaries are deterministic fixtures. These are not Production integration proofs.
 create function public.content_pipeline_visual_claim_request_status_v1(text,uuid) returns jsonb language sql as $stub$
- select coalesce((select jsonb_build_object('claim',response,'result','CLOSED','activeClaim',false) from public."29_content_pipeline_visual_claim_request" where worker_key=$1 and request_id=$2),jsonb_build_object('result','NOT_FOUND')) $stub$;
+ select coalesce((select jsonb_build_object('claim',response,'result',case when coalesce((response->>'testActive')::boolean,true) then 'CLAIMED' else 'CLOSED' end,'activeClaim',coalesce((response->>'testActive')::boolean,true)) from public."29_content_pipeline_visual_claim_request" where worker_key=$1 and request_id=$2),jsonb_build_object('result','NOT_FOUND')) $stub$;
 create function public.content_pipeline_claim_visual_stage_v1(text,uuid,text,bigint) returns jsonb language sql as $stub$ select '{}'::jsonb $stub$;
 `;
 const db=await PGlite.create(); await db.exec(setup);
 await db.exec('create schema supabase_migrations; create table supabase_migrations.schema_migrations(version text primary key,name text,statements text[]);');
 await db.exec(migrationTransaction(migration));
+const followUp=readFileSync(new URL('../../supabase/migrations/20261012012704_simplify_visual_inspection_contract.sql',import.meta.url),'utf8');
+// Other production Claim constructors are covered by the real rollback regression;
+// this local fixture tests the changed recording function with explicit lease states.
+await db.exec(followUp.match(/^CREATE OR REPLACE FUNCTION public\.content_pipeline_record_visual_delivery_v1[\s\S]*?\$function\$;/m)[0]);
 const rpc=async(name,...args)=>(await db.query(`select public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) as result`,args)).rows[0].result;
 const record=event=>rpc('content_pipeline_record_visual_delivery_v1','worker',JSON.stringify(event),false);
 const sha='a'.repeat(64), job=randomUUID(), hash='contract';
 async function seedReceipt(runtime='WORK',candidateSha=sha) {
  const requestId=randomUUID();await db.query('insert into public."29_content_pipeline_visual_claim_request"(worker_key,request_id,pipeline_image_id,response) values($1,$2,1,$3)',['worker',requestId,JSON.stringify({pipelineImageId:1,generationContractHash:hash,executionRole:'PRODUCER'})]);
- await db.query('insert into public."27_content_pipeline_source_stage_job"(job_id,pipeline_image_id,contract_hash,status,result) values($1,1,$2,$3,$4) on conflict(job_id) do update set result=excluded.result',[job,hash,'STAGED',JSON.stringify({sha256:candidateSha})]);
+ await db.query('insert into public."27_content_pipeline_source_stage_job"(job_id,pipeline_image_id,contract_hash,status,result,spec) values($1,1,$2,$3,$4,$5) on conflict(job_id) do update set result=excluded.result',[job,hash,'STAGED',JSON.stringify({sha256:candidateSha}),JSON.stringify({visualMcpOperation:{workerKey:'worker'}})]);
+ await db.query(`update public."27_content_pipeline_source_stage_job" set spec='{"visualMcpOperation":{"workerKey":"worker"}}'::jsonb where job_id=$1`,[job]);
  return {requestId,jobId:job,runtime,scope:'CANDIDATE',expectedSha:candidateSha,view:'CANONICAL'};
 }
 await db.query('insert into public."21_content_pipeline_image"(pipeline_image_id,generation_contract_hash,status) values(1,$1,$2)',[hash,'RETRY']);
@@ -61,5 +66,12 @@ test('three distinct receipts open only same runtime/SHA circuit; new SHA and sc
  assert.equal((await rpc('content_pipeline_visual_delivery_backoff_v1','worker',identity.requestId)).candidateCircuit,'CLOSED');
  identity=await seedReceipt('WORK','b'.repeat(64));await record({...identity,eventId:randomUUID(),stage:'CLIENT_IMAGE_OUTPUT',outcome:'FAIL',code:'CLIENT_PIXEL_RENDER_UNVERIFIED'});
  assert.equal((await rpc('content_pipeline_visual_delivery_backoff_v1','worker',identity.requestId)).candidateCircuit,'CLOSED');
+});
+test('new reports require active receipt, exact replay remains valid after close and unknown fields are request errors',async()=>{
+ const identity=await seedReceipt();const pass={...identity,eventId:randomUUID(),stage:'PIXELS_INSPECTED',outcome:'PASS',code:'PASS',pixelsInspected:true,pixelQa:'PASS',evidence:'Actual same candidate pixel report for lease closure fixture.'};
+ await record(pass);
+ await db.query(`update public."29_content_pipeline_visual_claim_request" set response=response||'{"testActive":false}'::jsonb where request_id=$1`,[identity.requestId]);
+ await record(pass);await assert.rejects(record({...pass,eventId:randomUUID()}),/VISUAL_CLAIM_RECEIPT_REQUIRED/);
+ await assert.rejects(record({...pass,extra:'not part of schema'}),/DELIVERY_REQUEST_INVALID/);
 });
 test.after(async()=>{await db.close();});

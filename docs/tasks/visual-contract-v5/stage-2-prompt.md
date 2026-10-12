@@ -33,7 +33,7 @@ evidence_ref 원소는 실제 HTTPS source_ref와 선택적 model_scope, support
 
 source_strategy/source_priority/generation_allowed/ai_edit_allowed/full_generation_allowed/reference_based_generation_allowed/composition_plan/annotation_contract/people_mode/pixel_qa_contract/qa_criteria/mobile_requirement/production_feasibility/production_flexibility를 신규 V5 Brief에 작성하지 않는다. Pipeline/Task/asset 운영 식별자는 서버가 관리한다.
 
-모든 must_show가 실제 시각 대상인지 확인한다. 필수·금지 목록의 동일 항목이나 사람 필수/금지 충돌을 제거한다. 사람·손·라이더가 필요하면 필수 목록에 명시하고 금지하면 금지 목록에 명시한다. 기본은 사람 없음이다. 구도/Inset/Source 탐색/편집 방식은 3-A가 선택한다. 이미지마다 핵심 질문 하나를 유지하되 제작이 어려운 요구를 QA 완화로 해결하지 않는다.
+모든 must_show가 실제 시각 대상인지 확인한다. 필수·금지 목록의 동일 항목이나 사람 필수/금지 충돌을 제거한다. 사람·손·라이더가 필요하면 필수 목록에 명시하고 금지하면 금지 목록에 명시한다. 사람 미지정 시 V5 서버 기본은 OPTIONAL이다. 구도/Inset/Source 탐색/편집 방식은 3-A가 선택한다. 이미지마다 핵심 질문 하나를 유지하되 제작이 어려운 요구를 QA 완화로 해결하지 않는다.
 
 ## 저장 및 완료
 
@@ -42,3 +42,8 @@ source_strategy/source_priority/generation_allowed/ai_edit_allowed/full_generati
 최종 보고: Pipeline/Topic, Writer 최종 상태, 신규 V5 Task 수, evidence level 요약, 이미지 Task 동기화 확인, 자기 Claim 종료 결과. 실패하면 실제 오류와 재개 지점을 기록하고 공식 종료한다.
 
 다음 담당: 3-A 제작. 다음 작업: 최신 Contract와 서버 visualPolicy 기준 후보 확보·Staging·검수 인계.
+
+
+## 신규 Source 경계 보완
+
+실제 물체 등장 여부가 아니라 실제 외형/표시가 답변 근거인지로 evidence level을 선택한다. 일반 점검 행동은 NONE, 검증한 Reference 범위의 재구성은 REFERENCE, 특정 모델 UI/제품 구조/정확한 배선 등 실제 자료 기반 표현은 REQUIRED다. 특정 모델 화면을 꼭 보여줘야 하는지 먼저 판단한다. 특정 Source URL, 매뉴얼 이미지, 제작 순서·Crop·방법을 신규 V5 필수 조건으로 고정하지 않는다. Source URL은 사실 근거/탐색 힌트로 전달하고 3-A가 허용된 방법을 선택한다. 매뉴얼은 기술 사실의 근거가 될 수 있지만 최종 이미지의 기본 자산은 아니다. 기존 Task/Hash/승인 자산은 변경하지 않는다.

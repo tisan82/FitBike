@@ -220,7 +220,7 @@ V5의 2단계 책임은 이미지 의미와 사실 경계다. Writer는 `contrac
 
 AI edit는 level과 무관하게 실제 입력 바이너리·Source·편집 사실 연결을 검증한다. 생성은 일반 ChatGPT 내장 도구만 사용한다. 외부 생성 API와 서버 모델은 금지한다. Source 미확보는 level 변경이나 자동 완화 사유가 아니다.
 
-모든 `must_show`는 원본과 해당 390px 뷰에서 식별 가능한 필수 조건이다. `must_not_show`는 실제 금지 조건이다. visual_objective/user_question은 방향성 문맥이며 명시되지 않은 온도·재시동 성공·고장 원인 같은 추상 상태를 독립 FAIL Gate로 추가하지 않는다. 사람/손 등이 필요한 경우 필수 목록에, 금지하는 경우 금지 목록에 명시한다. 공통 기본은 사람 없음이고 사람 필수·금지 충돌은 제출 오류다. 자연어 자동 검사는 제한적인 기본 모순 검사이며 제작 가능성이나 픽셀 PASS를 주장하지 않는다.
+모든 `must_show`는 원본과 해당 390px 뷰에서 식별 가능한 필수 조건이다. `must_not_show`는 실제 금지 조건이다. visual_objective/user_question은 방향성 문맥이며 명시되지 않은 온도·재시동 성공·고장 원인 같은 추상 상태를 독립 FAIL Gate로 추가하지 않는다. 사람/손 등이 필요한 경우 필수 목록에, 금지하는 경우 금지 목록에 명시한다. 사람의 필수·금지는 must_show/must_not_show에 명시하며, 미지정 시 현재 V5 서버 정책은 OPTIONAL이다. 사람 필수·금지 충돌은 제출 오류다. 자연어 자동 검사는 제한적인 기본 모순 검사이며 제작 가능성이나 픽셀 PASS를 주장하지 않는다.
 
 390px 식별성·역할별 최종 Card/Hero Crop·ALT/SEO·SHA·중복·출처 동일성은 공통 검수 정책이다. BODY에는 대표 이미지 Crop을 강제하지 않는다. 제작자가 선택한 실제 제작 방식·Source/Reference·확인 사실·transform/Crop/Annotation·Native 호출/반환 자산은 현재 Contract에 결합한 Job/감사 기록으로 전달한다. Annotation은 실제 대상을 정확히 가리키고 최소 factual label을 사용하며 최종 렌더링에서 검증한다. 제작자의 PASS는 Reviewer 승인 증거를 대체하지 않는다.
 
@@ -239,3 +239,10 @@ AI edit는 level과 무관하게 실제 입력 바이너리·Source·편집 사�
 - 비활성화한 콘텐츠와 자산은 즉시 삭제하지 않고 이관 검토가 끝날 때까지 보존
 
 신규 Factory는 이 유형을 더 생성하지 않는다.
+
+
+### V5 evidence selection and minimal execution records
+
+일반 장면에 오토바이·부품이 등장한다는 이유만으로 REQUIRED를 지정하지 않는다. 실제 모델/제품의 외형·표시 자체가 고객 답변의 근거이면 REQUIRED, 확인한 근거 범위의 재구성으로 충분하면 REFERENCE, 일반적인 행동·상황 설명이면 NONE을 사용한다. 특정 모델 UI가 본문 답변에 꼭 필요한 경우에만 그 UI를 must_show에 넣는다. 실제 기술 근거는 매뉴얼로 확인할 수 있으나 최종 이미지에 매뉴얼 그림을 사용할 의무는 없다. 검증된 사진·실제 화면을 탐색할 수 있으며, 자료 부재는 근거 수준 완화 사유가 아니다. 숫자/LOW·MEDIUM·HIGH 같은 별도 위험도 Contract 필드를 추가하지 않는다.
+
+Current Task/Contract, Job/input checkpoint, Claim receipt, execution outcome and minimal inspection event are authoritative. Computed policies and guidance are derived on read, not repeated in new receipt/run storage. Existing raw Contracts/hashes/history and approved assets remain unchanged. Producer success is reviewHandoff on its own run; later Reviewer RETRY does not revoke that historical handoff. Inspector evidence is required for transition; diagnostic logs are not a second approval gate.

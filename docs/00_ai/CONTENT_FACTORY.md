@@ -178,22 +178,17 @@ Visual 하나는 최소 하나의 명확한 Role과 User Question을 가져야 �
 
 ## 7. Image Source Strategy
 
-실제 구조와 상태를 설명하는 경우 실제 자료 탐색을 우선한다.
+신규 V5는 CONTENT.md의 evidence level을 따르며, 2단계는 시각 목적·필수/금지 요소·사실 경계만 정한다. Source URL은 근거 또는 탐색 힌트이며 그 URL만 제작 경로로 고정하지 않는다. 기존 V4의 명시적 제한은 유지한다.
 
-탐색 우선순위:
+- NONE: 일반 점검 장면은 적합한 실사 또는 ChatGPT Native 생성 중 품질·식별성·실행 가능성에 맞는 방법을 선택한다. 실제 모델 UI·제품·손상·배선을 임의로 만들어 사실처럼 제시하지 않는다.
+- REFERENCE: 실제로 검사한 근거 범위에서 Reference 생성 또는 실제 Source를 선택한다. 근거 없는 Full Generation은 금지한다.
+- REQUIRED: 검증된 실제/공식 Source 기반 자산을 사용한다. 구조·표시·사실을 보존하는 Crop/편집은 허용하지만 생성 재구성으로 대체하지 않는다.
 
-1. FitBike가 사용 가능한 MAXXIS, POWEROAD 등 승인 Brand Asset
-2. 제조사/브랜드 공식 이미지와 기술자료
-3. 블로그의 실제 작업/실차 이미지
-4. 신뢰 가능한 전문 자료의 실제 이미지
-5. 기타 현장 맥락을 확인할 수 있는 웹 자료
-6. FitBike 점검 안내용 신규 생성 이미지
+실사 탐색은 기존 Brand Asset, 제조사/제품 공식 사진, 검증 가능한 현장 사진을 우선 검토한다. 매뉴얼·PDF는 사실 확인 근거로 사용할 수 있으나 최종 이미지의 기본 선택이 아니다. 적합한 사진과 허용된 다른 제작 경로를 검토한 뒤 차선책으로 사용한다. 매뉴얼 일러스트는 Contract가 요구하는 실제 화면·실사·장착 장면의 대체품이 아니다.
 
-공식/블로그/웹 이미지는 단순 복사하여 FitBike 최종 자산으로 취급하지 않는다. 원본은 Research/Editorial Source로 기록하고, 서비스 목적에 맞는 정보 구조를 먼저 정의한 뒤 허용된 편집 또는 독립적인 FitBike 교육용 Visual 생성에 사용한다.
+같은 실패 URL을 반복 조회하지 않는다. 기본 탐색은 서로 다른 후보 페이지 최대 3개로 제한하고, 모두 부적합하면 허용된 다른 제작 방식으로 전환한다. 모든 허용 경로가 실패하면 사실 수준을 낮추지 않고 Source 실패로 종료한다. HTML/XML resolver는 특정 문서의 이미지 추출 도구이며 자유 검색 도구가 아니다. 현재 호스트에 검색 도구가 없으면 검색했다고 주장하지 않는다.
 
-원본 페이지/자산 URL, Source Name, Author/Operator, Source Type, 확인 시점, Content/Visual Role과 편집 이력을 기록한다. 라이선스·권리 상태·허락 근거는 제작 필수값이 아니다.
-
-권리 협의·판단 및 문제 이미지의 제외·삭제·수정은 운영자가 담당한다. AI는 출처만 기록하며 권리 대기/승인 상태를 만들지 않는다.
+출처의 페이지/실제 자산 URL, 운영자, 모델·연식 범위와 편집 이력을 기록한다. 라이선스·권리 상태·허락 근거는 AI 제작 필수값이 아니며 운영자가 별도로 관리한다.
 
 ## 8. Watermark Policy
 
@@ -203,7 +198,7 @@ Visual 하나는 최소 하나의 명확한 Role과 User Question을 가져야 �
 - 워터마크 영역만 Crop하여 사실상 제거하는 방식도 사용하지 않는다.
 - 해당 이미지는 사실/장면/Visual Requirement를 이해하기 위한 Research Reference로만 사용할 수 있다.
 - 같은 정보를 보여주는 워터마크 없는 공식/블로그/실제 자료를 다시 탐색한다.
-- 적절한 원본이 없으면 원본의 표현을 복제하지 않고, 검증된 사실과 Visual Requirement를 바탕으로 FitBike 목적의 독립적인 점검 안내 이미지를 신규 생성한다.
+- 적절한 원본이 없으면 현재 NONE/REFERENCE의 생성 허용 범위에서만, 원본 표현을 복제하지 않는 독립적인 점검 안내 이미지를 검토한다. REQUIRED 또는 기존 V4 생성 금지 조건에서는 대체 생성하지 않고 Source 실패·보완으로 처리한다.
 
 ## 9. Real Asset vs Generated Visual
 
@@ -232,6 +227,8 @@ Visual 하나는 최소 하나의 명확한 Role과 User Question을 가져야 �
 - 실제 사진에 안전하게 표시하기 어려운 설명 구조
 
 생성 이미지는 특정 제조사 공식 도면이나 특정 블로그 사진을 그대로 재현하지 않는다. Research에서 확인된 사실을 기반으로 FitBike만의 구도, 정보 계층, 라벨, 설명 목적을 가진 Visual을 만든다. 사람 표현과 alt/caption을 포함한 상세 제작 기준은 `CONTENT_EDITORIAL_VISUAL_STANDARD.md`를 따른다.
+
+V5에서는 위 대체·편집 절차도 evidence level의 허용 범위 안에서만 수행한다. REQUIRED의 Source 미확보·워터마크 문제를 독립 생성으로 우회하지 않는다.
 
 ## 10. Image Editing Standard
 
@@ -839,3 +836,12 @@ V5 does not silently rewrite existing V4 claims, candidates or approved assets. 
 Reuse the existing private `generatedInput` checkpoint, not a second mandatory persist upload. After Storage read-back, the worker saves `persistence.status=READ_BACK_VERIFIED`; legacy GENERATED_BINARY_PRESERVED/STORAGE_VERIFIED checkpoints retain their actual normalized-WebP proof. Producer receipt/Task exposes `recoverableNativeInput` separately from STAGED candidates. Recover a valid existing candidate first, then an admitted same-Worker/Task/Contract FAILED input with the returned resume spec unchanged and a new operationId. Original requestId/nativeAttemptId are provenance, not authorization; the new active Producer lease authorizes restaging. Semantic-rejected identity, changed Hash/method/prompt/references, missing Storage or altered bytes are excluded. FAILED input never authorizes Reviewer finalization or inspection/approval as STAGED.
 
 Native audit capture validation runs only when Native is used, immediately before the actual call with the actual scene/arguments; it is not a gate on real-Source production. New Native dispatch may bind `spec.nativeAttemptId` to that receipt's reported REQUEST/RESULT and operationId. Observable mismatches are rejected. Path-only outputs remain fileLink=UNVERIFIED, never fabricated file IDs or proven host execution. Recoveries preserve the original attempt identity. Server Job acceptance, confirmed input bytes, read-back preservation and STAGED are separate facts; a missing receipt has UNKNOWN binary status. Connector error text and operator observations remain separately reported. No server can store a file that was never received, and this release does not prove scheduled first-egress reliability or Native context isolation.
+
+
+### Minimal inspection recording and next-run recovery (2026-10-12)
+
+Use record_visual_pixel_inspection for candidate observations: eventId/requestId/jobId/view/pixelQa/evidence only. Runtime/SHA/Task/role come from the owned receipt and immutable Job. The ENVIRONMENT probe retains the typed record_visual_inspection_delivery contract. Request validation failure is NOT_ATTEMPTED, never a fabricated transport failure or semantic rejection.
+
+After a lost response, get_visual_inspection_event reads the exact eventId. Exact accepted replays retain the same payload/eventId. get_visual_inspection_recovery reads current receipt, stored candidate identity and latest required-view results. A later Claim resumes the same Job/SHA but requires a new actual inspection report; it never changes the old event's requestId or inherits its PASS. No pending evidence text, image bytes or second checkpoint table is added. Unreceived Native file references remain UNKNOWN.
+
+Role endpoints restrict exposed tools and receipt-bound writes while keeping the same authenticated operator identity. Different eligible Tasks may run concurrently; same Task retains one active lease. Shared endpoint remains compatible during connector migration. Diagnostic logging failure never authorizes approval or blocks official Claim cleanup.

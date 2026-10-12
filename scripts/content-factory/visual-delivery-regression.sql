@@ -3,7 +3,7 @@ set local lock_timeout='5s';
 set local statement_timeout='60s';
 do $test$
 declare
- w text:='delivery-regression-'||extensions.gen_random_uuid(); probe uuid:=extensions.gen_random_uuid(); probe2 uuid:=extensions.gen_random_uuid(); event uuid:=extensions.gen_random_uuid(); request uuid:=extensions.gen_random_uuid(); job uuid:=extensions.gen_random_uuid(); x jsonb; payload jsonb; i public."21_content_pipeline_image"%rowtype; j public."27_content_pipeline_source_stage_job"%rowtype; n integer; first_sha text;
+ w text:='delivery-regression-'||extensions.gen_random_uuid(); probe uuid:=extensions.gen_random_uuid(); probe2 uuid:=extensions.gen_random_uuid(); event uuid:=extensions.gen_random_uuid(); request uuid:=extensions.gen_random_uuid(); job uuid:=extensions.gen_random_uuid(); x jsonb; payload jsonb; i public."21_content_pipeline_image"%rowtype; j public."27_content_pipeline_source_stage_job"%rowtype; n integer; first_sha text; parallel_request uuid:=extensions.gen_random_uuid(); other_image public."21_content_pipeline_image"%rowtype; stored jsonb;
 begin
  if has_table_privilege('anon','public.content_pipeline_visual_delivery_event','SELECT') or has_table_privilege('authenticated','public.content_pipeline_visual_delivery_event','INSERT') or has_function_privilege('anon','public.content_pipeline_record_visual_delivery_v1(text,jsonb,boolean)','EXECUTE') then raise exception 'DELIVERY_PUBLIC_ACCESS'; end if;
  x:=public.content_pipeline_visual_delivery_health_v1(w,'WORK'); if x->>'ready'<>'false' then raise exception 'UNOBSERVED_RUNTIME_READY'; end if;
@@ -23,15 +23,32 @@ begin
  begin perform public.content_pipeline_record_visual_delivery_v1(w,payload||jsonb_build_object('outcome','FAIL','code','TRANSPORT_ERROR'),false); raise exception 'CHANGED_EVENT_REPLAY_ALLOWED'; exception when others then if sqlerrm<>'DELIVERY_EVENT_IMMUTABLE' then raise;end if;end;
  begin perform public.content_pipeline_claim_visual_delivery_v1(w,request,'PRODUCER',null,'SCHEDULED'); raise exception 'UNVERIFIED_RUNTIME_CLAIMED'; exception when others then if sqlerrm<>'PIXEL_DELIVERY_PRECHECK_BLOCKED' then raise;end if;end;
  if exists(select 1 from public."29_content_pipeline_visual_claim_request" where worker_key=w and request_id=request) then raise exception 'PRECHECK_CREATED_RECEIPT';end if;
- select i0.* into i from public."21_content_pipeline_image" i0 join public."27_content_pipeline_source_stage_job" j0 on j0.pipeline_image_id=i0.pipeline_image_id where public.content_pipeline_review_candidate_v1(i0.pipeline_image_id,j0.job_id) is not null and (i0.claim_token is null or i0.claim_expires_at<now()) order by j0.created_at desc limit 1 for update of i0 skip locked;
+ select i0.* into i from public."21_content_pipeline_image" i0 join public."27_content_pipeline_source_stage_job" j0 on j0.pipeline_image_id=i0.pipeline_image_id where public.content_pipeline_review_candidate_v1(i0.pipeline_image_id,j0.job_id) is not null and i0.status in ('PENDING','RETRY') and (i0.claim_token is null or i0.claim_expires_at<now()) order by j0.created_at desc limit 1 for update of i0 skip locked;
  if not found then raise exception 'VALID_STORED_FIXTURE_REQUIRED';end if;
  select j0.* into j from public."27_content_pipeline_source_stage_job" j0 where public.content_pipeline_review_candidate_v1(i.pipeline_image_id,j0.job_id) is not null order by created_at desc limit 1;
  first_sha:=j.result->>'sha256';
  update public."21_content_pipeline_image" set status='PENDING',staging_asset=null,review_candidate=null,visual_phase=null,claimed_by=null,claim_token=null,claim_expires_at=null,next_eligible_at=null where pipeline_image_id=i.pipeline_image_id;
  x:=public.content_pipeline_claim_visual_delivery_v1(w,request,'PRODUCER',i.pipeline_image_id,'WORK');
  if x->>'activeClaim'<>'true' or x->'claim'->>'deliveryRuntime'<>'WORK' then raise exception 'GATED_CLAIM_FAILED';end if;
+ select response into stored from public."29_content_pipeline_visual_claim_request" where worker_key=w and request_id=request;
+ if stored ?| array['runtimePolicy','reviewRequirements','nativeGenerationContext','nativeGenerationIsolationPolicy','preservedStagingInput'] then raise exception 'VISUAL_DUPLICATE_RECEIPT_STORAGE';end if;
+ if x->'claim'->'runtimePolicy' is null or x->'claim'->'nativeGenerationContext' is null then raise exception 'VISUAL_COMPACT_HYDRATION_FAILED';end if;
+ if exists(select 1 from public."23_content_pipeline_image_run" where pipeline_image_run_id=(x->'claim'->>'pipelineImageRunId')::bigint and metadata ?| array['runtimePolicy','reviewRequirements','nativeGenerationContext','nativeGenerationIsolationPolicy']) then raise exception 'VISUAL_DUPLICATE_RUN_STORAGE';end if;
+ if public.content_pipeline_claim_visual_stage_v1(w,extensions.gen_random_uuid(),'PRODUCER',i.pipeline_image_id)->>'result'<>'BUSY' then raise exception 'VISUAL_SAME_TASK_DOUBLE_CLAIM';end if;
+ -- Two different Task leases may coexist for this operator. No remote dispatch.
+ select i0.* into other_image from public."21_content_pipeline_image" i0 join public."27_content_pipeline_source_stage_job" j0 on j0.pipeline_image_id=i0.pipeline_image_id
+ where i0.pipeline_image_id<>i.pipeline_image_id and i0.status in ('PENDING','RETRY') and (i0.claim_token is null or i0.claim_expires_at<now()) and public.content_pipeline_review_candidate_v1(i0.pipeline_image_id,j0.job_id) is not null
+ order by j0.created_at desc limit 1 for update of i0 skip locked;
+ if not found then raise exception 'VISUAL_SECOND_IDLE_FIXTURE_REQUIRED';end if;
+ update public."21_content_pipeline_image" set status='PENDING',staging_asset=null,review_candidate=null,visual_phase=null,claimed_by=null,claim_token=null,claim_expires_at=null,next_eligible_at=null where pipeline_image_id=other_image.pipeline_image_id;
+ x:=public.content_pipeline_claim_visual_stage_v1(w,parallel_request,'PRODUCER',other_image.pipeline_image_id);
+ if x->>'activeClaim'<>'true' or public.content_pipeline_visual_claim_request_status_v1(w,request)->>'activeClaim'<>'true' then raise exception 'VISUAL_DIFFERENT_TASK_LEASE_CONFLICT';end if;
+ perform public.content_pipeline_fail_visual_request_v1(w,parallel_request,'RETRY','TEST_ROLLBACK','TRANSPORT_ERROR','Rollback-only independent Task lease fixture');
+ x:=public.content_pipeline_visual_claim_request_status_v1(w,request);
+
  insert into public."27_content_pipeline_source_stage_job"(job_id,pipeline_image_id,claim_token,contract_hash,spec,status,token_hash,result) values(job,i.pipeline_image_id,(x->'claim'->>'claimToken')::uuid,j.contract_hash,j.spec||jsonb_build_object('visualMcpOperation',jsonb_build_object('workerKey',w,'requestId',request,'operationId',extensions.gen_random_uuid())),'STAGED',extensions.digest('delivery-regression','sha256'),j.result);
  payload:=jsonb_build_object('eventId',extensions.gen_random_uuid(),'requestId',request,'jobId',job,'runtime','WORK','scope','CANDIDATE','stage','PIXELS_INSPECTED','outcome','PASS','code','PASS','view','CANONICAL','expectedSha',first_sha,'pixelsInspected',true,'pixelQa','PASS','evidence','Fixture operator actual canonical inspection only; transaction will roll back.');
+ begin perform public.content_pipeline_record_visual_delivery_v1(w,payload||jsonb_build_object('unsupportedField','value'),false);raise exception 'VISUAL_UNKNOWN_FIELD_ACCEPTED';exception when others then if sqlerrm<>'DELIVERY_REQUEST_INVALID' then raise;end if;end;
  perform public.content_pipeline_record_visual_delivery_v1(w,payload,false);
  perform public.content_pipeline_record_visual_delivery_v1(w,payload||jsonb_build_object('eventId',extensions.gen_random_uuid(),'view','MOBILE390'),false);
  perform public.content_pipeline_require_visual_pixel_report_v1(w,request,job,first_sha,'WORK');
@@ -50,6 +67,8 @@ begin
    payload:=jsonb_build_object('eventId',extensions.gen_random_uuid(),'requestId',request,'jobId',job,'runtime','WORK','scope','CANDIDATE','stage','CLIENT_IMAGE_OUTPUT','outcome','FAIL','code','CLIENT_PIXEL_RENDER_UNVERIFIED','view','CANONICAL','expectedSha',first_sha);
    perform public.content_pipeline_record_visual_delivery_v1(w,payload,false);
    perform public.content_pipeline_fail_visual_request_v1(w,request,'RETRY','PRODUCTION_PIXEL_INSPECTION','CLIENT_PIXEL_RENDER_UNVERIFIED','Transactional delivery failure fixture');
+   perform public.content_pipeline_record_visual_delivery_v1(w,payload,false); -- accepted exact replay survives closure
+   begin perform public.content_pipeline_record_visual_delivery_v1(w,payload||jsonb_build_object('eventId',extensions.gen_random_uuid()),false);raise exception 'VISUAL_CLOSED_NEW_EVENT_ACCEPTED';exception when others then if sqlerrm<>'VISUAL_CLAIM_RECEIPT_REQUIRED' then raise;end if;end;
    x:=public.content_pipeline_visual_delivery_backoff_v1(w,request);
  end loop;
  if x->>'candidateCircuit'<>'OPEN' or not exists(select 1 from public."21_content_pipeline_image" where pipeline_image_id=i.pipeline_image_id and next_eligible_at>now()+interval '29 minutes') then raise exception 'CANDIDATE_CIRCUIT_NOT_OPEN';end if;
