@@ -193,38 +193,38 @@ table,column,type,nullable,phase,SQL_reference_functions,recommendation,reason
 30_content_pipeline_native_attempt_event,contract_hash,text,NO,3 Native 감사,content_pipeline_native_attempt_audit_v1,유지,현재 컬럼 삭제 없음. 함수 텍스트 참조는 정적 후보이며 실행 사용 증명이 아님.
 30_content_pipeline_native_attempt_event,evidence,jsonb,NO,3 Native 감사,content_pipeline_native_attempt_audit_v1|content_pipeline_native_attempt_core_v1,유지,현재 컬럼 삭제 없음. 함수 텍스트 참조는 정적 후보이며 실행 사용 증명이 아님.
 30_content_pipeline_native_attempt_event,recorded_at,timestamp with time zone,NO,3 Native 감사,content_pipeline_native_attempt_audit_v1,유지,현재 컬럼 삭제 없음. 함수 텍스트 참조는 정적 후보이며 실행 사용 증명이 아님.
-31_content_pipeline_native_asset,durable_asset_id,uuid,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,pipeline_id,bigint,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,pipeline_image_id,bigint,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,generation_contract_hash,text,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,request_id,uuid,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,attempt_id,uuid,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,persist_operation_id,uuid,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,dispatch_operation_id,uuid,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,asset_source,text,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,production_method,text,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,persistence_status,text,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,handoff_status,text,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,original_bucket,text,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,original_path,text,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,original_sha256,text,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,original_mime,text,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,original_bytes,integer,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,original_width,integer,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,original_height,integer,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,normalized_path,text,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,normalized_sha256,text,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,dispatch_job_id,uuid,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,reference_manifest,jsonb,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,native_file_ref,text,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,durable_binary_verified,boolean,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,last_error_code,text,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,last_error,text,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,recovery_count,integer,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,created_at,timestamp with time zone,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,persisted_at,timestamp with time zone,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,staged_at,timestamp with time zone,YES,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
-31_content_pipeline_native_asset,updated_at,timestamp with time zone,NO,3 미사용 Native scaffold,,제거 후보,실측 0건·연결 persist/recovery RPC 없음. 외부 작성자·코드·FK 검토 후 별도 폐기 가능.
+31_content_pipeline_native_asset,durable_asset_id,uuid,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,pipeline_id,bigint,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,pipeline_image_id,bigint,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,generation_contract_hash,text,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,request_id,uuid,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,attempt_id,uuid,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,persist_operation_id,uuid,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,dispatch_operation_id,uuid,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,asset_source,text,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,production_method,text,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,persistence_status,text,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,handoff_status,text,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,original_bucket,text,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,original_path,text,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,original_sha256,text,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,original_mime,text,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,original_bytes,integer,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,original_width,integer,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,original_height,integer,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,normalized_path,text,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,normalized_sha256,text,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,dispatch_job_id,uuid,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,reference_manifest,jsonb,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,native_file_ref,text,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,durable_binary_verified,boolean,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,last_error_code,text,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,last_error,text,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,recovery_count,integer,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,created_at,timestamp with time zone,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,persisted_at,timestamp with time zone,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,staged_at,timestamp with time zone,YES,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
+31_content_pipeline_native_asset,updated_at,timestamp with time zone,NO,3 Native 입력 보존 Edge 경로,,유지 — 작성자 확인됨,실측 0건이지만 배포된 content-pipeline-native-asset v1에 실제 조회·upsert 코드가 있음. 관련 Edge 경로 이관 없이 미사용으로 판단하거나 DROP하지 않음.
 content_pipeline_maintenance_run,run_id,uuid,NO,Storage 유지관리,content_pipeline_cleanup_inspection_chunks_v1|content_pipeline_consume_maintenance_ticket_v1|content_pipeline_dispatch_staging_maintenance_v1|content_pipeline_finish_staging_maintenance_v1|content_pipeline_reserve_staging_cleanup_v1|content_pipeline_staging_maintenance_status_v1,유지,현재 컬럼 삭제 없음. 함수 텍스트 참조는 정적 후보이며 실행 사용 증명이 아님.
 content_pipeline_maintenance_run,status,text,NO,Storage 유지관리,content_pipeline_cleanup_inspection_chunks_v1|content_pipeline_consume_maintenance_ticket_v1|content_pipeline_dispatch_staging_maintenance_v1|content_pipeline_finish_staging_maintenance_v1|content_pipeline_reserve_staging_cleanup_v1|content_pipeline_staging_maintenance_status_v1,유지,현재 컬럼 삭제 없음. 함수 텍스트 참조는 정적 후보이며 실행 사용 증명이 아님.
 content_pipeline_maintenance_run,dry_run,boolean,NO,Storage 유지관리,content_pipeline_cleanup_inspection_chunks_v1|content_pipeline_consume_maintenance_ticket_v1|content_pipeline_dispatch_staging_maintenance_v1|content_pipeline_reserve_staging_cleanup_v1|content_pipeline_staging_maintenance_status_v1,유지,현재 컬럼 삭제 없음. 함수 텍스트 참조는 정적 후보이며 실행 사용 증명이 아님.
