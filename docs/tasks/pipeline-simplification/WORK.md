@@ -50,3 +50,15 @@ API는 typed legacy event + 최소 후보 관찰 + eventId 조회 + 미완료 �
 로컬87검사 통과: 기존 회귀 + typed 입력/응답 유실 조회/역할 제한/미완료 뷰 복구/전체 migration 컴파일·원자적 이력/lease 종료 후 replay 검증. 실제 RPC rollback·두 세션의 짧은 SELECT row-lock 경합 검증과 배포 read-back은 출시 단계에서 확인한다. 동시성 SELECT는 Task/Claim/자산 값을 변경하지 않는다. 실제 예약 간 복구·신규 Native 파일 최초 전달·서로 다른 Task의 실제 예약 동시 실행은 Work 테스트와 분리해 보고한다. 서버 테스트를 SCHEDULED 성공으로 기록하지 않는다.
 
 DB DROP 후보는 단계별 레거시 consumer 제거와 외부 작성자 확인 후 후속 migration으로 처리한다. 이번 release의 축소는 신규 중복 저장 제거이며264→다른 수로 컬럼 수가 줄었다고 보고하지 않는다.
+
+## 운영 배포 확인
+
+- PR86 main 병합: `750279d7fcf38b7e11768bf5c303e35f619924b1`.
+- Code Quality / Agent Orchestration QA / Supabase Visual Delivery 모두 SUCCESS. 워크플로87검사 PASS.
+- 운영 migration `20261012012704` 적용, 실제 RPC rollback 회귀 PASS. 두 실제 DB 세션에서 같은 Task 잠금 제외·다른 Task 잠금 획득 PASS. Task/Claim/자산 값은 테스트 후 유지.
+- Edge v37: 운영11개 파일을 해당 GitHub commit과 재조회 비교하여 모두 일치. PIXEL_RECORD_V2 capability 실호출 확인.
+- Vercel 운영 READY, 동일 commit, fitbike.co.kr HTTP200 확인.
+- 실제 Producer_01 연결은 connectedRole=SHARED. 계정의 App MCP 연결 주소는 파일 편집 도구로 변경할 수 없어, 제작/검수 역할 endpoint 적용은 연결 설정 변경이 남음. 예약은 변경하지 않음.
+- 실제 SCHEDULED 예약 간 복구·두 Task 예약 동시 실행·신규 Native 최초 전달·저장 Native 복구는 이번 배포 검증에서 미실행. 서버 잠금 PASS를 예약 성공으로 계산하지 않음.
+- 264개 컬럼 유지. 삭제 후보는 확인했지만 DROP하지 않았으며 신규 JSON 반복 저장만 축소.
+
