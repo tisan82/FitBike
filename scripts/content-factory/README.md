@@ -165,3 +165,10 @@ Model Guide Research는 활성 Model/Year를 먼저 Resolve하고 Tire·Battery�
 - Local `content-work/` stores temporary generation, Evidence, QA, image candidate, approval, and publish artifacts and is always Git-ignored.
 
 Factory/schema/rule/UI/API changes require Git commits. Topic registration, content generation, image review, approval, status changes, and publishing never create Git commits. New schema uses migrations in Git; new Topic or Content data is written at runtime and must not be added as seed migrations. Historical content migrations remain unchanged.
+
+
+## Unified chat authoring
+
+For new production 1·2-stage work, use service-role `content_pipeline_claim_authoring_v1` and `content_pipeline_complete_authoring_v1` as specified in docs/02_framework/API.md. Research, writing and V5 visual planning occur in one execution and one atomic stored package. The older local generator above remains a development interface; its seven local files are not new production DB stores. No schedule or stored prompt is changed automatically.
+
+Run authoring.test.mjs with PGLITE_MODULE; authoring-regression.sql is the rolled-back live verification used by deploy-visual-delivery.mjs. The Source Stage worker regression forbids table-28 access and verifies a successful STAGED receipt.

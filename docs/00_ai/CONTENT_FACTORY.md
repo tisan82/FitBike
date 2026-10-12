@@ -28,7 +28,7 @@ Content Factory는 콘텐츠 한 건을 하나의 Orchestration Context로 처�
 
 예약 기반 Content Factory는 단계 간 상태를 채팅 문맥에 의존하지 않는다.
 
-- `18_content_pipeline`: 콘텐츠 1건의 예약 Pipeline stage와 Planning/Research/Writer/Image/QA/Publish Artifact를 저장한다.
+- `18_content_pipeline`: 콘텐츠 1건의 stage와 산출물을 저장한다. 신규 통합 실행은 기획·근거를 `writer_artifact.authoringContext`에 포함하고 본문·이미지 기획과 한 번에 완료한다. 기존 Planning/Research 컬럼은 호환용으로 유지한다.
 - `19_content_pipeline_run`: 각 예약 실행의 시작, PASS/HOLD/BLOCKED, 오류와 완료 시각을 기록한다.
 - Queue 원장은 계속 `16_content_topic`이지만 예약 Pipeline은 기존 Work 진행 상태를 변경하지 않는다. Planning이 Candidate를 Claim해도 `16_content_topic.status`는 유지한다.
 - 주제 소유권은 공유한다. `18_content_pipeline.ownership_state`가 `CLAIMED` 또는 `COMPLETE`인 Topic은 기존 Work Queue의 `content_factory_next_topic_v1` 대상에서 제외하여 같은 주제를 Work와 예약이 중복 제작하지 않는다.
@@ -36,8 +36,8 @@ Content Factory는 콘텐츠 한 건을 하나의 Orchestration Context로 처�
 - 예약 게시는 기존 Work용 `content_factory_publish_v1`을 변경하거나 호출하지 않고 예약 전용 `content_pipeline_publish_v1`을 사용한다. 최종 서비스 원장(`12_content`, 관계 테이블, `17_content_asset_source`)은 동일하게 사용한다.
 - `COMPLETE`는 DB insert만으로 기록하지 않고 실제 Production URL과 공개 Content 상태를 확인한 뒤 기록한다.
 - Pipeline/Run 테이블과 예약 RPC는 내부 자동화용이며 `service_role` 전용이다. 공개 클라이언트에서 직접 접근하지 않는다.
-- 예약 Planning Worker의 신규 Topic 진입점은 `content_pipeline_planning_next_v2()`를 사용한다. 이 함수는 기존 `content_pipeline_claim_planning_v1()`의 `FOR UPDATE SKIP LOCKED` 원자적 Claim을 그대로 위임하는 `service_role` 전용 wrapper다. v1은 호환성을 위해 유지하며, 예약/Work Prompt가 임의 `INSERT/UPDATE`로 Claim을 우회하지 않는다.
-- 예약 Worker는 단계별 실행 시각을 서로 기다리지 않고 자신의 Ready Queue를 독립적으로 소비한다. Planning+Research는 RESEARCHED, Writer는 DRAFTED/Image Brief, Image Producer는 이미지 단위 준비 상태, Final QA는 모든 필수 이미지 준비 상태를 기준으로 Claim한다.
+- 신규 1·2단계 통합 실행은 `content_pipeline_claim_authoring_v1(requestId)` → 조사·집필·V5 이미지 기획 → `content_pipeline_complete_authoring_v1`을 사용한다. 응답의 packageExecution을 그대로 완료 산출물에 결합한다. `planning_next_v2`와 기존 단계별 RPC는 진행 중인 구형 실행의 호환용이다. 직접 INSERT/UPDATE로 소유권을 우회하지 않는다.
+- 신규 통합 실행은 별도 Research/Writer 예약을 기다리지 않고 한 실행에서 DRAFTED와 Image Task 동기화까지 완료한다. 이미지 제작·검수와 최종 QA·게시 단계는 각각의 준비 상태를 소비한다. 통합은 조사나 근거 확인을 생략하는 의미가 아니다.
 - Writer가 확정하는 이미지 수는 콘텐츠마다 가변이다. Image Producer는 콘텐츠 전체가 아니라 미완료 Image Brief를 처리하며 한 실행에서 최대 1건만 Claim하고 처리한다. 이미 성공한 Generation/Image QA/WebP 결과는 후속 실패 때문에 재생성하지 않는다.
 - 예약 Image Producer는 `fitbike.co.kr` HTTP API를 경유하지 않는다. `content_pipeline_issue_asset_upload_ticket_v1`로 해당 Pipeline/Image에만 유효한 짧은 수명의 1회 Upload Ticket을 발급받은 뒤 Supabase Edge Function `content-pipeline-asset-upload`로 WebP를 직접 전송한다. Edge Function은 Ticket의 Pipeline, Content Key, Asset Key, 만료와 1회 사용 여부를 검증하고 Supabase 내부 `service_role`로 `content-assets`에 저장한 뒤 SHA-256을 재검증한다. 장기 `CONTENT_FACTORY_PUBLISH_TOKEN` 또는 `service_role`은 Prompt/Artifact/Worker에 노출하지 않는다. 일반 `anon`/`authenticated` Storage 쓰기 정책도 열지 않는다.
 - 생성/외부/공식 이미지 모두 신규 권리 상태를 생성하지 않는다. 출처 기록 정책은 `CONTENT.md`를 따른다.
@@ -508,19 +508,13 @@ Scheduled Visual 작업의 동시성 Source of Truth는 Content 단위 `18_conte
 - Final QA Worker는 `IMAGE_READY` Content만 처리하며 미완료 Visual Content를 HOLD시키지 않는다.
 
 
-## Scheduled Worker Timing and RPC Contract
+## Unified Authoring and Legacy Worker Compatibility
 
-예약 기반 Content Factory의 표준 실행 시각은 KST 기준 매시간 `:00 → :10 → :20 → :35 → :50`이다. 시각은 처리 순서를 보조하지만 Worker는 다른 Worker를 기다리지 않고 자신의 Ready Queue만 소비한다.
+신규 1·2단계는 한 채팅 실행에서 기획 → 근거 확인 → 본문 작성 → V5 이미지 기획을 수행한다. 저장은 한 번의 통합 완료 RPC로 `WRITING → DRAFTED` 전환과 이미지 Task 동기화를 원자적으로 수행한다. 기획·근거의 단일 저장 위치는 `writer_artifact.authoringContext`이며 신규 실행의 `planning_artifact`와 `research_artifact`는 `{}`로 유지한다. 근거 자료·Fact Register·정확성 제한과 고객 질문 검증은 계속 필요하다.
 
-| Worker | Time | Claim / Completion responsibility |
-| --- | --- | --- |
-| Planning + Research | :00 | `content_pipeline_claim_planning_v1` → Planning complete → 동일 `pipeline_id`를 `content_pipeline_claim_stage_by_id_v1(..., 'PLANNED', 'RESEARCHING')`로 Research claim → Research complete/fail |
-| Writer + Visual Plan | :10 | `content_pipeline_claim_stage_v1('RESEARCHED','WRITING')` → Writer Artifact complete → `content_pipeline_sync_images_v1`로 Image Task 동기화 |
-| Image Producer 1 | :20 | `content_pipeline_claim_image_v1('image-producer-1')` → 이미지 단위 complete/fail, 회당 최대 1개 처리 |
-| Image Producer 2 | :35 | `content_pipeline_claim_image_v1('image-producer-2')` → 이미지 단위 complete/fail, 회당 최대 1개 처리 |
-| Final QA + Assembly | :50 | `content_pipeline_claim_stage_v1('IMAGE_READY','QA')` → Assembly/QA → QA_PASS complete/fail |
+신규 실행/재개/응답 유실 규약은 [API.md](../02_framework/API.md)의 Unified Authoring를 따른다. 새 실행은 requestId를 한 번 만들고 응답 유실 시 동일 requestId와 동일 대상 인자로 재조회한다. RUNNING인 실행은 새 실행으로 대체하지 않는다. 공식 HOLD/BLOCKED 종료 후에만 새 requestId와 해당 pipelineId로 재개하며, 새 실행의 packageExecution으로 산출물을 결합한다.
 
-Planning과 Research를 한 예약에서 연속 수행할 때 범용 Stage Claim으로 다른 `PLANNED` Item을 가져오지 않는다. 방금 Planning한 동일 Pipeline을 이어받기 위해 ID-scoped Claim RPC를 사용한다.
+기존 Planning/Research/Writer RPC와 진행 중인 산출물은 호환용으로 유지한다. 기존 실행을 통합 실행으로 자동 변환하지 않는다. 예약 시각과 예약 프롬프트는 이 변경으로 수정하지 않는다. 기존 예약이 구형 진입점을 계속 호출하면 구형 단계 흐름이 유지되므로 운영자가 실행 지시를 통합 RPC로 전환해야 한다. 같은 신규 Topic을 구형과 통합 경로로 동시에 시작하지 않는다.
 
 Writer의 완료 책임은 `WRITING → DRAFTED` 저장으로 끝나지 않는다. Writer Artifact의 `image_briefs`를 `21_content_pipeline_image`로 동기화하고, 동기화된 Task 수가 `required_image_count`와 일치하는지 확인해야 한다. Image Queue의 실행 상태 Source of Truth는 `21_content_pipeline_image`, 시도 이력은 `23_content_pipeline_image_run`이다.
 
@@ -845,3 +839,4 @@ Use record_visual_pixel_inspection for candidate observations: eventId/requestId
 After a lost response, get_visual_inspection_event reads the exact eventId. Exact accepted replays retain the same payload/eventId. get_visual_inspection_recovery reads current receipt, stored candidate identity and latest required-view results. A later Claim resumes the same Job/SHA but requires a new actual inspection report; it never changes the old event's requestId or inherits its PASS. No pending evidence text, image bytes or second checkpoint table is added. Unreceived Native file references remain UNKNOWN.
 
 Role endpoints restrict exposed tools and receipt-bound writes while keeping the same authenticated operator identity. Different eligible Tasks may run concurrently; same Task retains one active lease. Shared endpoint remains compatible during connector migration. Diagnostic logging failure never authorizes approval or blocks official Claim cleanup.
+

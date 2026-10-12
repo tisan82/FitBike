@@ -308,7 +308,7 @@ Deno.serve(async (req) => {
       ...(sourceResume ? { sourceResume: { sourceJobId: sourceParentId,
         canonicalSha256: sourceResume.canonicalSha256, strategy: "STORED_PREFLIGHT_ANNOTATION_ONLY" } } : {}),
     };
-    // Preserve the verified candidate before the optional legacy inspection bridge.
+    // Preserve the verified candidate before final receipt persistence.
     // A checkpoint is technical evidence only, never an approval or STAGED receipt.
     const { data: checkpoint, error: checkpointError } = await sb.from(
       "27_content_pipeline_source_stage_job",
@@ -330,39 +330,9 @@ Deno.serve(async (req) => {
       previewExpiresAt: new Date(Date.now() + 3600000).toISOString(),
     });
 
-    // Materialize the exact verified staged binary for independent pixel QA.
-    // The bridge is service-role-only and chunked to keep each DB payload bounded.
-    const { error: deleteError } = await sb.from(
-      "28_content_pipeline_source_stage_inspection_chunk",
-    )
-      .delete().eq("job_id", jobId);
-    if (deleteError) throw Error("INSPECTION_BRIDGE_WRITE_FAILED");
-    const rows: Array<{ job_id: string; seq: number; chunk_base64: string }> =
-      [];
-    const inspectChunkBytes = 4500;
-    for (
-      let seq = 0, offset = 0;
-      offset < final.webp.length;
-      seq++, offset += inspectChunkBytes
-    ) {
-      const part = final.webp.subarray(
-        offset,
-        Math.min(offset + inspectChunkBytes, final.webp.length),
-      );
-      let binary = "";
-      for (let i = 0; i < part.length; i++) {
-        binary += String.fromCharCode(part[i]);
-      }
-      rows.push({ job_id: jobId, seq, chunk_base64: btoa(binary) });
-    }
-
-    for (let offset = 0; offset < rows.length; offset += 100) {
-      const { error: chunkError } = await sb.from(
-        "28_content_pipeline_source_stage_inspection_chunk",
-      )
-        .insert(rows.slice(offset, offset + 100));
-      if (chunkError) throw Error("INSPECTION_BRIDGE_WRITE_FAILED");
-    }
+    // Inspection reads this SHA-verified private Storage object through MCP
+    // image blocks or canonical download. Do not duplicate binary in DB chunks.
+    Object.assign(result, { inspectionTransport: "CANONICAL_STORAGE", inspectionChunksStored: false });
     const { data: saved, error: saveError } = await sb.from(
       "27_content_pipeline_source_stage_job",
     ).update({ status: "STAGED", result, updated_at: new Date().toISOString() })
@@ -408,3 +378,4 @@ function scrubFileUrls(spec: Record<string, unknown>) {
   }
   return out;
 }
+
