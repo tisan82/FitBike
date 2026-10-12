@@ -178,15 +178,11 @@ Visual 하나는 최소 하나의 명확한 Role과 User Question을 가져야 �
 
 ## 7. Image Source Strategy
 
-신규 V5는 CONTENT.md의 evidence level을 따르며, 2단계는 시각 목적·필수/금지 요소·사실 경계만 정한다. Source URL은 근거 또는 탐색 힌트이며 그 URL만 제작 경로로 고정하지 않는다. 기존 V4의 명시적 제한은 유지한다.
+이미지 근거 레벨에 따른 제작 방식 제한은 폐지한다. 신규 V5는 evidence_requirement.level=NONE으로 통일하며 기존 level·generation_allowed·real_source_required는 제작 제한으로 사용하지 않는다. 1·2단계는 목적·핵심 필수/금지 요소와 ALT 초안만 정하고, 3-A는 실사 사용·편집·Native 생성 중 적합한 방법을 선택한다. 참고 URL 및 기술자료는 선택적 안내이며 특정 URL·국문 자료·Reference 검증을 제작 시작 조건으로 강제하지 않는다.
 
-- NONE: 일반 점검 장면은 적합한 실사 또는 ChatGPT Native 생성 중 품질·식별성·실행 가능성에 맞는 방법을 선택한다. 실제 모델 UI·제품·손상·배선을 임의로 만들어 사실처럼 제시하지 않는다.
-- REFERENCE: 실제로 검사한 근거 범위에서 Reference 생성 또는 실제 Source를 선택한다. 근거 없는 Full Generation은 금지한다.
-- REQUIRED: 검증된 실제/공식 Source 기반 자산을 사용한다. 구조·표시·사실을 보존하는 Crop/편집은 허용하지만 생성 재구성으로 대체하지 않는다.
+최종 이미지에 PDF 페이지·매뉴얼 도표·기술 문서 캡처를 사용하지 않는다. 사진 중심으로 제작하고 검증된 한국어·영어 설명을 필요한 만큼 추가한다. 기술자료는 본문 사실 확인용으로만 활용한다. 참고 URL 실패 시 다른 사진이나 Native 방식으로 전환한다. 실제 입력 사진의 동일성·출처, 현재 Contract 필수/금지 표현, 실제 픽셀 검사·SHA·Claim·Native 감사는 유지한다.
 
-실사 탐색은 기존 Brand Asset, 제조사/제품 공식 사진, 검증 가능한 현장 사진을 우선 검토한다. 매뉴얼·PDF는 사실 확인 근거로 사용할 수 있으나 최종 이미지의 기본 선택이 아니다. 적합한 사진과 허용된 다른 제작 경로를 검토한 뒤 차선책으로 사용한다. 매뉴얼 일러스트는 Contract가 요구하는 실제 화면·실사·장착 장면의 대체품이 아니다.
-
-같은 실패 URL을 반복 조회하지 않는다. 기본 탐색은 서로 다른 후보 페이지 최대 3개로 제한하고, 모두 부적합하면 허용된 다른 제작 방식으로 전환한다. 모든 허용 경로가 실패하면 사실 수준을 낮추지 않고 Source 실패로 종료한다. HTML/XML resolver는 특정 문서의 이미지 추출 도구이며 자유 검색 도구가 아니다. 현재 호스트에 검색 도구가 없으면 검색했다고 주장하지 않는다.
+같은 실패 URL을 반복 조회하지 않는다. 기본 탐색은 서로 다른 후보 페이지 최대 3개로 제한하고, 모두 부적합하면 허용된 다른 제작 방식으로 전환한다. 사진·Native 전달 경로 모두 실패하면 저장 자산과 재개 지점을 보존하여 공식 실패 처리한다. HTML/XML resolver는 특정 문서의 이미지 추출 도구이며 자유 검색 도구가 아니다. 현재 호스트에 검색 도구가 없으면 검색했다고 주장하지 않는다.
 
 출처의 페이지/실제 자산 URL, 운영자, 모델·연식 범위와 편집 이력을 기록한다. 라이선스·권리 상태·허락 근거는 AI 제작 필수값이 아니며 운영자가 별도로 관리한다.
 
@@ -198,7 +194,7 @@ Visual 하나는 최소 하나의 명확한 Role과 User Question을 가져야 �
 - 워터마크 영역만 Crop하여 사실상 제거하는 방식도 사용하지 않는다.
 - 해당 이미지는 사실/장면/Visual Requirement를 이해하기 위한 Research Reference로만 사용할 수 있다.
 - 같은 정보를 보여주는 워터마크 없는 공식/블로그/실제 자료를 다시 탐색한다.
-- 적절한 원본이 없으면 현재 NONE/REFERENCE의 생성 허용 범위에서만, 원본 표현을 복제하지 않는 독립적인 점검 안내 이미지를 검토한다. REQUIRED 또는 기존 V4 생성 금지 조건에서는 대체 생성하지 않고 Source 실패·보완으로 처리한다.
+- 적절한 원본이 없으면 원본 표현을 복제하지 않는 독립 Native 점검 이미지를 제작할 수 있다. 과거 근거 레벨·제작 허용 boolean으로 차단하지 않는다.
 
 ## 9. Real Asset vs Generated Visual
 
@@ -228,7 +224,7 @@ Visual 하나는 최소 하나의 명확한 Role과 User Question을 가져야 �
 
 생성 이미지는 특정 제조사 공식 도면이나 특정 블로그 사진을 그대로 재현하지 않는다. Research에서 확인된 사실을 기반으로 FitBike만의 구도, 정보 계층, 라벨, 설명 목적을 가진 Visual을 만든다. 사람 표현과 alt/caption을 포함한 상세 제작 기준은 `CONTENT_EDITORIAL_VISUAL_STANDARD.md`를 따른다.
 
-V5에서는 위 대체·편집 절차도 evidence level의 허용 범위 안에서만 수행한다. REQUIRED의 Source 미확보·워터마크 문제를 독립 생성으로 우회하지 않는다.
+Source 실패 시 다른 사진 또는 독립 Native 생성으로 전환할 수 있다. 워터마크 사진은 편집 원본으로 사용하지 않는다.
 
 ## 10. Image Editing Standard
 
@@ -557,21 +553,9 @@ Image Producer는 Claim 시 반환되는 `generationContract`를 해당 Image Ta
 
 ## Scheduled Visual Source Strategy
 
-V5 Writer는 CONTENT.md에 따라 **실제 외형 자체가 사용자 답의 Fact인지** 판단하여 evidence level만 지정한다. 아래 상세 전략/boolean 작성 규칙은 기존 V4 호환용이다. V5에서는 3-A가 서버 공통 정책 안에서 제작 경로를 선택하고 실제 Job/spec/감사에 기록한다.
+이미지 제작의 현재 기준은 Section 7과 CONTENT.md의 사진 중심 자율 제작 정책이다. 기존 V4의 REAL_ASSET_FIRST·generation_allowed=false 등 제작 경로 제한은 실행 Gate로 사용하지 않는다. 1·2단계는 필수 표현을 최소화하고 Source URL·매뉴얼·특정 구도를 강제하지 않는다. 3-A는 같은 Task/Contract의 미완료 자산부터 복구하고, 신규 제작이 필요하면 사진 사용·편집·Native 생성 중 선택한다. 탐색 힌트가 실패하면 다른 방법으로 전환한다.
 
-- 고객이 실제 바이크에서 찾아야 하는 위치, 실제 부품 형상, UI, 포트, 라벨, 각인, 배선, 마모/손상, 체결·장착 상태처럼 실제 외형 자체가 확인 정보이면 `REAL_ASSET_FIRST` / `generation_allowed=false`를 사용한다.
-- 특정 모델·제품의 정확한 구조가 확인 정보는 아니지만 실제 바이크를 다루는 고객에게 점검 위치·대상·행동·관계를 보여줄 필요가 있으면 `GENERATED_GUIDANCE_VISUAL` / `generation_allowed=true`를 사용할 수 있다. 생성 결과도 실제 바이크 점검 맥락이어야 하며 추상 교육자료·대시보드·카드·보고서·장식 이미지로 만들지 않는다.
-- 실제 외형 증거가 사용자 답에 필요할 때 Real Asset을 사용한다. 권리 검사를 제작 선택 조건으로 사용하지 않는다.
-- 적합한 Real Asset은 출처·원본 URL·운영자/저작자·확인 시점·편집 이력을 기록하고 Image QA → WebP → Storage Verify까지 진행한다. 3-A/3-B 완료 경계를 유지한다.
-- `NO_APPROVED_REAL_SOURCE`처럼 “승인된 권리 자산이 아직 없다”는 이유만으로 Visual Claim을 RETRY/HOLD/BLOCKED하지 않는다. Visual 실패는 Brief 충돌, 적합한 원본 부재, 바이너리 확보 실패, Image QA, WebP, Upload 또는 Storage Verify 실패처럼 제작 자체의 실패에 사용한다.
-- Publish Queue는 출처 이력을 보존하며 권리 상태를 요구하거나 기록하지 않는다.
-- Writer는 Source 후보를 찾기 전에 `고객이 실제 바이크에서 무엇을 확인해야 하는가`를 먼저 정의한다. 실제 외형·위치·상태가 확인 대상이면 Real Asset, 특정 구조가 Fact가 아니고 일반 점검 맥락을 안내하는 것이 목적이면 Generated Guidance를 검토한다. 실제 물체가 등장한다는 이유만으로 Real Asset을 선택하지 않는다.
-- `must_show` 전체가 한 장의 이미지에서 동시에 관찰 가능한지 One Image Feasibility Check를 수행한다. 차량 전체+작은 부품 근접+내부 배선+키 상태처럼 서로 다른 시야 수준을 한 장에 강제하면 Brief를 축소하거나 분리한다.
-- 실제 외형이 Fact가 아닌데 `generation_allowed=false`인 Brief는 Writer Self QA 실패다.
-- Generated Guidance 기본 계약은 `1 Scene + 1 User Question + 1 Check Point/Relationship + No Text`다.
-- Image Producer의 생성 요청 주변에는 다른 콘텐츠의 구체적인 Visual 예시를 넣지 않는다. 생성 도구가 대화 문맥을 참고할 수 있으므로 현재 `generationContract`의 subject/scene/objective/must-show/not-show만 생성 의도로 사용한다.
-- Real Asset은 Production `content-pipeline-source-ingest` Edge Function을 사용한다. 현재 PROCESSING Image Claim에 결합된 `content_pipeline_issue_source_ingest_ticket_v1` 1회용 Ticket으로 외부 HTTP(S) 원본을 서버에서 확보하고, MIME/용량 검증 → ImageMagick WASM decode → 최대 2000px 리사이즈 → WebP → SHA-256 → `content-assets/contents/<content-key>/<asset-key>.webp` 업로드 → Storage 재검증까지 수행한다. Ticket은 15분 만료·1회 소비이며 장기 secret을 Worker에 노출하지 않는다. 적합한 후보 하나의 ingest가 실패하면 같은 URL을 반복하지 말고 다음 독립 후보를 시도한다. 모든 독립 후보가 실패한 경우에만 `SOURCE_BINARY_UNAVAILABLE + REACQUIRE_SOURCE`로 RETRY한다.
-
+이미지 안 설명은 한국어 또는 영어로 필요한 만큼 추가할 수 있다. 한 장에서 동시에 식별할 수 없는 필수 요소는 기획에서 축소하거나 나눈다. 실제 선택한 Source·편집 입력·Native 호출·반환 자산의 식별자는 보존한다. 신규 PDF 입력은 제외하고 기존 승인/저장 후보의 canonical WebP 복구는 유지한다. 구형 Source ingest API는 새 표준 제작 경로가 아니며 현재 역할 전용 MCP를 사용한다.
 
 ### Semantic Visual QA — Mandatory
 
@@ -672,9 +656,9 @@ Dispatch is not completion: poll the same Job using the returned pollAfterSecond
 운영 기준은 **일반 ChatGPT 채팅 + 내장 이미지 생성/편집**이다. 외부 OpenAI API 호출과 API Key 설정을 사용하지 않는다. 서버는 생성 모델을 실행하지 않고 이미 생성된 파일의 접수·변환·보존만 담당한다. 이전 서버 Provider 경로는 제거했다. `get_visual_generation_capabilities`의 `referenceBasedGeneration=false`, `realSourceAiEdit=false`, `providerConfigured=false`는 서버 모델 호출이 없다는 뜻이며 내장 생성 차단 조건이 아니다. 내장 도구의 실제 가용성과 `nativeFileHandoff`/공식 fileParams 또는 업로드 UI 가용성을 별도로 확인한다. 파일 인계 경로를 확인하지 못하면 Claim 전에 BLOCKED로 보고하고 Source/DB RETRY/HOLD로 기록하지 않는다. 도구 자체가 없으면 `MCP_TOOL_UNAVAILABLE`이다.
 
 - `get_visual_image_task(pipelineImageId)`로 지정한 1건의 상태·Contract를 Claim 전에 조회한다. Contract hash를 임의로 바꾸지 않는다. 준비 후 `claim_visual_image`는 지정 이미지 1건만 Claim한다.
-- `REFERENCE_BASED_GENERATION`: `generation_allowed=true`, `real_source_required=false`, 그리고 `source_strategy=REFERENCE_FIRST_GENERATIVE` 또는 `reference_based_generation_allowed=true`인 경우 허용한다. 이때 `full_generation_allowed=false`도 검증된 Reference 생성은 허용한다. 무근거 Full Generation은 금지한다.
-- `REAL_SOURCE_AI_EDIT`: `ai_edit_allowed=true`이고 실제 원본 binary를 내장 편집 입력으로 사용한 경우만 허용한다. 접수 시 `inputFile`과 Reference에 일치하는 `inputAssetUrl`이 필요하고 서버가 두 원본의 SHA 일치를 검증한다. 서버는 편집 자체를 수행하거나 실행 증거를 추정하지 않는다. 내장 편집에 원본을 사용했다는 사실은 작업자의 증거로 별도 기록한다.
-- Reference는 실제 픽셀과 사실을 확인한 `sourcePageUrl`, `sourceOwner`, `verifiedFacts[]`, `pixelsInspected=true`, `checkedAt`을 포함한다. 확인한 경우만 `sourceAssetUrl`을 기록한다. 신규 생성은 검증 사실을 내장 생성 prompt에 반영하며 원본 binary를 입력했다고 보고하지 않는다.
+- `NATIVE_FULL_GENERATION`: references=[]로 현재 장면을 제작한다. 근거 레벨로 제한하지 않는다.
+- `REFERENCE_BASED_GENERATION`: 선택적 참고 자료를 사용한다. verifiedFacts·pixelsInspected·checkedAt은 참고 metadata이며 필수 입력이 아니다.
+- `REAL_SOURCE_AI_EDIT`: 실제 원본 binary를 내장 편집 입력으로 사용한다. inputFile과 inputAssetUrl/실제 출처는 연결하고 서버의 SHA 동일성 검증을 유지한다. 자료가 없으면 신규 생성 방식을 선택할 수 있다.
 - 내장 생성 결과의 자동 MCP 전달은 별도 일반 채팅 시험 전까지 `UNVERIFIED`다. 공식 `_meta["openai/fileParams"]`의 top-level `file`로 실제 PNG/JPEG/WebP를 전달한다. `dispatch_visual_generation`은 파일 접수 도구이며 모델을 호출하지 않는다. 사용자가 SHA나 public URL을 만들 필요가 없다.
 - 자동 전달이 불가능하면 `open_visual_file_upload(requestId,operationId,spec)` 화면에서 생성 이미지를 선택하거나 다운로드 파일을 업로드한다. optional host 파일 기능이 없으면 이미지를 채팅에 첨부하여 공식 fileParams로 전달한다. 두 경로 모두 실제 파일 접수가 불가능하면 `NATIVE_FILE_HANDOFF_UNAVAILABLE`로 보고한다. 업로드 화면을 열었다는 사실만으로 파일 접수 PASS를 기록하지 않는다.
 - 수동 대기 중 Claim이 만료되면 동일 이미지의 정상 reclaim 경로를 사용한다. 오래된 화면/receipt는 다른 이미지에 파일을 전달할 수 없다. Claim 유효기간을 임의 연장하거나 SQL로 Gate를 우회하지 않는다.
@@ -818,11 +802,11 @@ fetch/parse failure is distinct from missing Source evidence. JavaScript-only as
 
 Stage2 submits only the minimal V5 schema owned by CONTENT.md. Writer completion, image synchronization and build/claim validate V5 without requiring Writer feasibility, composition, annotation or pixel-QA objects. The immutable `generationContractHash` refers to the raw semantic Contract, never the derived `visualPolicy`; server identity remains in Task/Job metadata. `content_pipeline_visual_policy_v1` derives common compatibility policy for V5; V4 returns existing restrictions unchanged.
 
-Producer uses raw scene requirements and `visualPolicy`, selects permitted method and verified source/reference, preserves actual Native audit and stages an unannotated preflight. No reconstruction can satisfy REQUIRED. NATIVE_FULL_GENERATION uses references=[] only where the current V5 NONE policy permits it; no fictional reference is supplied. Producer finishes at review handoff/QA_PENDING and claim release. Reviewer never creates a new image: actual candidate pixel checks, QA attestation, same stored candidate finalization with exact original source identity, final 390px/role crops/SEO/duplicate/SHA checks, approval and READY_FOR_UPLOAD/release.
+Producer uses raw scene requirements and `visualPolicy`, selects permitted method and verified source/reference, preserves actual Native audit and stages an unannotated preflight. Evidence levels do not restrict production. NATIVE_FULL_GENERATION uses references=[]; optional reference guidance must not be fabricated. Producer finishes at review handoff/QA_PENDING and claim release. Reviewer never creates a new image: actual candidate pixel checks, QA attestation, same stored candidate finalization with exact original source identity, final 390px/role crops/SEO/duplicate/SHA checks, approval and READY_FOR_UPLOAD/release.
 
 Before QA attestation, Reviewer selects final annotations and verifies their actual targets; exact chosen label text must appear in annotationTargetChecks. Final Dispatch reuses the identical recorded preStagingQa. New or changed annotation targets require updated inspection/QA record before Dispatch.
 
-V5 does not silently rewrite existing V4 claims, candidates or approved assets. Existing source-stage spec retains selected source/method/transform; Native audit retains actual call and returned file linkage. Annotation choices are verified from actual final pixels and spec, not invented Writer requirements. Missing source/evidence or unavailable Native/file transport remains a truthful failure.
+V5 does not silently rewrite existing V4 claims, candidates or approved assets. Existing source-stage spec retains selected source/method/transform; Native audit retains actual call and returned file linkage. Annotation choices are verified from actual final pixels and spec, not invented Writer requirements. Unavailable file transport remains a truthful failure; missing reference guidance alone is not a failure.
 
 
 ### Preserved Native input recovery and dispatch tracing (2026-10-08)

@@ -5,9 +5,9 @@ type Reference = {
   sourcePageUrl: string;
   sourceAssetUrl?: string;
   sourceOwner: string;
-  verifiedFacts: string[];
-  pixelsInspected: boolean;
-  checkedAt: string;
+  verifiedFacts?: string[];
+  pixelsInspected?: boolean;
+  checkedAt?: string;
 };
 export type GenerationSpec = {
   productionMethod: "NATIVE_FULL_GENERATION" | "REFERENCE_BASED_GENERATION" | "REAL_SOURCE_AI_EDIT";
@@ -53,7 +53,7 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
     typeof s.prompt !== "string" || s.prompt.trim().length < 20 ||
     s.prompt.length > 6000 ||
     !Array.isArray(s.references) ||
-    (s.productionMethod === "NATIVE_FULL_GENERATION" ? s.references.length !== 0 : s.references.length < 1 || s.references.length > 4)
+    (s.productionMethod === "NATIVE_FULL_GENERATION" ? s.references.length !== 0 : s.references.length > 4)
   ) throw Error("INVALID_GENERATION_SPEC");
   if (s.nativeAttemptId !== undefined && !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(s.nativeAttemptId)) throw Error("INVALID_NATIVE_ATTEMPT_ID");
   for (const r of s.references) {
@@ -71,14 +71,10 @@ export function validateGenerationSpec(raw: unknown): GenerationSpec {
       ) ||
       typeof r.sourceOwner !== "string" || !r.sourceOwner.trim() ||
       r.sourceOwner.length > 200 ||
-      !Array.isArray(r.verifiedFacts) || !r.verifiedFacts.length ||
-      r.verifiedFacts.length > 10 ||
-      r.verifiedFacts.some((f) =>
-        typeof f !== "string" || !f.trim() || f.length > 500
-      ) ||
-      r.pixelsInspected !== true || typeof r.checkedAt !== "string" ||
-      !Number.isFinite(Date.parse(r.checkedAt))
-    ) throw Error("VERIFIED_REFERENCE_EVIDENCE_REQUIRED");
+      (r.verifiedFacts !== undefined && (!Array.isArray(r.verifiedFacts) || r.verifiedFacts.length > 10 || r.verifiedFacts.some((f) => typeof f !== "string" || !f.trim() || f.length > 500))) ||
+      (r.pixelsInspected !== undefined && typeof r.pixelsInspected !== "boolean") ||
+      (r.checkedAt !== undefined && (typeof r.checkedAt !== "string" || !Number.isFinite(Date.parse(r.checkedAt))))
+    ) throw Error("REFERENCE_METADATA_INVALID");
     sourceUrl(r.sourcePageUrl);
     if (r.sourceAssetUrl !== undefined) sourceUrl(r.sourceAssetUrl);
   }
@@ -135,7 +131,11 @@ export function generationCapabilities() {
     sourceLabelFontSizeAt390px: { minimum: 14, maximum: 24, default: 16 },
     executionMode: "NATIVE_CHATGPT_FILE_HANDOFF",
     visualContractVersions: [4, 5],
-    visualPolicyVersion: "VISUAL_COMMON_V1",
+    visualPolicyVersion: "VISUAL_PHOTO_V3",
+    evidenceLevel: "NONE",
+    evidenceIsGuidanceOnly: true,
+    sourceOrderEnforced: false,
+    pdfVisualAllowed: false,
     nativeProductionMethods: ["NATIVE_FULL_GENERATION", "REFERENCE_BASED_GENERATION", "REAL_SOURCE_AI_EDIT"],
     externalGenerationApiAllowed: false,
     referenceBasedGeneration: false,

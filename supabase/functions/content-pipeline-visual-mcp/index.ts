@@ -126,7 +126,7 @@ const tools: VisualTool[] = [
               type: "array",
               minItems: 0,
               maxItems: 4,
-              description: "NATIVE_FULL_GENERATION requires []; reference/edit methods require 1–4 inspected references. Contract permission is verified by the server.",
+              description: "NATIVE_FULL_GENERATION uses []; Reference guidance is optional. AI edit retains actual input source identity. Evidence level never restricts method selection.",
               items: {
                 type: "object",
                 properties: {
@@ -135,19 +135,16 @@ const tools: VisualTool[] = [
                   sourceOwner: { type: "string", minLength: 1, maxLength: 200 },
                   verifiedFacts: {
                     type: "array",
-                    minItems: 1,
+                    minItems: 0,
                     maxItems: 10,
                     items: { type: "string", minLength: 1, maxLength: 500 },
                   },
-                  pixelsInspected: { const: true },
+                  pixelsInspected: { type: "boolean" },
                   checkedAt: { type: "string", format: "date-time" },
                 },
                 required: [
                   "sourcePageUrl",
                   "sourceOwner",
-                  "verifiedFacts",
-                  "pixelsInspected",
-                  "checkedAt",
                 ],
                 additionalProperties: false,
               },
@@ -237,7 +234,7 @@ const tools: VisualTool[] = [
   {
     name: "dispatch_visual_source",
     description:
-      "Stage one public HTTPS photo/PDF candidate for this operator’s active image. Use one operationId per candidate/edit intent and retain it after response loss. Preserves provenance. Supports crop/maxWidth/circle/arrow and Korean label annotations (type=label,text,x,y,fontSize; max 16 characters; size in 390px display pixels). Coordinates refer to the cropped output; verify names and positions against the Contract. Also supports composition SIDE_BY_SIDE of 2–3 inspected raster sources with individual crop and short ASCII labels. No image generation; retain operationId for recovery.",
+      "Stage one public HTTPS photo candidate; PDF pages, manual diagrams and document screenshots are excluded. Planning URLs and evidence are optional guidance, not mandatory production paths. Select another photo or Native method if a hint fails. Preserve the actual source provenance and operationId. Supports crop/maxWidth/circle/arrow and Korean labels (max 16 characters, size at 390px). SIDE_BY_SIDE supports 2–3 inspected raster sources. No image generation in this tool.",
     inputSchema: {
       type: "object",
       properties: {

@@ -125,6 +125,8 @@ export async function deploy() {
     await queryProject('TARGET_MIGRATION', migrationTransaction(readFileSync(migrationPath, 'utf8')));
     await queryProject('SIMPLIFICATION_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012012704_simplify_visual_inspection_contract.sql', 'utf8'), {version:'20261012012704',name:'simplify_visual_inspection_contract',followUp:true}));
     await queryProject('AUTHORING_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012073342_unified_authoring_no_inspection_chunks.sql','utf8'), {version:'20261012073342',name:'unified_authoring_no_inspection_chunks',followUp:true}));
+    await queryProject('PHOTO_POLICY_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012203358_photo_source_policy.sql','utf8'), {version:'20261012203358',name:'photo_source_policy',followUp:true}));
+    await queryProject('PHOTO_POLICY_REGRESSION',readFileSync('scripts/content-factory/photo-source-policy-regression.sql','utf8'));
     await queryProject('AUTHORING_TRANSACTIONAL_REGRESSION',readFileSync('scripts/content-factory/authoring-regression.sql','utf8'));
     await queryProject('TRANSACTIONAL_REGRESSION', readFileSync('scripts/content-factory/visual-delivery-regression.sql', 'utf8'));
     await verifyConcurrentTaskLocks();

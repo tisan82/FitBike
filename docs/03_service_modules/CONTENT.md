@@ -118,7 +118,7 @@ alt/caption 기준은 `docs/00_ai/CONTENT_EDITORIAL_VISUAL_STANDARD.md`가 담�
 
 FitBike는 웹에서 발견한 실제 작업·부품 사진을 Editorial Source로 활용할 수 있다. 이미지 선택은 정보 적합성·사실성·원본 확보 가능성을 우선한다.
 
-이미지 제작·QA·업로드·게시 자동화는 출처만 기록한다. 원본 페이지 URL, 실제 이미지/PDF URL, 저작자 또는 운영자, 모델·연식·PDF 페이지(해당 시), 확인 시점과 편집 이력을 보존한다. 라이선스 조건·권리 상태·사용/편집 허락은 필수 입력, QA 항목 또는 진행 Gate로 사용하지 않으며 신규 권리 상태를 생성하거나 승인값을 추정하지 않는다. 권리 협의와 판단은 운영자가 별도로 담당하며, 문제 자산은 운영자가 서비스 제외·삭제·수정한다. 이 운영 절차가 법적 사용 권한을 부여하는 것은 아니다.
+이미지 제작·QA·업로드·게시 자동화는 출처만 기록한다. 원본 페이지 URL, 실제 이미지 URL, 저작자 또는 운영자, 모델·연식 (기존 PDF 자산은 원 URL·페이지 이력만 보존), 확인 시점과 편집 이력을 보존한다. 라이선스 조건·권리 상태·사용/편집 허락은 필수 입력, QA 항목 또는 진행 Gate로 사용하지 않으며 신규 권리 상태를 생성하거나 승인값을 추정하지 않는다. 권리 협의와 판단은 운영자가 별도로 담당하며, 문제 자산은 운영자가 서비스 제외·삭제·수정한다. 이 운영 절차가 법적 사용 권한을 부여하는 것은 아니다.
 
 허용되는 편집은 모바일 중심 크롭, 회전·원근 보정, 밝기·화이트밸런스 개선, 실제 부품을 바꾸지 않는 배경 정리, 핵심 위치를 가리지 않는 화살표·윤곽·짧은 라벨, 개인정보 마스킹이다. 차종·제품 코드·단자 방향·실제 손상·분해 상태를 바꾸거나 여러 사진을 하나의 실제 장면처럼 오인시키는 편집은 금지한다.
 
@@ -210,21 +210,15 @@ Autonomous Batch의 부족한 Queue를 채우기 위해 FitBike DB의 모델별 
 
 V5의 2단계 책임은 이미지 의미와 사실 경계다. Writer는 `contract_version=5`, `image_id`, `asset_role`, `user_question`, `visual_objective`, `must_show`, `must_not_show`, `evidence_requirement`, `alt_text_draft`만 작성한다. 제작 방식·Source 탐색 순서·구도·Annotation·Crop·별도 QA 문구는 작성하지 않는다. Pipeline/Task/asset 식별자는 서버의 Task/Job metadata에서 관리하며 의미 Contract 원문과 Hash는 제작 결과·파생 정책과 분리한다. 기계 판독 schema는 `scripts/content-factory/visual-brief-v5.schema.json`이다.
 
-`evidence_requirement.level`은 NONE / REFERENCE / REQUIRED다. `fact_ids`는 이미 정의된 CF ID 배열이며 사실을 새로 만드는 필드가 아니다. 선택적 `evidence_ref` 배열은 실제 확보한 HTTPS `source_ref`, 모델·연식 범위 `model_scope`, 확인 가능한 사실 `supports`를 전달한다. URL 존재는 픽셀 확인·Source 확보 성공이 아니다. 특정 모델 범위를 일반화하지 않는다.
+이미지 근거 레벨에 따른 제작 제한은 사용하지 않는다. 신규 V5는 호환 필드 `evidence_requirement.level=NONE`으로 통일한다. `fact_ids`와 `evidence_ref`는 선택적 참고 정보이며 제작 방식·특정 URL·Source 확보의 필수 Gate가 아니다. 기존 REFERENCE/REQUIRED 원문과 Hash는 보존하지만 파생 실행 정책에서는 NONE으로 처리한다. 3-A가 실사 사용·Crop/라벨·AI 편집·Native 신규 생성 중 적합한 방법을 선택한다. Source 탐색 순서는 강제하지 않는다.
 
-| Level | Common production boundary |
-| --- | --- |
-| NONE | 일반 상황 Native full generation 또는 실제 Source 허용. 특정 기술 구조·수치·손상을 사실처럼 만들지 않는다. |
-| REFERENCE | 실제로 검사한 근거 범위의 reference-based reconstruction 또는 실제 Source 허용. 근거 없이 full generation하지 않는다. |
-| REQUIRED | 검증된 실제/공식 Source 기반 최종 자산만 허용. 원본 구조·표시·사실을 보존하는 편집/Crop/Annotation은 허용하지만 생성 재구성으로 대체하지 않는다. |
-
-AI edit는 level과 무관하게 실제 입력 바이너리·Source·편집 사실 연결을 검증한다. 생성은 일반 ChatGPT 내장 도구만 사용한다. 외부 생성 API와 서버 모델은 금지한다. Source 미확보는 level 변경이나 자동 완화 사유가 아니다.
+최종 이미지 소재는 사진 중심이다. PDF 페이지·매뉴얼 도표·기술 문서 캡처는 사용하지 않는다. 기술자료와 영문 자료는 사실 확인과 설명 문구 작성의 참고로 활용할 수 있으며 국문 자료 확보를 필수 조건으로 요구하지 않는다. 사진 위 한국어 또는 영어 설명·라벨을 필요한 만큼 추가할 수 있다. 참고 URL 실패는 다른 사진이나 Native 방식으로 전환할 사유다. 실제 모델/제품/수치/구조를 허위 사실처럼 제시하지 않는다. AI edit의 실제 입력 바이너리·출처 동일성 검증과 Native REQUEST/RESULT 감사는 유지한다. 생성은 일반 ChatGPT 내장 도구만 사용하고 외부 생성 API·서버 모델은 사용하지 않는다.
 
 모든 `must_show`는 원본과 해당 390px 뷰에서 식별 가능한 필수 조건이다. `must_not_show`는 실제 금지 조건이다. visual_objective/user_question은 방향성 문맥이며 명시되지 않은 온도·재시동 성공·고장 원인 같은 추상 상태를 독립 FAIL Gate로 추가하지 않는다. 사람/손 등이 필요한 경우 필수 목록에, 금지하는 경우 금지 목록에 명시한다. 사람의 필수·금지는 must_show/must_not_show에 명시하며, 미지정 시 현재 V5 서버 정책은 OPTIONAL이다. 사람 필수·금지 충돌은 제출 오류다. 자연어 자동 검사는 제한적인 기본 모순 검사이며 제작 가능성이나 픽셀 PASS를 주장하지 않는다.
 
 390px 식별성·역할별 최종 Card/Hero Crop·ALT/SEO·SHA·중복·출처 동일성은 공통 검수 정책이다. BODY에는 대표 이미지 Crop을 강제하지 않는다. 제작자가 선택한 실제 제작 방식·Source/Reference·확인 사실·transform/Crop/Annotation·Native 호출/반환 자산은 현재 Contract에 결합한 Job/감사 기록으로 전달한다. Annotation은 실제 대상을 정확히 가리키고 최소 factual label을 사용하며 최종 렌더링에서 검증한다. 제작자의 PASS는 Reviewer 승인 증거를 대체하지 않는다.
 
-기존 V4의 명시적 제한과 활성 Claim·저장 후보·Hash는 유지한다. 새 Brief는 V5를 사용하며 기존 Task는 자동 변환하지 않는다. 의미/제한을 바꿀 때 새 Contract/Hash를 발급하며 이전 자산 이력과 승인 결과를 보존한다.
+기존 V4의 장면 필수·금지 조건과 활성 Claim·저장 후보·Hash는 유지한다. 과거 근거 레벨·제작 허용 boolean은 새 공통 실행 정책의 제작 제한으로 사용하지 않는다. 새 Brief는 V5를 사용하며 기존 Task는 자동 변환하지 않는다. 의미/제한을 바꿀 때 새 Contract/Hash를 발급하며 이전 자산 이력과 승인 결과를 보존한다.
 
 ## Existing Content Remediation
 
@@ -243,11 +237,11 @@ AI edit는 level과 무관하게 실제 입력 바이너리·Source·편집 사�
 
 ### V5 evidence selection and minimal execution records
 
-일반 장면에 오토바이·부품이 등장한다는 이유만으로 REQUIRED를 지정하지 않는다. 실제 모델/제품의 외형·표시 자체가 고객 답변의 근거이면 REQUIRED, 확인한 근거 범위의 재구성으로 충분하면 REFERENCE, 일반적인 행동·상황 설명이면 NONE을 사용한다. 특정 모델 UI가 본문 답변에 꼭 필요한 경우에만 그 UI를 must_show에 넣는다. 실제 기술 근거는 매뉴얼로 확인할 수 있으나 최종 이미지에 매뉴얼 그림을 사용할 의무는 없다. 검증된 사진·실제 화면을 탐색할 수 있으며, 자료 부재는 근거 수준 완화 사유가 아니다. 숫자/LOW·MEDIUM·HIGH 같은 별도 위험도 Contract 필드를 추가하지 않는다.
+이미지별 근거 레벨 판단 절차는 제거한다. 새 Brief는 NONE을 저장하고, URL과 기술자료는 참고로만 전달한다. must_show는 핵심 1~2개 중심이며 특정 모델 화면·소품·구도를 필요 없이 고정하지 않는다. 제작자는 내용 정합성·실제 픽셀·모바일 식별성을 충족하는 사진 또는 Native 방법을 선택한다. 별도 위험도 필드를 추가하지 않는다.
 
 Current Task/Contract, Job/input checkpoint, Claim receipt, execution outcome and minimal inspection event are authoritative. Computed policies and guidance are derived on read, not repeated in new receipt/run storage. Existing raw Contracts/hashes/history and approved assets remain unchanged. Producer success is reviewHandoff on its own run; later Reviewer RETRY does not revoke that historical handoff. Inspector evidence is required for transition; diagnostic logs are not a second approval gate.
 
 
 ### Unified authoring storage
 
-1·2단계 신규 통합 실행의 최종 단일 산출물은 `writer_artifact`이며 기획·Fact Register/근거는 `authoringContext`에 포함한다. 실행 통합으로 조사·본문 품질·모델 정확성·V5 evidence_requirement 검증을 생략하지 않는다. V5의 REQUIRED/REFERENCE/NONE 기준과 제작자가 허용 범위 안에서 Source/제작 방식을 선택하는 경계는 유지한다. 별도 위험도나 Source URL 강제 필드를 추가하지 않는다. 기존 산출물과 Contract/Hash는 자동 변환하지 않는다. 호출 규약은 API.md, 실행 정책은 CONTENT_FACTORY.md가 소유한다.
+1·2단계 신규 통합 실행의 최종 단일 산출물은 `writer_artifact`이며 기획·Fact Register/근거는 `authoringContext`에 포함한다. 실행 통합으로 조사·본문 품질·모델 정확성·V5 evidence_requirement 검증을 생략하지 않는다. 이미지 근거 레벨은 NONE으로 통일하고 제작자가 Source/제작 방식을 선택한다. 별도 위험도나 Source URL 강제 필드를 추가하지 않는다. 기존 산출물과 Contract/Hash는 자동 변환하지 않는다. 호출 규약은 API.md, 실행 정책은 CONTENT_FACTORY.md가 소유한다.

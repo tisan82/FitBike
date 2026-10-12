@@ -148,6 +148,8 @@ Deno.serve(async (req) => {
         ? await generateAsset(s)
         : await downloadSource(u!.href);
     }
+    // Fresh inputs are photos/raster assets only. Existing canonical recovery remains valid.
+    if (downloaded.mime === "application/pdf") throw Error("PDF_VISUAL_SOURCE_NOT_ALLOWED");
     let generatedInput;
     if (generative) {
       // Preserve a decoded, normalized WebP before applying the requested transform.
