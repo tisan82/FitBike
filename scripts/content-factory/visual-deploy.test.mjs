@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { migrationTransaction, migrationVersion, queryProject, projectRef } from './deploy-visual-delivery.mjs';
+import { migrationTransaction, migrationVersion, queryProject, projectRef, verifyConcurrentTaskLocks } from './deploy-visual-delivery.mjs';
 const { PGlite } = await import(process.env.PGLITE_MODULE ?? '@electric-sql/pglite');
 
 test('target migration/history are atomic, exact, replayable and leave old history untouched', async () => {
@@ -32,4 +32,14 @@ test('scoped Management query preserves SQL and does not expose error payloads',
     assert.doesNotMatch(error.message, /private input|URL/);
     return true;
   });
+});
+
+
+test('two-session lock verification requires held marker, skips same Task and admits different Task',async()=>{
+ const stages=[];const query=async stage=>{stages.push(stage);if(stage==='CONCURRENT_FIXTURES')return[{pipeline_image_id:2},{pipeline_image_id:1}];if(stage==='CONCURRENT_HELD_SESSION')return new Promise(resolve=>setTimeout(()=>resolve([{pipeline_image_id:2,session_id:100}]),10));if(stage==='CONCURRENT_MARKER')return[{marker_available:false}];if(stage==='CONCURRENT_COMPETING_SESSION')return[{acquired_ids:[1],session_id:101}];};
+ assert.equal(await verifyConcurrentTaskLocks(query),true);assert.equal(stages.includes('CONCURRENT_COMPETING_SESSION'),true);
+ await assert.rejects(verifyConcurrentTaskLocks(async stage=>stage==='CONCURRENT_COMPETING_SESSION'?[{acquired_ids:[1,2],session_id:101}]:query(stage)),/VISUAL_CONCURRENT_TASK_LOCK_FAILED/);
+ for(const holder of [[],[{pipeline_image_id:2}],[{pipeline_image_id:1,session_id:100}]])await assert.rejects(verifyConcurrentTaskLocks(async stage=>stage==='CONCURRENT_HELD_SESSION'?holder:query(stage)),/VISUAL_CONCURRENT_TASK_LOCK_FAILED/);
+ await assert.rejects(verifyConcurrentTaskLocks(async stage=>stage==='CONCURRENT_COMPETING_SESSION'?[{acquired_ids:[1]}]:query(stage)),/VISUAL_CONCURRENT_TASK_LOCK_FAILED/);
+ assert.equal(await verifyConcurrentTaskLocks(async()=>[]),false);
 });

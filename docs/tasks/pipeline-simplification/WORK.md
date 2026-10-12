@@ -47,6 +47,6 @@ API는 typed legacy event + 최소 후보 관찰 + eventId 조회 + 미완료 �
 
 ## 검증/출시
 
-로컬86검사 통과: 기존 회귀 + typed 입력/응답 유실 조회/역할 제한/미완료 뷰 복구/전체 migration 컴파일·원자적 이력/lease 종료 후 replay 검증. 실제 RPC rollback 검증과 배포 read-back은 출시 단계에서 확인한다. 실제 예약 간 복구·신규 Native 파일 최초 전달·서로 다른 Task의 실제 예약 동시 실행은 Work 테스트와 분리해 보고한다. 서버 테스트를 SCHEDULED 성공으로 기록하지 않는다.
+로컬87검사 통과: 기존 회귀 + typed 입력/응답 유실 조회/역할 제한/미완료 뷰 복구/전체 migration 컴파일·원자적 이력/lease 종료 후 replay 검증. 실제 RPC rollback·두 세션의 짧은 SELECT row-lock 경합 검증과 배포 read-back은 출시 단계에서 확인한다. 동시성 SELECT는 Task/Claim/자산 값을 변경하지 않는다. 실제 예약 간 복구·신규 Native 파일 최초 전달·서로 다른 Task의 실제 예약 동시 실행은 Work 테스트와 분리해 보고한다. 서버 테스트를 SCHEDULED 성공으로 기록하지 않는다.
 
 DB DROP 후보는 단계별 레거시 consumer 제거와 외부 작성자 확인 후 후속 migration으로 처리한다. 이번 release의 축소는 신규 중복 저장 제거이며264→다른 수로 컬럼 수가 줄었다고 보고하지 않는다.

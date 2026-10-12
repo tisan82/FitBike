@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { randomInt } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
@@ -76,8 +77,37 @@ export async function queryProject(stage, sql, fetcher = fetch) {
     // Emit codes/metrics only; API errors can contain SQL and sensitive values.
     throw new Error(`${stage}: HTTP_${response.status}${known ? ':' + known[0] : ''}${sqlState ? ':SQLSTATE_' + sqlState : ''} (responseBytes=${Buffer.byteLength(body)})`);
   }
-  await response.arrayBuffer();
+  const rows = await response.json();
   console.log(`${stage}: PASS`);
+  return rows;
+}
+
+// Short rollback-equivalent SELECT transactions: no Claim/data mutation, no
+// asset/Storage access. Confirms actual separate sessions, not only a SQL scan.
+export async function verifyConcurrentTaskLocks(query = queryProject) {
+  const fixtures = await query('CONCURRENT_FIXTURES', `select pipeline_image_id from public."21_content_pipeline_image" where status in ('PENDING','RETRY') and (claim_token is null or claim_expires_at<now()) order by pipeline_image_id desc limit 2`);
+  const ids = Array.isArray(fixtures) ? fixtures.map(row=>Number(row.pipeline_image_id)) : [];
+  if (ids.length !== 2 || ids.some(id=>!Number.isSafeInteger(id)||id<1)) { console.log('CONCURRENT_TASK_LOCKS: NOT_VERIFIED_NO_IDLE_FIXTURES'); return false; }
+  const marker = randomInt(1000000000000,2000000000000);
+  const held = query('CONCURRENT_HELD_SESSION', `with locked as materialized(select pipeline_image_id from public."21_content_pipeline_image" where pipeline_image_id=${ids[0]} and status in ('PENDING','RETRY') and (claim_token is null or claim_expires_at<now()) for update skip locked), signal as materialized(select pg_advisory_xact_lock(${marker}::bigint) from locked), pause as materialized(select pg_sleep(5) from signal) select pipeline_image_id,pg_backend_pid() as session_id from locked cross join pause`);
+  // Attach promptly: a failed first request must never become an unhandled rejection.
+  let holdError; const completion=held.catch(error=>{holdError=error;return [];});
+  let confirmed=false, competing;
+  try {
+    for(let n=0;n<8;n++) {
+      const rows=await query('CONCURRENT_MARKER', `select pg_try_advisory_xact_lock(${marker}::bigint) as marker_available`);
+      if(rows?.[0]?.marker_available===false){confirmed=true;break;}
+      if(holdError)throw holdError;
+      await new Promise(resolve=>setTimeout(resolve,100));
+    }
+    if(!confirmed){console.log('CONCURRENT_TASK_LOCKS: NOT_VERIFIED_SESSION_SERIALIZED');return false;}
+    competing=await query('CONCURRENT_COMPETING_SESSION', `with eligible as materialized(select pipeline_image_id from public."21_content_pipeline_image" where pipeline_image_id in (${ids.join(',')}) and status in ('PENDING','RETRY') and (claim_token is null or claim_expires_at<now()) order by pipeline_image_id for update skip locked) select coalesce(jsonb_agg(pipeline_image_id),'[]'::jsonb) as acquired_ids,pg_backend_pid() as session_id from eligible`);
+  } finally { await completion; if(holdError)throw holdError; }
+  if(holdError)throw holdError;
+  const heldRows=await completion, acquired=competing?.[0]?.acquired_ids;
+  const first=heldRows?.[0], second=competing?.[0];
+  if(!Array.isArray(heldRows)||heldRows.length!==1||Number(first?.pipeline_image_id)!==ids[0]||!Number.isSafeInteger(first?.session_id)||first.session_id<1||!Number.isSafeInteger(second?.session_id)||second.session_id<1||first.session_id===second.session_id||!Array.isArray(acquired)||acquired.some(id=>!Number.isSafeInteger(id))||acquired.includes(ids[0])||!acquired.includes(ids[1]))throw new Error('VISUAL_CONCURRENT_TASK_LOCK_FAILED');
+  console.log('CONCURRENT_TASK_LOCKS: PASS'); return true;
 }
 
 async function requireCurrentMain() {
@@ -95,6 +125,7 @@ export async function deploy() {
     await queryProject('TARGET_MIGRATION', migrationTransaction(readFileSync(migrationPath, 'utf8')));
     await queryProject('SIMPLIFICATION_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012012704_simplify_visual_inspection_contract.sql', 'utf8'), {version:'20261012012704',name:'simplify_visual_inspection_contract',followUp:true}));
     await queryProject('TRANSACTIONAL_REGRESSION', readFileSync('scripts/content-factory/visual-delivery-regression.sql', 'utf8'));
+    await verifyConcurrentTaskLocks();
     await requireCurrentMain();
     // JWT verification is already disabled in deployed v35. The function retains
     // its existing custom worker authentication; no auth policy change here.
