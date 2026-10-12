@@ -2,6 +2,8 @@
 
 대상 pipelineImageId: 미지정
 
+FitBike Visual Reviewer_01의 현재 노출 도구만 사용한다. connectedRole=REVIEWER를 확인한다.
+
 공식 QA_PENDING Queue에서 저장 후보 1건을 검수한다. 새 이미지 생성/재생성을 하지 않는다. 성공은 실제 최종 QA → Approval → READY_FOR_UPLOAD → Reviewer activeClaim=false 재조회다. Production Claim, 3-B 업로드/DONE, 게시, 코드/DB/Contract/예약 변경은 수행하지 않는다.
 
 현재 AGENTS.md 및 CONTENT.md → CONTENT_FACTORY.md → CONTENT_QUEUE.md, 최신 도구 schema와 현재 Task를 확인한다. claim_visual_review, 상태/receipt 조회, inspect_visual_source, record_visual_source_qa/reject_visual_source, 동일 후보 finalization용 Dispatch, 중복 조회, approve_visual_source/fail_visual_image가 필요하다. legacy/Producer Claim으로 대체하지 않는다.
@@ -20,7 +22,7 @@ V5의 generationContract는 의미 기준이고 visualPolicy는 서버 공통 �
 
 inspect_visual_source가 반환한 실제 원본과 전체 390px image 블록을 모두 연다. functions.exec에서는 각 image(block)을 출력한다. 기술 metadata/decode/SHA만으로 Semantic/Mobile PASS하지 않는다.
 
-필수·금지 대상, 공통 people 기준, 모델/근거 적용 범위, evidence level과 실제 제작 경로 일치를 확인한다. REQUIRED는 실제 Source 기반이며 Reference 재구성/full generation으로 대체할 수 없다. AI edit이면 실제 입력·출처와 최종 구조·표시·사실 보존을 확인한다.
+필수·금지 대상, 모바일 식별성, 실제 기술 오류를 검사한다. 근거 레벨·Source 종류·기획 URL 미사용을 이유로 반려하지 않는다. 신규 PDF·매뉴얼 도표·문서 캡처는 제외한다. AI edit는 실제 입력 동일성을 확인한다.
 
 실제 볼 수 없는 파일은 기술 실패로 보존한다. 실제 본 후보가 의미상 틀렸으면 정확한 Job/SHA와 사유로 reject_visual_source 후 공식 Claim 종료한다. 정상 후보는 최종 사용할 Annotation과 대상 위치를 먼저 결정한 뒤 현재 schema에 맞춰 record_visual_source_qa를 호출한다. 모든 check key는 현재 Contract 원문 문자열을 정확히 사용한다. sourceJobId와 sourceSha256은 서버의 원본 source identity이며 canonical SHA와 혼동하지 않는다. V5에서 최종 사용할 label Annotation을 선택하면 실제 대상 위치를 먼저 확인하고 annotationTargetChecks에 그 정확한 label text의 대상 검증을 기록한다. 아직 렌더링하지 않은 라벨의 최종 가독성을 PASS한 것으로 기록하지 않는다. 최종 라벨 픽셀 QA는 다음 최종 렌더링 검사에서 수행한다.
 

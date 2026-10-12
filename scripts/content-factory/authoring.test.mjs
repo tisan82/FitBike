@@ -20,6 +20,12 @@ async function topic(db,key){await db.query(`insert into public."16_content_topi
 async function claim(db,id,target=null){return(await db.query('select public.content_pipeline_claim_authoring_v1($1::uuid,$2::bigint) as r',[id,target])).rows[0].r;}
 const packet=c=>({version:1,execution:c.packageExecution,planning:{customer_question:'How to inspect parked motorcycle condition?'},research:{fact_register:[{fact_id:'CF1',claim:'Fixture only',verification:'TEST_FIXTURE'}]},writer:{content_key:c.topicKey,final_title:'Fixture article',image_briefs:[brief]}});
 const complete=async(db,c,p)=> (await db.query('select public.content_pipeline_complete_authoring_v1($1,$2,$3::jsonb) as r',[c.pipelineId,c.pipelineRunId,JSON.stringify(p)])).rows[0].r;
+test('new unified authoring normalizes image levels before Hash and image sync; replay remains idempotent',async()=>{const db=await database();try{
+ await db.exec(readFileSync(new URL('../../supabase/migrations/20261012203358_photo_source_policy.sql',import.meta.url),'utf8'));
+ await topic(db,'photo-policy-normalization');const c=await claim(db,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');const p=packet(c);p.writer.image_briefs[0]={...brief,evidence_requirement:{level:'REQUIRED'}};
+ await complete(db,c,p);const image=(await db.query('select generation_contract from public."21_content_pipeline_image"')).rows[0];assert.equal(image.generation_contract.evidence_requirement.level,'NONE');
+ assert.equal((await complete(db,c,p)).replayed,true);
+ }finally{await db.close();}});
 test('single authoring run stores context once, performs real V5 sync, and completion replay does not repeat writes',async()=>{const db=await database();try{
  await topic(db,'authoring-one');const c=await claim(db,'11111111-1111-4111-8111-111111111111');const p=packet(c);const r=await complete(db,c,p);assert.equal(r.stage,'DRAFTED');
  const row=(await db.query('select planning_artifact,research_artifact,writer_artifact from public."18_content_pipeline"')).rows[0];assert.deepEqual(row.planning_artifact,{});assert.deepEqual(row.research_artifact,{});assert.deepEqual(row.writer_artifact.authoringContext.research,p.research);

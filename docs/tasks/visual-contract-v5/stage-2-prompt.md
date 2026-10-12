@@ -22,14 +22,14 @@ visual_objective: 실제로 보여줄 대상과 관계 한 문장
 must_show: 실제로 식별해야 하는 필수 시각 대상 목록
 must_not_show: 금지 대상·오인 표현 목록
 evidence_requirement:
-  level: NONE 또는 REFERENCE 또는 REQUIRED
+  level: NONE 고정 (이미지 제작 제한으로 사용하지 않음)
   fact_ids: Research에 실제 존재하는 CF ID 배열, 해당 없으면 []
   evidence_ref: 실제 확보한 근거 배열, 없으면 생략 또는 []
 alt_text_draft: 실제 시각 대상 중심 ALT 초안
 
 evidence_ref 원소는 실제 HTTPS source_ref와 선택적 model_scope, supports만 사용한다. supports는 해당 자료가 뒷받침하는 구조/사실 설명이다. 문서 URL과 실제 이미지 파일 URL을 혼동하지 않는다. URL 전달은 픽셀 검사 완료가 아니다.
 
-근거 level의 의미·제작 허용 범위는 CONTENT.md의 공통 정책을 따른다. 일반 장면은 NONE, 실제 확인한 형태를 재구성할 수 있는 경우 REFERENCE, 최종 자산이 검증된 실제/공식 Source 기반이어야 하는 경우 REQUIRED다. 근거를 확보하지 못했다고 REQUIRED를 NONE으로 낮추지 않는다.
+이미지 근거 레벨을 분류하지 않는다. 모든 새 Brief의 level은 NONE이다. Source URL·기술자료는 선택적 참고이며 특정 URL·국문 자료·제작 방식을 강제하지 않는다. PDF 페이지·매뉴얼 도표·문서 캡처는 이미지 소재에서 제외하고 사진 중심 장면으로 기획한다. must_show는 핵심 1~2개 중심으로 정한다.
 
 source_strategy/source_priority/generation_allowed/ai_edit_allowed/full_generation_allowed/reference_based_generation_allowed/composition_plan/annotation_contract/people_mode/pixel_qa_contract/qa_criteria/mobile_requirement/production_feasibility/production_flexibility를 신규 V5 Brief에 작성하지 않는다. Pipeline/Task/asset 운영 식별자는 서버가 관리한다.
 
@@ -39,11 +39,9 @@ source_strategy/source_priority/generation_allowed/ai_edit_allowed/full_generati
 
 현재 공식 Writer 완료 경로로 본문 Artifact와 신규 V5 image_briefs를 저장하고 이미지 Task 동기화를 확인한다. 서버 schema/basic consistency 검사 성공을 픽셀 QA 또는 Source 확보 성공이라고 보고하지 않는다. 기존 활성 Claim·QA_PENDING·승인 자산·Contract Hash를 덮어쓰거나 자동 V5 변환하지 않는다.
 
-최종 보고: Pipeline/Topic, Writer 최종 상태, 신규 V5 Task 수, evidence level 요약, 이미지 Task 동기화 확인, 자기 Claim 종료 결과. 실패하면 실제 오류와 재개 지점을 기록하고 공식 종료한다.
+최종 보고: Pipeline/Topic, Writer 최종 상태, 신규 V5 Task 수, 이미지 Task 동기화 확인, 자기 Claim 종료 결과. 실패하면 실제 오류와 재개 지점을 기록하고 공식 종료한다.
 
 다음 담당: 3-A 제작. 다음 작업: 최신 Contract와 서버 visualPolicy 기준 후보 확보·Staging·검수 인계.
 
 
 ## 신규 Source 경계 보완
-
-실제 물체 등장 여부가 아니라 실제 외형/표시가 답변 근거인지로 evidence level을 선택한다. 일반 점검 행동은 NONE, 검증한 Reference 범위의 재구성은 REFERENCE, 특정 모델 UI/제품 구조/정확한 배선 등 실제 자료 기반 표현은 REQUIRED다. 특정 모델 화면을 꼭 보여줘야 하는지 먼저 판단한다. 특정 Source URL, 매뉴얼 이미지, 제작 순서·Crop·방법을 신규 V5 필수 조건으로 고정하지 않는다. Source URL은 사실 근거/탐색 힌트로 전달하고 3-A가 허용된 방법을 선택한다. 매뉴얼은 기술 사실의 근거가 될 수 있지만 최종 이미지의 기본 자산은 아니다. 기존 Task/Hash/승인 자산은 변경하지 않는다.

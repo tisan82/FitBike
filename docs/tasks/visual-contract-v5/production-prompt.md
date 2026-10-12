@@ -2,6 +2,8 @@
 
 대상 pipelineImageId: 미지정
 
+FitBike Visual Producer_02의 현재 노출 도구만 사용한다. connectedRole=PRODUCER를 확인한다.
+
 공식 Production Queue에서 Image Task 1건을 처리한다. 성공 종료는 실제 STAGED 후보 → handoff_visual_review → visualPhase=QA_PENDING → 인계 Job/Contract/SHA 일치 → Production activeClaim=false 재조회다. Reviewer QA 기록·승인·READY_FOR_UPLOAD, 3-B 업로드/DONE, 게시, 코드/DB/Contract/예약 변경은 수행하지 않는다.
 
 ## 실행 전과 Claim
@@ -12,15 +14,15 @@
 
 ## 계약과 복구
 
-V5는 작은 generationContract와 별도 visualPolicy를 함께 사용한다. 모든 must_show가 필수이며 objective/user_question의 추상 의미를 새 Gate로 추가하지 않는다. 제작 방식은 서버 허용 범위에서 선택한다. V4는 기존의 명시적 생성/실사/Annotation/모바일 제한을 그대로 따른다. Contract/Hash를 수정하지 않는다.
+V5는 작은 generationContract와 별도 visualPolicy를 함께 사용한다. 모든 must_show가 필수이며 objective/user_question의 추상 의미를 새 Gate로 추가하지 않는다. 제작 방식은 서버 허용 범위에서 선택한다. V4의 필수·금지 표현과 실제 출력 검사는 유지하되 과거 생성/실사 허용 boolean은 제작 방식 제한으로 사용하지 않는다. Contract/Hash를 수정하지 않는다.
 
 recoverableProductionCandidate가 있으면 새 Source 탐색·생성 대신 같은 Worker/Task/Contract/Job/SHA의 기존 후보를 실제 Inspection하고 인계를 재개한다. recoverableStaging도 현재 역할의 executionProtocol/nextAction에 따라 처리한다. 둘 다 없고 recoverableNativeInput이 있으면 서버가 반환한 spec을 그대로 사용해 새 operationId로 dispatch_visual_generation을 호출한다. 이 입력은 저장된 입력일 뿐 STAGED/QA PASS가 아니다. 파일을 다시 전달하거나 Native를 재생성하지 않고 Staging부터 재개한다. semantic 무효화 후보는 재사용하지 않는다. 닫힌 Claim이나 Task 조회 결과만으로 쓰기 권한이 생기지 않는다.
 
 ## 후보 확보
 
-V5 NONE은 일반 상황 NATIVE_FULL_GENERATION 또는 실제 Source를 사용할 수 있다. REFERENCE는 실제 검사한 근거 기반 제작이며 REQUIRED는 검증된 실제/공식 Source 기반 최종 자산이어야 한다. 실제 구조·표시·손상을 바꾸지 않는 허용 편집만 수행한다. Source 부재 때문에 evidence level을 바꾸지 않는다.
+이미지 근거 레벨·과거 제작 허용 boolean으로 제작 방법을 제한하지 않는다. 사진 사용·편집·ChatGPT Native 신규 생성 중 현재 목적에 가장 적합한 방법을 선택한다. 참고 자료는 선택 사항이다.
 
-이미 확보된 evidence_ref를 먼저 확인한다. HTML/XML 문서에서 실제 이미지가 필요하면 resolve_visual_source_assets를 사용하고 반환 preview를 실제 열어 적합성을 확인한다. HTML 문서 URL을 sourceAssetUrl로 접수하지 않는다. PDF는 다른 적합한 실제 자산이 없을 때 해당 페이지 범위로 사용한다. Source 후보가 403/404/MIME/내용 불일치이면 같은 URL 반복 대신 독립 후보로 교체한다. 실제 근거가 없는 상태 차이·가짜 경고/라벨은 만들지 않는다.
+Source URL과 evidence_ref는 탐색 힌트로만 사용한다. URL 실패 시 다른 사진 또는 Native 생성으로 전환한다. PDF·매뉴얼 도표·기술 문서 캡처는 이미지 소재로 사용하지 않는다. 기술자료는 설명 문구의 참고로만 활용한다. HTML 문서 URL을 이미지 파일로 접수하지 않는다.
 
 Native가 필요한 경우 현재 채팅의 실제 도구와 감사 입력을 확인한다. 서버 generation/reference capability false를 내장 도구 부재로 해석하지 않는다. 일반 ChatGPT 내장 생성/편집만 사용하고 외부 API/서버 모델은 금지한다.
 
@@ -34,7 +36,7 @@ attemptId 하나로 실제 REQUEST의 도구 인자와 RESULT의 actualNativeCal
 
 실제 Source는 dispatch_visual_source, Native 반환 파일은 dispatch_visual_generation의 현재 공식 file 입력 또는 검증된 URL+SHA 경로를 사용한다. 신규 Native 접수에는 현재 REQUEST/RESULT의 nativeAttemptId를 spec에 함께 전달한다. 실제 생성에 사용한 prompt를 접수 prompt에도 그대로 사용한다. 서버는 관찰 가능한 prompt·file ID·operationId 불일치를 차단하지만, 경로만 기록된 파일 연결은 UNVERIFIED이며 서버가 생성 호출을 관찰했다고 주장하지 않는다. 복구 spec의 원래 nativeAttemptId는 수정하지 않는다.
 
-V5 NONE full generation은 productionMethod=NATIVE_FULL_GENERATION, references=[]다. Reference/Edit 방식은 실제 검사한 references를 사용하고 AI edit는 실제 inputFile 연결도 검증한다.
+신규 생성은 productionMethod=NATIVE_FULL_GENERATION, references=[]를 사용한다. Reference 방식의 자료는 선택적 참고이며 사전 사실·픽셀 확인을 필수 Gate로 요구하지 않는다. AI edit는 실제 inputFile과 입력 사진의 동일성·출처를 유지한다.
 
 제작은 preflightOnly=true의 unannotated 후보를 접수한다. 현재 지원 schema에 맞춰 실제 Source/Reference·확인 사실·제작 방식·transform을 기록한다. operationId는 후보 intent마다 하나를 유지하며 응답 유실 시 공식 조회로 복구한다.
 
