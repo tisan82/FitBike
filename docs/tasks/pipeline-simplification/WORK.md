@@ -9,7 +9,7 @@
 | 테이블 | 컬럼 수 | 사용 단계/책임 | 판단 |
 |---|---:|---|---|
 |16_content_topic|24|1 기획·Queue·중복·범위|주제 핵심 유지|
-|18_content_pipeline|22|1~4 단계 Artifact/본문/진행|기획·Research·Writer 유지, JSON alias 신규 쓰기 통합은 후속|
+|18_content_pipeline|22|1~4 단계 Artifact/본문/진행|신규 1·2단계는 writer_artifact.authoringContext 단일 저장; 구형 컬럼은 기존 건 호환 유지|
 |19_content_pipeline_run|9|1~4 실행 이력|단계별 결과 유지|
 |21_content_pipeline_image|37|2 Brief/Contract → 3A/검수/3B Task|ID·Hash·Claim·후보 유지; 상태 중복 컬럼은 소비자 이관 후 통합|
 |23_content_pipeline_image_run|14|제작/검수/3B 실행 결과|raw Contract/hash 유지; 파생 JSON 신규 중복 저장 제거|
@@ -22,8 +22,8 @@
 |24_content_pipeline_source_ingest_ticket|9|Source 수신 보안 ticket|활성0건이지만 소비 경로 제거 전 유지|
 |25_content_pipeline_generated_asset_handoff|12|구형 분할 수신|9건, 활성0; 레거시 API 폐기 후 제거 후보|
 |26_content_pipeline_generated_asset_chunk|3|구형 분할 binary|0건; 부모/append/consume 경로 폐기 후 제거 후보|
-|28_content_pipeline_source_stage_inspection_chunk|4|구형 검사 binary 전송|689건; 현재 image 응답/fallback 전환 후 제거 후보|
-|31_content_pipeline_native_asset|32|미사용 Native scaffold|0건·persist/recovery RPC 없음; 외부 작성자 확인 후 제거 후보|
+|28_content_pipeline_source_stage_inspection_chunk|4|구형 검사 binary 전송|신규 쓰기 중단 배포·실제 STAGED/0조각 검증 완료; 2026-10-12 재조회904건은 이력/정리 경로 유지|
+|31_content_pipeline_native_asset|32|배포된 Native 입력 저장·복구 Edge 경로|0건이지만 content-pipeline-native-asset v1의 실제 조회·upsert 확인; 미사용/삭제 대상으로 확정하지 않음|
 |content_pipeline_maintenance_run|11|Storage 정리|1~3단계 본문/검사 입력 아님; 삭제 보호에 필요|
 |content_pipeline_staging_cleanup_lease|3|Storage 정리 경합 방지|1~3단계 본문/검사 입력 아님; 삭제 보호에 필요|
 
@@ -62,3 +62,20 @@ DB DROP 후보는 단계별 레거시 consumer 제거와 외부 작성자 확인
 - 실제 SCHEDULED 예약 간 복구·두 Task 예약 동시 실행·신규 Native 최초 전달·저장 Native 복구는 이번 배포 검증에서 미실행. 서버 잠금 PASS를 예약 성공으로 계산하지 않음.
 - 264개 컬럼 유지. 삭제 후보는 확인했지만 DROP하지 않았으며 신규 JSON 반복 저장만 축소.
 
+
+## 2026-10-12 후속 결정
+
+1·2단계는 일반 채팅에서 통합하며 예약은 3-A부터 시작한다. 1·2단계 통합 때문에 예약을 바꾸지 않는다. 신규 실행은 claim_authoring → 한 산출물 → complete_authoring을 사용한다. 구형 경로의 범위·현재 서버 호환 상태와 전체 검증 순서는 [RETIREMENT_SCOPE.md](RETIREMENT_SCOPE.md)를 따른다. 범위 확정과 API 서버 차단/물리 삭제는 서로 다른 조치다. 이번 후속 문서 변경은 신규 API 차단이나 DROP을 실행한 것으로 보고하지 않는다.
+
+## 역할 연결과 실제 Work E2E 확인 (2026-10-12 KST)
+
+- 공식 표준: Producer_02=PRODUCER(26도구), Reviewer_01=REVIEWER(22도구). capability 실호출과 현재 callable 목록 확인. 기존 Producer_01/Reviewer_02 SHARED는 신규 표준에서 제외; 기존 App URL 편집/삭제를 수행했다고 보고하지 않음.
+- 기존 작성 콘텐츠 pipeline68 `motorcycle-fuel-octane-selection-guide`의 마지막 이미지43019를 실제 완결. 기존 본문/기획/근거/Contract는 보존했고 최종 assembly에서 H2 level·승인 이미지 배치·접힌 공식자료 영역을 적용.
+- 내장 Native1회, REQUEST/RESULT exact reported argument read-back, official fileParams 첫 전달 PASS. 원본 PNG SHA `d08ee7a855830d2c93b70c7ec5313d442620636acec8801b4531afa1e7608caf`; 서버 보존 입력 SHA `33c79fb35724c69fbb2b9e3e48786a39e67ef0f428b62a4b2b976331aa0fef5a`.
+- Producer receipt `bc1dfb70-1874-4c6c-b35f-07441153045f`: STAGED Job `32bec281-d921-41c4-a8a0-a7c6e09d07c5`의 canonical/390px 실제 관찰·최소 이벤트 저장 → QA_PENDING 인계 → activeClaim=false.
+- Reviewer receipt `a91f6780-a6f2-42c5-b7f0-2b61d6540054`: 같은 후보 검사·QA기록 → 저장 입력 재사용으로 최종화 Job `b6b8b098-b33f-4ad0-acba-b4a70a364bac` → final canonical/390px 재검사·승인 → READY_FOR_UPLOAD/Reviewer activeClaim=false.
+- 승인/Production SHA 동일 `0cd0a35e960f1e75c2ee9377561d577b7062cb8e29859c0009b9f15bfe9ff512`. 3-B run1474가 ticket-bound 서버 업로드·read-back 후 DONE/claim 해제. 모든4이미지 DONE → IMAGE_READY.
+- 최종 QA run355 PASS; Publish run356에서 Content172 게시 후 HTTP200, canonical, 단일H1, H2, 실제4이미지·각 public binary SHA, ALT, 접힌 참고 공식자료, Article/Breadcrumb JSON-LD 확인 → COMPLETE/ownership COMPLETE/활성 image Claim0.
+- 공개 결과: https://fitbike.co.kr/contents/motorcycle-fuel-octane-selection-guide . 이번 두 Source Stage Job의 구형 table28 조각은0행.
+- 범위: Work에서 실제 기존 콘텐츠의 후속 제작·검수·업로드·게시 성공. 예약/SCHEDULED, 장애 후 FAILED native 입력 복구, 새 통합 authoring의 실제 콘텐츠 신규 저장, 두 Task의 실제 예약 동시 실행은 이 결과로 인증하지 않음. 통합 authoring SQL은 앞선 운영 rollback 회귀로 검증됨.
+- 구형 신규 실행 지시 범위는 확정; 호환 SQL 서버 차단·테이블/컬럼 DROP은 아직 미실행. 예약/ Supabase 프롬프트 변경 없음.
