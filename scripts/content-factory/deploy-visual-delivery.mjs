@@ -72,7 +72,7 @@ export async function queryProject(stage, sql, fetcher = fetch) {
   });
   if (!response.ok) {
     const body = await response.text();
-    const known = body.match(/VISUAL_[A-Z_]+|DELIVERY_[A-Z_]+|PIXEL_DELIVERY_[A-Z_]+|VALID_STORED_FIXTURE_REQUIRED|GATED_CLAIM_FAILED|STALE_PIXEL_PASS_ALLOWED|FOREIGN_RECEIPT_ALLOWED|CANDIDATE_CIRCUIT_[A-Z_]+/);
+    const known = body.match(/AUTHORING_[A-Z_]+|VISUAL_[A-Z_]+|DELIVERY_[A-Z_]+|PIXEL_DELIVERY_[A-Z_]+|VALID_STORED_FIXTURE_REQUIRED|GATED_CLAIM_FAILED|STALE_PIXEL_PASS_ALLOWED|FOREIGN_RECEIPT_ALLOWED|CANDIDATE_CIRCUIT_[A-Z_]+/);
     const sqlState = body.match(/SQLSTATE[^A-Z0-9]*([0-9A-Z]{5})/i)?.[1];
     // Emit codes/metrics only; API errors can contain SQL and sensitive values.
     throw new Error(`${stage}: HTTP_${response.status}${known ? ':' + known[0] : ''}${sqlState ? ':SQLSTATE_' + sqlState : ''} (responseBytes=${Buffer.byteLength(body)})`);
@@ -124,12 +124,15 @@ export async function deploy() {
   await requireCurrentMain();
     await queryProject('TARGET_MIGRATION', migrationTransaction(readFileSync(migrationPath, 'utf8')));
     await queryProject('SIMPLIFICATION_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012012704_simplify_visual_inspection_contract.sql', 'utf8'), {version:'20261012012704',name:'simplify_visual_inspection_contract',followUp:true}));
+    await queryProject('AUTHORING_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012073342_unified_authoring_no_inspection_chunks.sql','utf8'), {version:'20261012073342',name:'unified_authoring_no_inspection_chunks',followUp:true}));
+    await queryProject('AUTHORING_TRANSACTIONAL_REGRESSION',readFileSync('scripts/content-factory/authoring-regression.sql','utf8'));
     await queryProject('TRANSACTIONAL_REGRESSION', readFileSync('scripts/content-factory/visual-delivery-regression.sql', 'utf8'));
     await verifyConcurrentTaskLocks();
     await requireCurrentMain();
     // JWT verification is already disabled in deployed v35. The function retains
     // its existing custom worker authentication; no auth policy change here.
     cli('EDGE_DEPLOY', ['functions', 'deploy', 'content-pipeline-visual-mcp', '--project-ref', projectRef, '--use-api', '--no-verify-jwt']);
+    cli('SOURCE_STAGE_DEPLOY', ['functions','deploy','content-pipeline-source-stage','--project-ref',projectRef,'--use-api','--no-verify-jwt']);
     console.log(`RELEASE_COMMIT: ${process.env.GITHUB_SHA}`);
     console.log('SCHEDULED_PIXEL_INSPECTION: NOT_VERIFIED; NATIVE_HANDOFF: NOT_VERIFIED');
 }
@@ -137,3 +140,4 @@ export async function deploy() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   deploy().catch(error => { console.error(error.message); process.exitCode = 1; });
 }
+

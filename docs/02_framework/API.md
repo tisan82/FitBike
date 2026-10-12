@@ -165,7 +165,7 @@ Frontend: `https://fitbike.co.kr/oauth/consent` (noindex, robots excluded). It p
 
 Source Stage worker recovery: `content_pipeline_source_stage_status_v1` reconciles PENDING/RUNNING jobs against their exact pg_net response. Definitive HTTP errors (including546 WORKER_RESOURCE_LIMIT) mark the job FAILED and preserve original code/checkpoint; Image/Claim/approved QA stay unchanged. Transport timeout or two-minute timedOut alone is advisory, not proof of worker termination. The server enforces a ten-minute unresolved-job deadline and fences late receipt writes. Status includes transport httpStatus/timedOut/responseAvailable, pollAfterSeconds and nextAction. This service-role-only status call may finalize a failed candidate receipt; it never claims, approves or publishes. MCP inspection requires STAGED and otherwise supplies current status/failure/action instead of treating SOURCE_NOT_STAGED as a visual defect.
 
-Source processing uses one raster source decode and one WebP encode (quality84, bounded encoder effort), composites annotations without intermediate PNG roundtrips, loads PDF/SVG dependencies only when needed, limits source raster to8MP, PDF rendered page to4MP, final output to2MP/1600px height, and defaults maxWidth780 when unspecified. Larger sources should use a genuine page-provided smaller asset rather than guessed URLs. Storage read-back still performs independent actual WebP decode/SHA verification. A STORAGE_VERIFIED checkpoint is saved before legacy inspection chunk batches; it is not STAGED/QA approval and can never enter Production without renewed technical and semantic validation.
+Source processing uses one raster source decode and one WebP encode (quality84, bounded encoder effort), composites annotations without intermediate PNG roundtrips, loads PDF/SVG dependencies only when needed, limits source raster to8MP, PDF rendered page to4MP, final output to2MP/1600px height, and defaults maxWidth780 when unspecified. Larger sources should use a genuine page-provided smaller asset rather than guessed URLs. Storage read-back still performs independent actual WebP decode/SHA verification. A STORAGE_VERIFIED checkpoint is saved before the final STAGED receipt; Source Stage stores no new inspection chunk rows and reports inspectionTransport=CANONICAL_STORAGE and inspectionChunksStored=false; it is not STAGED/QA approval and can never enter Production without renewed technical and semantic validation.
 
 ### Visual MCP native ChatGPT file handoff (2026-10-02)
 
@@ -246,3 +246,24 @@ Delivery logs contain safe symbolic stage/code, traceId, validated request/job U
 `get_visual_inspection_event(eventId)` returns only this operator's event (recorded=true) or NOT_FOUND (recorded=false), with no evidence text/binary/URLs. `get_visual_inspection_recovery(requestId)` returns authoritative current checkpoint, Job/SHA and latest required-view records for this receipt. Missing/failed views require actual inspection; previous Claim PASS is not inherited. The legacy `record_visual_inspection_delivery({event})` now advertises its exact typed field set; optional unknown keys are rejected before RPC. `DELIVERY_REQUEST_INVALID` + safe field/reason + REQUEST_VALIDATION + NOT_ATTEMPTED identifies input failure separately from DB_RECORD/response uncertainty.
 
 Connect role-specific apps to the same authenticated MCP endpoint with `?role=PRODUCER` or `?role=REVIEWER`. The server filters tools/list, rejects cross-role tool calls and fences shared writes to matching receipt roles. OAuth operator worker identity stays unchanged so the same stored candidate remains reviewable. The shared URL retains old clients for migration; existing RPC role/ownership guards still apply. This release does not change account plugin configuration or automations.
+
+
+
+## Unified Authoring (1·2단계 단일 실행)
+
+Service-role-only RPCs; SECURITY INVOKER. No new table/column, public endpoint or stored prompt.
+
+| RPC | Input | Read/write and role |
+| --- | --- | --- |
+| `content_pipeline_claim_authoring_v1` | `p_request_id uuid`, `p_pipeline_id bigint default null` | 신규 null 대상은 eligible Topic을 원자적으로 선택해 Pipeline WRITING + AUTHORING_V1 RUNNING 1개를 생성한다. 동일 요청은 같은 실행과 현재 상태를 읽어 반환한다. 대상 ID 지정은 종료된 통합 HOLD/BLOCKED 실행의 재개용이다. |
+| `content_pipeline_complete_authoring_v1` | `p_pipeline_id bigint`, `p_pipeline_run_id bigint`, `p_package jsonb` | 현재 실행 소유권·산출물 결합·V5 feasibility를 확인하고 한 트랜잭션에서 writer 저장, DRAFTED, image sync, run PASS를 완료한다. |
+
+Package의 루트 키는 `version`, `execution`, `planning`, `research`, `writer`만 허용한다. version=1, execution은 Claim의 `packageExecution`을 그대로 복사한다: `{pipelineId,pipelineRunId,topicKey}`. planning/research는 비어 있지 않은 object, writer는 기존 Writer Artifact object이며 image_briefs는 V5이다. writer.authoringContext는 서버가 생성하므로 호출자가 넣지 않는다. 실제 본문·근거·이미지 기획의 내용 규약은 기존 콘텐츠 정책을 따른다. 형식 검증은 사실 확인을 대신하지 않는다.
+
+단일 저장 위치: writer 필드 + `writer_artifact.authoringContext={version:1,execution,planning,research}`. 기존 NOT NULL planning_artifact/research_artifact는 `{}`로 남기고 payload를 중복 기록하지 않는다. Run metadata는 request identity, package hash, 작은 완료 receipt만 저장한다.
+
+응답 유실은 새 실행을 만들지 않는다. Claim은 동일 requestId/동일 p_pipeline_id(null 포함)로 재호출한다. `activeExecution`, `stage`, `nextAction`을 확인하며 성공/종료 응답을 새 RUNNING으로 해석하지 않는다. 완료는 같은 pipeline/run/package를 그대로 재전달한다. 동일 hash의 PASS replay는 저장·이미지 동기화를 반복하지 않고 원래 receipt와 currentStage를 반환한다. 변경된 package는 REPLAY_CONFLICT이다.
+
+실패는 기존 `content_pipeline_fail_stage_v1`에 정확한 pipelineId/runId와 expected_stage=WRITING을 전달한다. 잘못된/과거 run은 현재 실행을 실패시킬 수 없다. 공식 HOLD/BLOCKED 이후 새 requestId + 해당 pipelineId로 claim_authoring을 호출하면 새 run fence를 발급한다. 과거 execution이 포함된 산출물을 재사용하지 않는다. generic resume는 통합 실행에 AUTHORING_RESUME_REQUIRES_REQUEST_ID로 거부한다. 응답 유실을 이유로 다른 requestId를 만들거나 직접 stage를 수정하지 않는다. 실행 종료가 확인되지 않은 RUNNING은 운영 복구 대상이며 자동 lease 만료를 새로 추가하지 않았다.
+
+기존 단계별 실행·산출물은 그대로 유지한다. 새 통합 경로 적용은 호출부/운영 지시를 이 RPC로 전환해야 하며 기존 예약·Supabase 프롬프트는 자동 변경하지 않는다.

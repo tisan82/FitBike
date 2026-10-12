@@ -246,3 +246,8 @@ AI edit는 level과 무관하게 실제 입력 바이너리·Source·편집 사�
 일반 장면에 오토바이·부품이 등장한다는 이유만으로 REQUIRED를 지정하지 않는다. 실제 모델/제품의 외형·표시 자체가 고객 답변의 근거이면 REQUIRED, 확인한 근거 범위의 재구성으로 충분하면 REFERENCE, 일반적인 행동·상황 설명이면 NONE을 사용한다. 특정 모델 UI가 본문 답변에 꼭 필요한 경우에만 그 UI를 must_show에 넣는다. 실제 기술 근거는 매뉴얼로 확인할 수 있으나 최종 이미지에 매뉴얼 그림을 사용할 의무는 없다. 검증된 사진·실제 화면을 탐색할 수 있으며, 자료 부재는 근거 수준 완화 사유가 아니다. 숫자/LOW·MEDIUM·HIGH 같은 별도 위험도 Contract 필드를 추가하지 않는다.
 
 Current Task/Contract, Job/input checkpoint, Claim receipt, execution outcome and minimal inspection event are authoritative. Computed policies and guidance are derived on read, not repeated in new receipt/run storage. Existing raw Contracts/hashes/history and approved assets remain unchanged. Producer success is reviewHandoff on its own run; later Reviewer RETRY does not revoke that historical handoff. Inspector evidence is required for transition; diagnostic logs are not a second approval gate.
+
+
+### Unified authoring storage
+
+1·2단계 신규 통합 실행의 최종 단일 산출물은 `writer_artifact`이며 기획·Fact Register/근거는 `authoringContext`에 포함한다. 실행 통합으로 조사·본문 품질·모델 정확성·V5 evidence_requirement 검증을 생략하지 않는다. V5의 REQUIRED/REFERENCE/NONE 기준과 제작자가 허용 범위 안에서 Source/제작 방식을 선택하는 경계는 유지한다. 별도 위험도나 Source URL 강제 필드를 추가하지 않는다. 기존 산출물과 Contract/Hash는 자동 변환하지 않는다. 호출 규약은 API.md, 실행 정책은 CONTENT_FACTORY.md가 소유한다.
