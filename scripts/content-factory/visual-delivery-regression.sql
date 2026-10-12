@@ -23,7 +23,9 @@ begin
  begin perform public.content_pipeline_record_visual_delivery_v1(w,payload||jsonb_build_object('outcome','FAIL','code','TRANSPORT_ERROR'),false); raise exception 'CHANGED_EVENT_REPLAY_ALLOWED'; exception when others then if sqlerrm<>'DELIVERY_EVENT_IMMUTABLE' then raise;end if;end;
  begin perform public.content_pipeline_claim_visual_delivery_v1(w,request,'PRODUCER',null,'SCHEDULED'); raise exception 'UNVERIFIED_RUNTIME_CLAIMED'; exception when others then if sqlerrm<>'PIXEL_DELIVERY_PRECHECK_BLOCKED' then raise;end if;end;
  if exists(select 1 from public."29_content_pipeline_visual_claim_request" where worker_key=w and request_id=request) then raise exception 'PRECHECK_CREATED_RECEIPT';end if;
- select i0.* into i from public."21_content_pipeline_image" i0 join public."27_content_pipeline_source_stage_job" j0 on j0.pipeline_image_id=i0.pipeline_image_id where public.content_pipeline_review_candidate_v1(i0.pipeline_image_id,j0.job_id) is not null and i0.status in ('PENDING','RETRY') and (i0.claim_token is null or i0.claim_expires_at<now()) order by j0.created_at desc limit 1 for update of i0 skip locked;
+ -- Reuse an idle approved queue item only inside this rollback-only transaction.
+ -- Never consume active claims or change Storage; every state mutation rolls back.
+ select i0.* into i from public."21_content_pipeline_image" i0 join public."27_content_pipeline_source_stage_job" j0 on j0.pipeline_image_id=i0.pipeline_image_id where public.content_pipeline_review_candidate_v1(i0.pipeline_image_id,j0.job_id) is not null and i0.status in ('PENDING','RETRY','READY_FOR_UPLOAD') and (i0.claim_token is null or i0.claim_expires_at<now()) order by j0.created_at desc limit 1 for update of i0 skip locked;
  if not found then raise exception 'VALID_STORED_FIXTURE_REQUIRED';end if;
  select j0.* into j from public."27_content_pipeline_source_stage_job" j0 where public.content_pipeline_review_candidate_v1(i.pipeline_image_id,j0.job_id) is not null order by created_at desc limit 1;
  first_sha:=j.result->>'sha256';
@@ -37,7 +39,7 @@ begin
  if public.content_pipeline_claim_visual_stage_v1(w,extensions.gen_random_uuid(),'PRODUCER',i.pipeline_image_id)->>'result'<>'BUSY' then raise exception 'VISUAL_SAME_TASK_DOUBLE_CLAIM';end if;
  -- Two different Task leases may coexist for this operator. No remote dispatch.
  select i0.* into other_image from public."21_content_pipeline_image" i0 join public."27_content_pipeline_source_stage_job" j0 on j0.pipeline_image_id=i0.pipeline_image_id
- where i0.pipeline_image_id<>i.pipeline_image_id and i0.status in ('PENDING','RETRY') and (i0.claim_token is null or i0.claim_expires_at<now()) and public.content_pipeline_review_candidate_v1(i0.pipeline_image_id,j0.job_id) is not null
+ where i0.pipeline_image_id<>i.pipeline_image_id and i0.status in ('PENDING','RETRY','READY_FOR_UPLOAD') and (i0.claim_token is null or i0.claim_expires_at<now()) and public.content_pipeline_review_candidate_v1(i0.pipeline_image_id,j0.job_id) is not null
  order by j0.created_at desc limit 1 for update of i0 skip locked;
  if not found then raise exception 'VISUAL_SECOND_IDLE_FIXTURE_REQUIRED';end if;
  update public."21_content_pipeline_image" set status='PENDING',staging_asset=null,review_candidate=null,visual_phase=null,claimed_by=null,claim_token=null,claim_expires_at=null,next_eligible_at=null where pipeline_image_id=other_image.pipeline_image_id;
