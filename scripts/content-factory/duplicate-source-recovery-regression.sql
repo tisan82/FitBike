@@ -15,8 +15,12 @@ begin
  select * into j from public."27_content_pipeline_source_stage_job" where pipeline_image_id=i.pipeline_image_id and spec->>'preflightOnly'='true' and public.content_pipeline_review_candidate_v1(i.pipeline_image_id,job_id) is not null order by created_at desc limit 1;
  select pipeline_image_id into other_id from public."21_content_pipeline_image" where pipeline_image_id<>i.pipeline_image_id and status='DONE' order by pipeline_image_id limit 1 for update skip locked;
  if other_id is null then raise exception 'APPROVED_IDENTITY_FIXTURE_REQUIRED';end if;
- -- Transaction-local duplicate; every update rolls back, including public metadata.
- update public."21_content_pipeline_image" set staging_asset=jsonb_set(staging_asset,'{qa,sourceAssetUrl}',to_jsonb(j.spec->>'sourceAssetUrl')) where pipeline_image_id=other_id;
+ -- Seed source identity only inside this transaction, including Native fixtures and legacy DONE rows without staging metadata.
+ j.spec:=(j.spec-'composition'-'inputAssetUrl')||jsonb_build_object('sourceAssetUrl','https://example.invalid/duplicate-regression-'||extensions.gen_random_uuid()::text);
+ update public."27_content_pipeline_source_stage_job" set spec=j.spec where job_id=j.job_id;
+ update public."21_content_pipeline_image" set staging_asset=coalesce(staging_asset,'{}'::jsonb)||jsonb_build_object(
+  'qa',coalesce(staging_asset->'qa','{}'::jsonb)||jsonb_build_object('sourceAssetUrl',j.spec->>'sourceAssetUrl')) where pipeline_image_id=other_id;
+ if public.content_pipeline_duplicate_source_id_v1(i.pipeline_image_id,j.spec) is null then raise exception 'DUPLICATE_FIXTURE_NOT_SEEDED';end if;
  update public."21_content_pipeline_image" set status='PENDING',staging_asset=null,visual_phase='QA_PENDING',review_candidate=public.content_pipeline_review_candidate_v1(i.pipeline_image_id,j.job_id),claimed_by=null,claim_token=null,claim_expires_at=null,next_eligible_at=null where pipeline_image_id=i.pipeline_image_id;
  w:=j.spec->'visualMcpOperation'->>'workerKey'; original_result:=j.result; original_hash:=i.generation_contract_hash;
  begin
