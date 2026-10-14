@@ -12,6 +12,9 @@ on:
       - 'supabase/migrations/20261012073342_unified_authoring_no_inspection_chunks.sql'
       - 'supabase/migrations/20261012203358_photo_source_policy.sql'
       - 'scripts/content-factory/photo-source-policy*'
+      - 'supabase/migrations/20261013055416_duplicate_source_recovery.sql'
+      - 'scripts/content-factory/duplicate-source-recovery*'
+      - 'scripts/content-factory/duplicate-source-repair.sql'
       - 'scripts/content-factory/authoring-regression.sql'
       - 'scripts/content-factory/deploy-visual-delivery.mjs'
       - 'scripts/content-factory/visual-delivery-regression.sql'
@@ -43,11 +46,12 @@ jobs:
       - name: Visual regression tests
         run: |
           npm install --prefix "$RUNNER_TEMP/fitbike-visual-tests" --no-package-lock --ignore-scripts @electric-sql/pglite@0.3.14 @imagemagick/magick-wasm@0.0.42
-          MAGICK_WASM_MODULE="$RUNNER_TEMP/fitbike-visual-tests/node_modules/@imagemagick/magick-wasm/dist/index.js" PGLITE_MODULE="$RUNNER_TEMP/fitbike-visual-tests/node_modules/@electric-sql/pglite/dist/index.js" node --test --test-concurrency=1 scripts/content-factory/photo-source-policy.test.mjs scripts/content-factory/authoring.test.mjs scripts/content-factory/visual-pre-staging-worker.test.mjs scripts/content-factory/native-input-resume.test.mjs scripts/content-factory/visual-source-resume.test.mjs scripts/content-factory/visual-simplification.test.mjs scripts/content-factory/inspection-contract.test.mjs scripts/content-factory/inspection-delivery.test.mjs scripts/content-factory/visual-mcp-transport.test.mjs scripts/content-factory/visual-inspection-pixels.test.mjs scripts/content-factory/visual-delivery-sql.test.mjs scripts/content-factory/visual-deploy.test.mjs
+          MAGICK_WASM_MODULE="$RUNNER_TEMP/fitbike-visual-tests/node_modules/@imagemagick/magick-wasm/dist/index.js" PGLITE_MODULE="$RUNNER_TEMP/fitbike-visual-tests/node_modules/@electric-sql/pglite/dist/index.js" node --test --test-concurrency=1 scripts/content-factory/duplicate-source-recovery.test.mjs scripts/content-factory/photo-source-policy.test.mjs scripts/content-factory/authoring.test.mjs scripts/content-factory/visual-pre-staging-worker.test.mjs scripts/content-factory/native-input-resume.test.mjs scripts/content-factory/visual-source-resume.test.mjs scripts/content-factory/visual-simplification.test.mjs scripts/content-factory/inspection-contract.test.mjs scripts/content-factory/inspection-delivery.test.mjs scripts/content-factory/visual-mcp-transport.test.mjs scripts/content-factory/visual-inspection-pixels.test.mjs scripts/content-factory/visual-delivery-sql.test.mjs scripts/content-factory/visual-deploy.test.mjs
       - name: Apply exact migration, verify RPCs, deploy Edge
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/content-factory/deploy-visual-delivery.mjs
+
 

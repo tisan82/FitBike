@@ -126,6 +126,8 @@ export async function deploy() {
     await queryProject('SIMPLIFICATION_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012012704_simplify_visual_inspection_contract.sql', 'utf8'), {version:'20261012012704',name:'simplify_visual_inspection_contract',followUp:true}));
     await queryProject('AUTHORING_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012073342_unified_authoring_no_inspection_chunks.sql','utf8'), {version:'20261012073342',name:'unified_authoring_no_inspection_chunks',followUp:true}));
     await queryProject('PHOTO_POLICY_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012203358_photo_source_policy.sql','utf8'), {version:'20261012203358',name:'photo_source_policy',followUp:true}));
+    await queryProject('DUPLICATE_RECOVERY_MIGRATION',migrationTransaction(readFileSync('supabase/migrations/20261013055416_duplicate_source_recovery.sql','utf8'),{version:'20261013055416',name:'duplicate_source_recovery',followUp:true}));
+    await queryProject('DUPLICATE_RECOVERY_REGRESSION',readFileSync('scripts/content-factory/duplicate-source-recovery-regression.sql','utf8'));
     await queryProject('PHOTO_POLICY_REGRESSION',readFileSync('scripts/content-factory/photo-source-policy-regression.sql','utf8'));
     await queryProject('AUTHORING_TRANSACTIONAL_REGRESSION',readFileSync('scripts/content-factory/authoring-regression.sql','utf8'));
     await queryProject('TRANSACTIONAL_REGRESSION', readFileSync('scripts/content-factory/visual-delivery-regression.sql', 'utf8'));
@@ -135,6 +137,7 @@ export async function deploy() {
     // its existing custom worker authentication; no auth policy change here.
     cli('EDGE_DEPLOY', ['functions', 'deploy', 'content-pipeline-visual-mcp', '--project-ref', projectRef, '--use-api', '--no-verify-jwt']);
     cli('SOURCE_STAGE_DEPLOY', ['functions','deploy','content-pipeline-source-stage','--project-ref',projectRef,'--use-api','--no-verify-jwt']);
+    await queryProject('DUPLICATE_INCIDENT_REPAIR',readFileSync('scripts/content-factory/duplicate-source-repair.sql','utf8'));
     console.log(`RELEASE_COMMIT: ${process.env.GITHUB_SHA}`);
     console.log('SCHEDULED_PIXEL_INSPECTION: NOT_VERIFIED; NATIVE_HANDOFF: NOT_VERIFIED');
 }
@@ -142,4 +145,5 @@ export async function deploy() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   deploy().catch(error => { console.error(error.message); process.exitCode = 1; });
 }
+
 
