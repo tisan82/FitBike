@@ -127,6 +127,7 @@ export async function deploy() {
     await queryProject('AUTHORING_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012073342_unified_authoring_no_inspection_chunks.sql','utf8'), {version:'20261012073342',name:'unified_authoring_no_inspection_chunks',followUp:true}));
     await queryProject('PHOTO_POLICY_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261012203358_photo_source_policy.sql','utf8'), {version:'20261012203358',name:'photo_source_policy',followUp:true}));
     await queryProject('DUPLICATE_RECOVERY_MIGRATION',migrationTransaction(readFileSync('supabase/migrations/20261013055416_duplicate_source_recovery.sql','utf8'),{version:'20261013055416',name:'duplicate_source_recovery',followUp:true}));
+    await queryProject('DUPLICATE_BINDING_CORRECTION',readFileSync('scripts/content-factory/duplicate-source-binding-fix.sql','utf8'));
     await queryProject('DUPLICATE_RECOVERY_REGRESSION',readFileSync('scripts/content-factory/duplicate-source-recovery-regression.sql','utf8'));
     await queryProject('PHOTO_POLICY_REGRESSION',readFileSync('scripts/content-factory/photo-source-policy-regression.sql','utf8'));
     await queryProject('AUTHORING_TRANSACTIONAL_REGRESSION',readFileSync('scripts/content-factory/authoring-regression.sql','utf8'));
