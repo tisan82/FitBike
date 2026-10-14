@@ -953,7 +953,7 @@ Deno.serve(async (req) => {
           if (deliveryRuntime !== undefined) await rpc("content_pipeline_require_visual_pixel_report_v1", {p_worker_key:worker,p_request_id:a.requestId,p_job_id:a.jobId,p_sha:a.expectedSha,p_runtime:deliveryRuntime});
           deliveryStage = "CLAIM_MUTATION";
           result = await rpc("content_pipeline_handoff_visual_review_v1", {p_worker_key:worker,p_request_id:a.requestId,p_job_id:a.jobId,p_expected_sha:a.expectedSha});
-          if (result.activeClaim || result.handoffCompleted !== true) throw Error("REVIEW_HANDOFF_NOT_VERIFIED");
+          if (result.activeClaim || (result.handoffCompleted !== true && result.duplicateBlocked !== true)) throw Error("REVIEW_HANDOFF_NOT_VERIFIED");
         }
         else if (name === "record_visual_source_qa") {
           result = await rpc("content_pipeline_register_pre_staging_qa_v1", {p_worker_key:worker,p_request_id:a.requestId,p_job_id:a.jobId,p_expected_sha:a.expectedSha,p_qa:a.preStagingQa});
@@ -1009,15 +1009,26 @@ Deno.serve(async (req) => {
             const { bindNativeAttempt } = await import("./generation.ts");
             spec.nativeAttemptBinding = bindNativeAttempt(spec, audit, a.operationId, current.claim) ?? undefined;
           }
+          let generationDuplicate = false;
           if (spec.productionMethod === "REAL_SOURCE_AI_EDIT") {
+            deliveryStage = "SOURCE_USAGE_CHECK";
             const usage = await sourceUsage(
               current.claim.pipelineImageId,
               spec.inputAssetUrl,
             );
             if (usage.result === "DUPLICATE") {
-              throw Error("DUPLICATE_SOURCE_PREFLIGHT");
+              if ((current.executionRole ?? current.claim?.executionRole) === "REVIEWER") {
+                deliveryStage = "DUPLICATE_CANDIDATE_RETURN";
+                result = await rpc("content_pipeline_return_duplicate_visual_candidate_v1", {
+                  p_worker_key: worker, p_request_id: a.requestId,
+                  p_job_id: current.reviewCandidate?.jobId, p_expected_sha: current.reviewCandidate?.sha256,
+                });
+                if (result.activeClaim !== false || result.duplicateBlocked !== true) throw Error("DUPLICATE_RETURN_NOT_VERIFIED");
+                generationDuplicate = true;
+              } else throw Error("DUPLICATE_SOURCE_PREFLIGHT");
             }
           }
+          if (!generationDuplicate) {
           // Verify Contract permission even when merely opening the upload UI.
           const allowed = await rpc("content_pipeline_reference_generation_allowed_v1", { p_contract: current.claim.generationContract, p_method: spec.productionMethod });
           if (allowed !== true) throw Error("REFERENCE_GENERATION_CONTRACT_NOT_ALLOWED");
@@ -1031,19 +1042,30 @@ Deno.serve(async (req) => {
               p_worker_key: worker, p_request_id: a.requestId, p_operation_id: a.operationId, p_spec: spec,
             });
           }
+          }
         } else if (name === "dispatch_visual_source") {
           if (!current.activeClaim) throw inactiveClaimError(current);
           if (!uuid(a.operationId)) throw Error("INVALID_OPERATION_ID");
           if (!a.spec) throw Error("INVALID_SOURCE_SPEC");
           validateSpec(a.spec);
+          deliveryStage = "SOURCE_USAGE_CHECK";
+          let duplicateUsage: Record<string, unknown> | null = null;
           for (const candidate of ((a.spec.composition as { sources: Array<{ sourceAssetUrl: string; expectedSourceSha?: string }> } | undefined)?.sources ?? [{ sourceAssetUrl: String(a.spec.sourceAssetUrl), expectedSourceSha: undefined }])) {
           const usage = await sourceUsage(current.claim.pipelineImageId, candidate.sourceAssetUrl, candidate.expectedSourceSha);
-          if (usage.result === "DUPLICATE") {
-            throw Error(
-              "DUPLICATE_SOURCE_PREFLIGHT: select a different source within the same claim; no candidate dispatched",
-            );
+          if (usage.result === "DUPLICATE") { duplicateUsage = usage; break; }
           }
-          }
+          if (duplicateUsage && (current.executionRole ?? current.claim?.executionRole) === "REVIEWER") {
+            deliveryStage = "DUPLICATE_CANDIDATE_RETURN";
+            result = await rpc("content_pipeline_return_duplicate_visual_candidate_v1", {
+              p_worker_key: worker, p_request_id: a.requestId,
+              p_job_id: current.reviewCandidate?.jobId, p_expected_sha: current.reviewCandidate?.sha256,
+            });
+            if (result.activeClaim !== false || result.duplicateBlocked !== true) throw Error("DUPLICATE_RETURN_NOT_VERIFIED");
+            result = {...result, duplicateBlocked: true, finalizationDispatched: false,
+              failureCode: "DUPLICATE_SOURCE_PREFLIGHT", nextAction: "RECLAIM_PRODUCER_SELECT_NEW_SOURCE"};
+          } else {
+          if (duplicateUsage) throw Error("DUPLICATE_SOURCE_PREFLIGHT: select a different source within the same claim; no candidate dispatched");
+          deliveryStage = "SOURCE_DISPATCH";
           result = await rpc(
             "content_pipeline_dispatch_visual_source_request_v1",
             {
@@ -1053,6 +1075,7 @@ Deno.serve(async (req) => {
               p_spec: a.spec,
             },
           );
+          }
         } else if (
           [
             "get_visual_source_status",
@@ -1507,4 +1530,3 @@ function inspectionContentError(metadata: {selectedViews?:string[];sha256?:strin
   }
   return null;
 }
-

@@ -824,3 +824,8 @@ After a lost response, get_visual_inspection_event reads the exact eventId. Exac
 
 Role endpoints restrict exposed tools and receipt-bound writes while keeping the same authenticated operator identity. Different eligible Tasks may run concurrently; same Task retains one active lease. Shared endpoint remains compatible during connector migration. Diagnostic logging failure never authorizes approval or blocks official Claim cleanup.
 
+
+
+### Duplicate Source recovery (2026-10-14)
+
+Approved-source reuse is a Source policy failure (`DUPLICATE_SOURCE_PREFLIGHT`), never a transport failure. Producer handoff checks the same source URL/SHA policy as Reviewer finalization, including composition inputs and real AI-edit input URLs. A stored duplicate candidate is rejected through the owned Job/Contract/SHA receipt, its asset and pixel-QA history are preserved, and its Claim is closed as RETRY with PRODUCTION_PENDING / SELECT_NEW_SOURCE. Reviewer must not repeatedly reinspect that rejected candidate or regenerate under the review lease. New Producer source selection must retain the original Contract and uniqueness gates. A Producer duplicate detected before staging can select another source within its existing lease. Unknown server errors use SERVER_OPERATION_FAILED; only actual network failures are TRANSPORT_ERROR.
