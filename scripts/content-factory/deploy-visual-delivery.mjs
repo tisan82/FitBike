@@ -72,8 +72,8 @@ export async function queryProject(stage, sql, fetcher = fetch) {
   });
   if (!response.ok) {
     const body = await response.text();
-    const known = body.match(/AUTHORING_[A-Z_]+|VISUAL_[A-Z_]+|DELIVERY_[A-Z_]+|PIXEL_DELIVERY_[A-Z_]+|VALID_STORED_FIXTURE_REQUIRED|GATED_CLAIM_FAILED|STALE_PIXEL_PASS_ALLOWED|FOREIGN_RECEIPT_ALLOWED|CANDIDATE_CIRCUIT_[A-Z_]+/);
-    const sqlState = body.match(/SQLSTATE[^A-Z0-9]*([0-9A-Z]{5})/i)?.[1];
+    const known = body.match(/DUPLICATE_[A-Z_]+|NORMAL_[A-Z_]+|SOURCE_[A-Z_]+|REVIEW_[A-Z_]+|SEMANTIC_[A-Z_]+|APPROVED_[A-Z_]+|AUTHORING_[A-Z_]+|VISUAL_[A-Z_]+|DELIVERY_[A-Z_]+|PIXEL_DELIVERY_[A-Z_]+|VALID_STORED_FIXTURE_REQUIRED|GATED_CLAIM_FAILED|STALE_PIXEL_PASS_ALLOWED|FOREIGN_RECEIPT_ALLOWED|CANDIDATE_CIRCUIT_[A-Z_]+/);
+    const sqlState = body.match(/(?:SQLSTATE[^A-Z0-9]*|ERROR:\s*)([0-9A-Z]{5})/i)?.[1];
     // Emit codes/metrics only; API errors can contain SQL and sensitive values.
     throw new Error(`${stage}: HTTP_${response.status}${known ? ':' + known[0] : ''}${sqlState ? ':SQLSTATE_' + sqlState : ''} (responseBytes=${Buffer.byteLength(body)})`);
   }
