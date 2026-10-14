@@ -37,9 +37,12 @@ begin
  if exists(select 1 from public."23_content_pipeline_image_run" where pipeline_image_run_id=(x->'claim'->>'pipelineImageRunId')::bigint and metadata ?| array['runtimePolicy','reviewRequirements','nativeGenerationContext','nativeGenerationIsolationPolicy']) then raise exception 'VISUAL_DUPLICATE_RUN_STORAGE';end if;
  if public.content_pipeline_claim_visual_stage_v1(w,extensions.gen_random_uuid(),'PRODUCER',i.pipeline_image_id)->>'result'<>'BUSY' then raise exception 'VISUAL_SAME_TASK_DOUBLE_CLAIM';end if;
  -- Two different Task leases may coexist for this operator. No remote dispatch.
- select i0.* into other_image from public."21_content_pipeline_image" i0 join public."27_content_pipeline_source_stage_job" j0 on j0.pipeline_image_id=i0.pipeline_image_id
- where i0.pipeline_image_id<>i.pipeline_image_id and i0.status in ('PENDING','RETRY','READY_FOR_UPLOAD') and (i0.claim_token is null or i0.claim_expires_at<now()) and public.content_pipeline_review_candidate_v1(i0.pipeline_image_id,j0.job_id) is not null
- order by j0.created_at desc limit 1 for update of i0 skip locked;
+ -- A second lease needs a valid idle Task, not a second stored image.
+ select i0.* into other_image from public."21_content_pipeline_image" i0
+ where i0.pipeline_image_id<>i.pipeline_image_id and i0.status in ('PENDING','RETRY','READY_FOR_UPLOAD')
+ and (i0.claim_token is null or i0.claim_expires_at<now())
+ and i0.generation_contract is not null and i0.generation_contract_hash ~ '^[a-f0-9]{64}$'
+ order by i0.pipeline_image_id desc limit 1 for update of i0 skip locked;
  if not found then raise exception 'VISUAL_SECOND_IDLE_FIXTURE_REQUIRED';end if;
  update public."21_content_pipeline_image" set status='PENDING',staging_asset=null,review_candidate=null,visual_phase=null,claimed_by=null,claim_token=null,claim_expires_at=null,next_eligible_at=null where pipeline_image_id=other_image.pipeline_image_id;
  x:=public.content_pipeline_claim_visual_stage_v1(w,parallel_request,'PRODUCER',other_image.pipeline_image_id);
