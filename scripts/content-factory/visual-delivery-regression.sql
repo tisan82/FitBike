@@ -21,8 +21,7 @@ begin
  update public.content_pipeline_visual_delivery_event set created_at=now()-interval '40 minutes' where event_id=probe2;
  perform public.content_pipeline_record_visual_delivery_v1(w,payload,false); -- exact replay survives issued probe expiry
  begin perform public.content_pipeline_record_visual_delivery_v1(w,payload||jsonb_build_object('outcome','FAIL','code','TRANSPORT_ERROR'),false); raise exception 'CHANGED_EVENT_REPLAY_ALLOWED'; exception when others then if sqlerrm<>'DELIVERY_EVENT_IMMUTABLE' then raise;end if;end;
- begin perform public.content_pipeline_claim_visual_delivery_v1(w,request,'PRODUCER',null,'SCHEDULED'); raise exception 'UNVERIFIED_RUNTIME_CLAIMED'; exception when others then if sqlerrm<>'PIXEL_DELIVERY_PRECHECK_BLOCKED' then raise;end if;end;
- if exists(select 1 from public."29_content_pipeline_visual_claim_request" where worker_key=w and request_id=request) then raise exception 'PRECHECK_CREATED_RECEIPT';end if;
+ -- Environment readiness is advisory; candidate-qa-gate-regression.sql tests an unknown runtime Claim and blocked handoff/approval.
  -- Reuse an idle approved queue item only inside this rollback-only transaction.
  -- Never consume active claims or change Storage; every state mutation rolls back.
  select i0.* into i from public."21_content_pipeline_image" i0 join public."27_content_pipeline_source_stage_job" j0 on j0.pipeline_image_id=i0.pipeline_image_id where public.content_pipeline_review_candidate_v1(i0.pipeline_image_id,j0.job_id) is not null and i0.status in ('PENDING','RETRY','READY_FOR_UPLOAD') and (i0.claim_token is null or i0.claim_expires_at<now()) order by j0.created_at desc limit 1 for update of i0 skip locked;

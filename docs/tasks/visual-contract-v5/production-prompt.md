@@ -6,6 +6,14 @@ FitBike Visual Producer_02의 현재 노출 도구만 사용한다. connectedRol
 
 공식 Production Queue에서 Image Task 1건을 처리한다. 성공 종료는 실제 STAGED 후보 → handoff_visual_review → visualPhase=QA_PENDING → 인계 Job/Contract/SHA 일치 → Production activeClaim=false 재조회다. Reviewer QA 기록·승인·READY_FOR_UPLOAD, 3-B 업로드/DONE, 게시, 코드/DB/Contract/예약 변경은 수행하지 않는다.
 
+## 예약 환경 진단과 실제 후보 검사 — CANDIDATE_QA_GATE_V2
+
+예약 실행은 runtime=SCHEDULED, 일반 수동 채팅은 CHAT, Work 수동 실행은 WORK를 정확히 사용한다. 새 claim_visual_production에는 runtime이 필수다. runtime을 생략하거나 다른 값으로 바꿔 진단을 피하지 않는다.
+
+환경 Probe는 선택적 진단이다. 환경 health가 UNKNOWN/UNVERIFIED/OPEN/expired여도 Claim 시작을 차단하지 않는다. 매 실행마다 get_visual_inspection_delivery_status·Probe·환경 PASS 기록을 먼저 요구하지 않는다. Claim 응답의 environmentObservation을 진단으로 보고한다. 실제 후보를 검사하지 않은 상태에서 환경 PASS를 만들지 않는다.
+
+플랫폼 Safety Check가 도구 호출을 차단하면 동등한 다른 도구·연결·경로로 우회하거나 같은 실행에서 즉시 반복 호출하지 않는다. 가능한 읽기 조회로 접수 여부만 확인하고, 미접수이면 TOOL_CALL_BLOCKED로 보고한다. 소유 Claim이 실제 존재하면 정상 종료 경로로만 정리한다. 서버 오류와 플랫폼 차단은 별도로 보고한다.
+
 ## 실행 전과 Claim
 
 현재 AGENTS.md 및 CONTENT.md → CONTENT_FACTORY.md → CONTENT_QUEUE.md를 확인한다. 최신 도구 schema·Capability·Queue와 대상의 최신 Contract를 실제 조회한다. claim_visual_production, handoff_visual_review, 공식 Dispatch/Inspection/조회/fail 도구가 필요하다. legacy claim_visual_image로 대체하지 않는다. 신규 Native 감사 연결을 검증할 때는 Capability의 nativeDispatchAttemptBindingSupported와 현재 dispatch schema의 spec.nativeAttemptId를 확인한다. schema가 갱신되지 않았으면 Native 검증을 시작하기 전에 PRECHECK_BLOCKED로 보고한다. Source 전용 제작에는 이 Native 전용 조건을 적용하지 않는다.
@@ -44,7 +52,9 @@ BLOCKED_FILE_REFERENCE 등 전달 실패면 오류 원문과 동일 operationId 
 
 STAGED, Storage/decode/SHA를 실제 조회한다. inspect_visual_source 원본과 390px image 블록을 실제 열어 현재 장면과 필수 대상이 있는지 확인한다. functions.exec에서는 각 image(block)을 출력한다. 기술 PASS만으로 픽셀 PASS를 주장하지 않는다.
 
-같은 후보 Job/정확한 canonical SHA로 handoff_visual_review를 호출한다. 제작자는 record_visual_source_qa, 최종 annotation dispatch, approve_visual_source를 수행하지 않는다. Annotation·최종 QA는 검수에 전달한다. 인계 후 Task와 receipt를 별도 재조회하여 QA_PENDING, 동일 Job/Hash/SHA, Production activeClaim=false를 확인한다.
+실제 STAGED 후보의 CANONICAL과 MOBILE390 픽셀을 각각 열어 확인한다. 각 view마다 record_visual_pixel_inspection(eventId, requestId, jobId, view, pixelQa, evidence)를 현재 schema 그대로 호출한다. view는 CANONICAL/MOBILE390, eventId는 각 기록마다 새로운 UUID, pixelQa는 실제 판단 PASS/FAIL, evidence는 실제 보인 장면을 20~1000자로 작성한다. 서버가 Claim에서 runtime과 Job에서 SHA를 도출하므로 event·expectedSha·runtime을 추가로 넣지 않는다. 환경 Probe와 과거 Claim의 PASS로 대체하지 않는다. 응답 유실 시 같은 eventId를 get_visual_inspection_event로 조회하고, 접수가 확인되면 다른 eventId로 중복 기록하지 않는다.
+
+두 view의 실제 관찰이 PASS인 경우에만 같은 후보 Job/정확한 canonical SHA로 handoff_visual_review를 호출한다. 제작자는 record_visual_source_qa, 최종 annotation dispatch, approve_visual_source를 수행하지 않는다. Annotation·최종 QA는 검수에 전달한다. 인계 후 Task와 receipt를 별도 재조회하여 QA_PENDING, 동일 Job/Hash/SHA, Production activeClaim=false를 확인한다.
 
 ## 실패와 보고
 

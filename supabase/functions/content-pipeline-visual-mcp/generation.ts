@@ -151,7 +151,10 @@ export function generationCapabilities() {
     inspectionDeliveryTools: ["probe_visual_inspection_delivery","record_visual_inspection_delivery","get_visual_inspection_delivery_status"],
     clientPixelDeliveryAdvisoryIsFailure: false,
     serverObservedClientPixels: false,
-    deliveryClaimGate: "OPTIONAL_RUNTIME_REQUIRES_FRESH_PROBE",
+    deliveryClaimGate: "RUNTIME_REQUIRED_ENVIRONMENT_ADVISORY",
+    candidateQaGate: "SAME_CLAIM_JOB_SHA_CANONICAL_MOBILE390_PASS",
+    candidateQaGateVersion: "CANDIDATE_QA_GATE_V2",
+    environmentProbeRequired: false,
     deliveryClientAdapter: "scripts/content-factory/inspection-client.mjs",
     claimResponseLossRecovery: "READ_OWN_REQUEST_BEFORE_IDENTICAL_REPLAY",
     nativeResultPreflightSupported: true,
@@ -262,9 +265,10 @@ export function visualExecutionProtocol(role: unknown, preflightOnly = true) {
   const executionRole = role === "PRODUCER" || role === "REVIEWER" ? role : "LEGACY";
   const qaFields = ["pipelineImageId","contractHash","sourceJobId","sourceSha256","pixelsInspected=true","status=PASS","evidence","mustShowChecks","mustNotShowChecks","inspectionTargetVerified=true","annotationTargetChecks"];
   const common = {version:"ROLE_PROTOCOL_V1",executionRole,evaluator:"OPERATOR_PIXEL_ATTESTATION",serverVisionSupported:false,
+    deliveryPolicy:{version:"CANDIDATE_QA_GATE_V2",claimRuntime:"Explicit actual WORK/CHAT/SCHEDULED required on new split Claims",environmentProbe:"Optional diagnostic; UNKNOWN or failed Probe does not block Claim; never bypass platform Safety Check",candidateInspection:"Inspect actual CANONICAL and MOBILE390; record_visual_pixel_inspection separately for each view under the owned Claim and exact Job/SHA before handoff/approval. Environment Probe PASS and previous Claim PASS never replace this."},
     checkKeys:"Use exact current Contract strings. expectedSha = inspection.sha256 (canonical); preStagingQa.sourceSha256 = inspection.sourceSha256 (actual gate input), not canonical SHA. Inspect actual pixels before any attestation."};
   if(executionRole === "PRODUCER") return {...common,
-    phase1:"dispatch spec.preflightOnly=true without annotations; poll STAGED; inspect actual scene and technical Storage/decode/SHA",
+    phase1:"dispatch spec.preflightOnly=true without annotations; poll STAGED; inspect actual scene and technical Storage/decode/SHA; record each actual CANONICAL/MOBILE390 inspection with record_visual_pixel_inspection",
     phase2:"handoff_visual_review(requestId,jobId,expectedSha=inspection.sha256); re-read QA_PENDING and own activeClaim=false",
     qaFields:[],nativeGenerationAllowed:true,qaRecordingAllowed:false,approvalAllowed:false,successStatus:"QA_PENDING",
     nextAction:"SCREEN_CURRENT_SCENE_THEN_HANDOFF_VISUAL_REVIEW",

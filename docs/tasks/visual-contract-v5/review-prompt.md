@@ -45,3 +45,8 @@ Semantic 실패는 실제 확인한 후보만 반려하며 이력을 보존한�
 보고: Task/requestId/전체 Hash, 후보·최종 Job/source SHA/canonical SHA, 실제 원본/390px/역할Crop/근거/ALT/중복 판정, Approval/최종 상태/activeClaim. 실패 시 정확한 오류·보존 자산·재개 지점 포함.
 
 다음 담당/다음 작업을 반드시 명시한다. 성공 시 3-B, Semantic 반려 시 3-A 제작, 기술 복구 시 3-A 검수다.
+
+
+## 실행환경과 후보 픽셀 기록 — CANDIDATE_QA_GATE_V2
+
+새 claim_visual_review에는 실제 runtime=WORK/CHAT/SCHEDULED를 명시한다. Probe는 선택적 환경 진단이며 Claim의 선행 필수 조건이 아니다. 환경 PASS·Producer 관찰·이전 Claim 관찰을 현재 Reviewer QA로 대체하지 않는다. 현재 Claim에서 최종 승인할 정확한 Job/SHA의 CANONICAL·MOBILE390 픽셀을 각각 확인한 뒤 record_visual_pixel_inspection(eventId,requestId,jobId,view,pixelQa,evidence)를 현재 minimal schema로 기록한다. 원본 후보 QA와 최종화 뒤 생긴 별도 Job/SHA의 관찰은 구분한다. 최종 후보의 두 최신 관찰 PASS와 기존 semantic/mobile/SEO/role crop QA가 모두 통과해야 approve_visual_source를 호출한다. 픽셀 미전달은 실제 관찰 PASS가 아니며 자산을 보존한 기술 RETRY로 종료한다. 플랫폼 Safety Check 차단은 동등 호출로 우회하거나 즉시 반복하지 않는다.
