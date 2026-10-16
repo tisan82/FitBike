@@ -844,3 +844,7 @@ New split Claims declare the actual WORK/CHAT/SCHEDULED runtime. Environment Pro
 이 버전은 REAL_SOURCE 원본 접수만 제공한다. 참고용(RE-FERENCE_ONLY가 아닌 정확한 enum REFERENCE_ONLY)과 제작 입력(PRODUCTION_INPUT)을 구분한다. Source에 추가 Native 편집이 필요하면 참고용으로 보존하고 예약 실행 가능한 입력으로 보지 않는다. 외부 생성 API를 추가하지 않으며 기존 Native 제작/복구의 계약을 변경하지 않는다. 실제 Source pixels와 expectedSha를 보고한 뒤 서버가 원본 SHA·signature·decode·private Storage read-back을 검증한다. 만료되는 fileParams URL은 영속 provenance로 저장하지 않는다. 기존 content-pipeline-native-handoff의 authoring-supply/ prefix를 원본 컨테이너로 재사용하며 공급 원본은 이번 버전에서 자동 삭제하지 않는다. 기존 daily staging cleanup은 별도 content-pipeline-staging bucket만 처리한다.
 
 새 통합 작성 경로의 Task에는 INPUT_REQUIRED를 원자적으로 설정한다. 준비된 선택 제작 입력 또는 검증된 기존 복구 후보가 없으면 Queue와 Claim에서 제외한다. 기존 Task는 LEGACY를 유지하며 명시적 Source 공급 재개 대상만 새 정책으로 전환한다. Producer는 Task의 suppliedSources에서 supplyId를 얻어 dispatch_visual_supplied_source로 입력을 소비한다. 다른 operator가 공급한 Source도 현재 Production Claim과 Task/Hash에 대한 서버 admission으로 소비할 수 있으나 기존 same-worker recovery 조건을 해제하지 않는다. 최종 canonical/mobile/crop/SEO QA와 Reviewer 승인 Gate는 그대로다. 영구적인 공급 파일 누락/변조 및 확정된 중복·의미 거절은 선택 입력을 해제하고 재공급 대상으로 돌린다. 일시적 Storage 장애는 영구 거절과 구분한다.
+
+### Authoring 저장 오류 복구
+
+통합 작성의 저장 오류는 `get_authoring_execution_status`로 원래 requestId 또는 pipelineId의 자기 Run을 조회한다. `get_visual_claim_result`는 Authoring 실행 상태를 확인하지 않는다. `activeExecution=true`는 새 Claim 대신 기존 Run으로 입력을 수정·완료한다. `contentSaved=true`/`runStatus=PASS`는 본문 저장을 반복하지 않고 Source 공급 상태를 확인한다. MCP의 `field`/`reason`은 형식 수정 위치이며 원문 산출물 보존을 우선한다. 유효 Run을 계속할 수 없으면 공식 `fail_content_authoring` 후 상태를 재조회한다.

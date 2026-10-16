@@ -75,3 +75,7 @@ Gate를 우회하지 않는다. 기존 v1 Authoring/Producer/Reviewer API는 유
 
 Persistent Knowledge: 신규 Global rule NONE. 서비스 실행·Queue·API·schema delta와 정식 프롬프트를
 기존 Source of Truth에 갱신했다. Policy Conflict NONE. 추가 권리 승인 Gate·외부 생성 모델 없음.
+
+## Authoring package/readback correction — 2026-10-16
+
+Production logs for Pipelines 110/111 showed AUTHORING_PACKAGE_INVALID; 110 re-Claim showed AUTHORING_EXECUTION_BUSY. Both original Runs remained RUNNING. Added explicit existing V1/V5 input schema and pre-RPC validation with field paths, preserved safe Authoring business error codes, and operator-owned read-only execution status. Updated integrated authoring prompt with a numeric version=1 package example and same-Run resume. No DB schema/data mutation or Claim release is part of this correction; 419/420 remain available for original-chat recovery.

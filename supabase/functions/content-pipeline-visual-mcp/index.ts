@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { authoringSupplyTools, authoringSupplyToolNames, executeAuthoringSupply } from "./authoring-supply.ts";
+import { authoringSupplyTools, authoringSupplyToolNames, executeAuthoringSupply, authoringDiagnostic } from "./authoring-supply.ts";
 import { DELIVERY_VERSION, INSPECTION_VIEWS, normalizeInspectionResponse, deliveryDiagnostic } from "./inspection-delivery.mjs";
 import { deliveryEventSchema, validateDeliveryEvent, InspectionInputError, toolAllowedForRole, inspectionRecovery, pixelViews, roleToolDefinition } from "./inspection-contract.mjs";
 import { nativeAuditDiagnostic } from "./native-audit.ts";
@@ -1378,6 +1378,11 @@ Deno.serve(async (req) => {
     if (["inspect_visual_source","probe_visual_inspection_delivery"].includes(name)) console.warn(JSON.stringify({traceId,tool:name,requestId:a.requestId??null,jobId:a.jobId??null,stage:"SERVER_RESPONSE",code:"PASS",elapsedMs:Date.now()-startedAt,responseBytes:new TextEncoder().encode(JSON.stringify({content,structuredContent:result})).length,imageCount:images.length,clientPixelsInspected:"NOT_REPORTED"}));
     return response;
   } catch (e) {
+    if(["claim_content_authoring","complete_content_authoring","fail_content_authoring","get_authoring_execution_status"].includes(name)){
+      const diagnostic={traceId,...authoringDiagnostic(e,name)};
+      console.error(JSON.stringify(diagnostic));
+      return json({jsonrpc:"2.0",id,result:{isError:true,structuredContent:diagnostic,content:[{type:"text",text:JSON.stringify(diagnostic)}]}});
+    }
     const auditError = ["record_visual_generation_attempt","validate_visual_generation_result"].includes(name);
     const diagnostic = auditError ? nativeAuditDiagnostic(e, {traceId,tool:name,requestId:a.requestId,attemptId:a.attemptId,phase:name === "validate_visual_generation_result" ? "RESULT" : a.phase}) : null;
     if (diagnostic) console.error(JSON.stringify(diagnostic));

@@ -51,7 +51,7 @@ export function validateDeliveryEvent(event) {
   return event;
 }
 
-const authoringOnly = new Set(['claim_content_authoring','complete_content_authoring','fail_content_authoring','open_authoring_source_supply','preview_authoring_source','persist_authoring_source','get_authoring_source_supply']);
+const authoringOnly = new Set(['claim_content_authoring','get_authoring_execution_status','complete_content_authoring','fail_content_authoring','open_authoring_source_supply','preview_authoring_source','persist_authoring_source','get_authoring_source_supply']);
 const producerOnly = new Set(['dispatch_visual_supplied_source','claim_visual_production', 'handoff_visual_review', 'open_visual_file_upload', 'validate_visual_generation_call', 'validate_visual_generation_result', 'record_visual_generation_attempt', 'resolve_visual_source_assets']);
 const reviewerOnly = new Set(['claim_visual_review', 'record_visual_source_qa', 'approve_visual_source']);
 export function toolAllowedForRole(name, role) {
