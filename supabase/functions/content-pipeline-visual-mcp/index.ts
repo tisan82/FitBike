@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { authoringSupplyTools, authoringSupplyToolNames, executeAuthoringSupply } from "./authoring-supply.ts";
 import { DELIVERY_VERSION, INSPECTION_VIEWS, normalizeInspectionResponse, deliveryDiagnostic } from "./inspection-delivery.mjs";
 import { deliveryEventSchema, validateDeliveryEvent, InspectionInputError, toolAllowedForRole, inspectionRecovery, pixelViews, roleToolDefinition } from "./inspection-contract.mjs";
 import { nativeAuditDiagnostic } from "./native-audit.ts";
@@ -81,6 +82,8 @@ type VisualTool = {
   _meta?: Record<string, unknown>;
 };
 const tools: VisualTool[] = [
+  ...authoringSupplyTools,
+  {name:"dispatch_visual_supplied_source",description:"Create a production candidate from the exact previously supplied private Source. Requires owned current Production Claim, selected supplied input and current Task/Contract. Server chooses Storage identity; caller supplies no path or replacement URL. Does not generate or approve. Inspect and record final canonical/mobile pixels before handoff.",inputSchema:{type:"object",properties:{requestId:{type:"string",format:"uuid"},operationId:{type:"string",format:"uuid"},supplyId:{type:"string",format:"uuid"},transform:transformSchema},required:["requestId","operationId","supplyId","transform"],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}},
   {name:"resolve_visual_source_assets",description:"Read-only server HTML/XML image resolver before Claim. Extracts actual img/src/srcset/lazy links scoped to a section, resolves relative URLs, validates public HTTPS DNS and redirects, probes bounded raster candidates for MIME/signature/decode/SHA and returns actual 390px previews. Never guesses URLs, changes Contract, claims, stages or asserts semantic QA. Use sourcePageUrl for provenance and the inspected sourceAssetUrl for dispatch.",inputSchema:{type:"object",properties:{sourcePageUrl:{type:"string",maxLength:4096},sectionQuery:{type:"string",maxLength:200},maxCandidates:{type:"integer",minimum:1,maximum:5}},required:["sourcePageUrl"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:true}},
   { name: "validate_visual_generation_call", description: "Read-only audit capture validation immediately before an actual native call. Source-only production does not require this validator. Pass nativeCall as {toolName: actual native image tool name, schemaVersion: RAW_ARGUMENTS_V1, arguments: exact native tool arguments, sceneInstruction: {text: actual scene message or null, location: TOOL_ARGUMENT|CONVERSATION_MESSAGE|UNOBSERVED}}. Preserves raw runtime-specific keys, including null or omitted prompt. instructionVisibility is separate from valid; never infer a scene instruction or runtime validity. Returns field/reason for invalid capture. Does not validate the native runtime schema, generate, record an attempt, claim or approve.", inputSchema: {type:"object",properties:{nativeCall:{type:"object",additionalProperties:true}},required:["nativeCall"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
   { name: "validate_visual_generation_result", description: "Read-only RESULT preflight for this authenticated Producer receipt and saved REQUEST. Uses the same validation as record_visual_generation_attempt without inserting evidence, renewing Claim, generating or approving. Pass exact RESULT evidence including actualNativeCall, outputs and actual pixel screen. Returns valid/code/field/reason; validation is not storage or native runtime proof. On valid=true save identical RESULT, then read back.", inputSchema: {type:"object",properties:{requestId:{type:"string",format:"uuid"},attemptId:{type:"string",format:"uuid"},evidence:{type:"object",additionalProperties:true}},required:["requestId","attemptId","evidence"],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
@@ -248,6 +251,7 @@ const tools: VisualTool[] = [
             sourceAssetUrl: { type: "string" },
             sourcePageUrl: { type: "string" },
             sourceOwner: { type: "string" },
+            sourceSupplyId: { type: "string", format: "uuid", description: "Preserve exact stored candidate supply identity during Reviewer finalization; initial supply ingestion uses dispatch_visual_supplied_source." },
             sourcePdfPage: { type: "integer", minimum: 1, maximum: 500 },
             composition: {
               type: "object", additionalProperties: false,
@@ -608,7 +612,7 @@ Deno.serve(async (req) => {
   const requestUrl = new URL(req.url);
   const path = requestUrl.pathname;
   const endpointRole = requestUrl.searchParams.get("role");
-  if (endpointRole && !["PRODUCER", "REVIEWER"].includes(endpointRole)) return json({error:"INVALID_ENDPOINT_ROLE"},400);
+  if (endpointRole && !["PRODUCER", "REVIEWER", "AUTHORING"].includes(endpointRole)) return json({error:"INVALID_ENDPOINT_ROLE"},400);
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -650,7 +654,7 @@ Deno.serve(async (req) => {
     !allowed.includes((data.user.email ?? "").toLowerCase())
   ) return json({ error: "OPERATOR_ACCESS_DENIED" }, 403);
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-  if (Number(req.headers.get("content-length") ?? 0) > 16384) {
+  if (Number(req.headers.get("content-length") ?? 0) > (endpointRole === "AUTHORING" ? 524288 : 16384)) {
     return json({ error: "REQUEST_TOO_LARGE" }, 413);
   }
   let b: {
@@ -678,6 +682,16 @@ Deno.serve(async (req) => {
         pixelQa?: string;
         operationId?: string;
         pipelineId?: number;
+        pipelineRunId?: number;
+        executionRole?: string;
+        package?: Record<string, unknown>;
+        contractHash?: string;
+        sourceRole?: string;
+        sourceOwner?: string;
+        sourceObservation?: Record<string, unknown>;
+        nativeEditRequired?: boolean;
+        supplyId?: string;
+        transform?: Record<string, unknown>;
         pipelineImageId?: number;
         jobId?: string;
         expectedSha?: string;
@@ -696,7 +710,7 @@ Deno.serve(async (req) => {
   };
   try {
     const raw = await req.text();
-    if (new TextEncoder().encode(raw).length > 16384) {
+    if (new TextEncoder().encode(raw).length > (endpointRole === "AUTHORING" ? 524288 : 16384)) {
       return json({ error: "REQUEST_TOO_LARGE" }, 413);
     }
     b = JSON.parse(raw);
@@ -728,7 +742,7 @@ Deno.serve(async (req) => {
             ? protocol
             : "2025-06-18",
         capabilities: { tools: {}, resources: {} },
-        serverInfo: { name: "fitbike-visual-operations", version: "1.8.0" },
+        serverInfo: { name: "fitbike-visual-operations", version: "1.9.0" },
       },
     });
   }
@@ -791,15 +805,31 @@ Deno.serve(async (req) => {
   let deliveryResponseBytes: number | null = null;
   let inspectionResult: Record<string, unknown> | null = null;
   try {
-    if (endpointRole && !def.annotations.readOnlyHint && a.requestId) {
+    if (endpointRole && endpointRole !== "AUTHORING" && !def.annotations.readOnlyHint && a.requestId) {
       const owned = await rpc("content_pipeline_visual_claim_request_status_v1", {p_worker_key:worker,p_request_id:a.requestId});
       if (owned.claim && (owned.executionRole ?? owned.claim.executionRole) !== endpointRole) throw Error("ROLE_CLAIM_MISMATCH");
     }
     let result;
     let images: Array<{ type: string; data: string; mimeType: string }> = [];
-    if (name === "get_visual_generation_capabilities") {
+    if (authoringSupplyToolNames.has(name)) {
+      const supplied = await executeAuthoringSupply(name, a, {worker, sb, rpc});
+      result = supplied.result;
+      images = supplied.images.map(bytes=>({type:"image",mimeType:"image/png",data:encodeBase64(bytes)}));
+    } else if (name === "dispatch_visual_supplied_source") {
+      if (!uuid(a.requestId) || !uuid(a.operationId) || !uuid(a.supplyId)) throw Error("INVALID_SUPPLIED_SOURCE_REQUEST");
+      validateSpecTransform(a.transform);
+      const {data:supply,error:supplyError} = await sb.from("content_pipeline_visual_supply").select("pipeline_image_id,intent,proof").eq("supply_id",a.supplyId).maybeSingle();
+      if (supplyError || !supply) throw Error("SOURCE_SUPPLY_NOT_FOUND");
+      const usage = await sourceUsage(supply.pipeline_image_id,supply.intent.sourceAssetUrl,supply.proof?.sha256);
+      if (usage.result === "DUPLICATE") {
+        const invalidated = await rpc("content_pipeline_reject_source_supply_v1",{p_worker_key:worker,p_request_id:a.requestId,p_supply_id:a.supplyId,p_reason:"DUPLICATE_SOURCE_PREFLIGHT"});
+        if (invalidated.invalidated !== true) throw Error("SOURCE_SUPPLY_REJECTION_NOT_VERIFIED");
+        throw Error("DUPLICATE_SOURCE_PREFLIGHT");
+      }
+      result = await rpc("content_pipeline_dispatch_supplied_source_v1",{p_worker_key:worker,p_request_id:a.requestId,p_operation_id:a.operationId,p_supply_id:a.supplyId,p_transform:a.transform});
+    } else if (name === "get_visual_generation_capabilities") {
       const { generationCapabilities } = await import("./generation.ts");
-      result = {...generationCapabilities(),inspectionRecordingVersion:"PIXEL_RECORD_V2",candidateInspectionRecordTool:"record_visual_pixel_inspection",inspectionEventLookupTool:"get_visual_inspection_event",inspectionRecoveryTool:"get_visual_inspection_recovery",connectedRole:endpointRole??"SHARED",roleEndpointsSupported:true};
+      result = {...generationCapabilities(),inspectionRecordingVersion:"PIXEL_RECORD_V2",candidateInspectionRecordTool:"record_visual_pixel_inspection",inspectionEventLookupTool:"get_visual_inspection_event",inspectionRecoveryTool:"get_visual_inspection_recovery",connectedRole:endpointRole??"SHARED",roleEndpointsSupported:true,sourceSupplySupported:true,sourceSupplyVersion:"SOURCE_SUPPLY_V1",sourceSupplyGenerationSupported:false,sourceSupplyDispatchTool:"dispatch_visual_supplied_source",authoringSourceEndpointRole:"AUTHORING"};
     } else if (name === "probe_visual_inspection_delivery") {
       if (!["WORK","CHAT","SCHEDULED"].includes(String(a.runtime))) throw Error("INVALID_DELIVERY_RUNTIME");
       const probeId = crypto.randomUUID();
@@ -871,6 +901,10 @@ Deno.serve(async (req) => {
       const readRole = ["QA_PENDING","REVIEWING","APPROVED"].includes(String(image.visual_phase)) ? "REVIEWER" : ["PRODUCTION_PENDING","PRODUCING"].includes(String(image.visual_phase)) ? "PRODUCER" : image.status === "PROCESSING" ? "LEGACY" : "PRODUCER";
       result.recoverableProductionCandidate = await rpc("content_pipeline_owned_visual_candidate_v1", {p_worker_key:worker,p_image_id:image.pipeline_image_id});
       result.recoverableNativeInput = readRole === "REVIEWER" ? null : await rpc("content_pipeline_owned_native_input_v1", {p_worker_key:worker,p_image_id:image.pipeline_image_id});
+      if (readRole !== "REVIEWER") {
+        const supplied = await rpc("content_pipeline_source_supply_status_v1",{p_worker_key:worker,p_pipeline_id:null,p_pipeline_image_id:image.pipeline_image_id});
+        result.suppliedSources = (supplied.items??[]).filter((s:Record<string,unknown>)=>s.contractHash===image.generation_contract_hash && s.status==="READY" && s.selected && s.sourceRole==="PRODUCTION_INPUT").map((s:Record<string,unknown>)=>({supplyId:s.supplyId,contractHash:s.contractHash,sourceRole:s.sourceRole,sourceOwner:s.sourceOwner,sourceAssetUrl:(s.intent as Record<string,unknown>).sourceAssetUrl,originalSha:s.originalSha,nativeEditRequired:(s.intent as Record<string,unknown>).nativeEditRequired,dispatchTool:"dispatch_visual_supplied_source"}));
+      }
       result.executionProtocol = visualExecutionProtocol(readRole, !recovery);
       result.preStagingProtocol = result.executionProtocol;
       if(readRole !== "REVIEWER") result.nativeGenerationContext = nativeGenerationContext(image.pipeline_image_id, image.generation_contract_hash, image.generation_contract ?? {});
@@ -882,16 +916,7 @@ Deno.serve(async (req) => {
         a.pipelineId !== undefined &&
         (!Number.isSafeInteger(a.pipelineId) || a.pipelineId < 1)
       ) throw Error("INVALID_PIPELINE_ID");
-      let q = sb.from("21_content_pipeline_image").select(
-        "pipeline_image_id,pipeline_id,image_id,asset_key,status,handoff_phase,visual_phase,claimed_by,claim_expires_at,next_eligible_at,failure_stage,failure_code",
-      ).in("status", ["PENDING", "RETRY", "PROCESSING", "READY_FOR_UPLOAD"])
-        .order("pipeline_id").order("ordinal").limit(25);
-      if (a.executionRole === "REVIEWER") q = q.in("visual_phase",["QA_PENDING","REVIEWING"]);
-      if (a.executionRole === "PRODUCER") q = q.or("visual_phase.is.null,visual_phase.in.(PRODUCTION_PENDING,PRODUCING)");
-      if (a.pipelineId !== undefined) q = q.eq("pipeline_id", a.pipelineId);
-      const { data, error } = await q;
-      if (error) throw Error(error.message);
-      result = { images: data, limit: 25, workerKey: worker };
+      result = await rpc("content_pipeline_source_supply_queue_v1", {p_worker_key:worker,p_pipeline_id:a.pipelineId??null,p_execution_role:a.executionRole??(endpointRole==="PRODUCER"||endpointRole==="REVIEWER"?endpointRole:null)});
     } else if (name === "resolve_visual_source_assets") {
       const {resolveSourceAssets}=await import("./source-resolver.ts");
       const resolved=await resolveSourceAssets(a.sourcePageUrl,a.sectionQuery,a.maxCandidates);
@@ -1396,6 +1421,7 @@ function validateSpec(raw: unknown) {
         "sourcePageUrl",
         "sourceOwner",
         "sourcePdfPage",
+        "sourceSupplyId",
         "composition",
         "preflightOnly",
         "preStagingQa",
@@ -1403,6 +1429,7 @@ function validateSpec(raw: unknown) {
       ].includes(k)
     )
   ) throw Error("INVALID_SOURCE_SPEC");
+  if (s.sourceSupplyId !== undefined && !uuid(s.sourceSupplyId)) throw Error("INVALID_SOURCE_SUPPLY_ID");
   if (s.composition !== undefined) {
     const c = s.composition as { layout: string; sources: Array<Record<string, unknown>> };
     if (!c || c.layout !== "SIDE_BY_SIDE" || Object.keys(c).some(k=>!["layout","sources"].includes(k)) || !Array.isArray(c.sources) || c.sources.length < 2 || c.sources.length > 3) throw Error("INVALID_SOURCE_COMPOSITION");

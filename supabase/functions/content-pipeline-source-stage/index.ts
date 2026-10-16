@@ -6,7 +6,8 @@ import {
   transformSource,
   validateTransform,
 } from "./transform.ts";
-import { downloadSource, sourceUrl } from "./source.ts";
+import { downloadSource, sourceUrl, verifySourceSignature } from "./source.ts";
+import { readStoredSuppliedSource } from "./supply-input.ts";
 import { readStoredSourceCandidate } from "./source-resume.ts";
 import { readStoredNativeInput } from "./native-resume.ts";
 import { generateAsset, generationCapabilities } from "./generation.ts";
@@ -96,11 +97,30 @@ Deno.serve(async (req) => {
     let sourceResume: Awaited<ReturnType<typeof readStoredSourceCandidate>> | undefined;
     const sourceParentId = !generative && !composite && s.preflightOnly !== true
       ? s.preStagingQa?.sourceJobId : undefined;
-    if (sourceParentId) {
+    if (s.sourceSupplyId !== undefined && !sourceParentId) {
+      const { data: supply, error } = await sb.from("content_pipeline_visual_supply")
+        .select("supply_id,pipeline_id,pipeline_image_id,contract_hash,status,selected,source_role,intent,proof")
+        .eq("supply_id", s.sourceSupplyId).single();
+      if (error || !supply) throw Error("SOURCE_SUPPLY_ASSET_MISSING");
+      downloaded = await readStoredSuppliedSource(j, supply, async (path) => {
+        const read = await sb.storage.from("content-pipeline-native-handoff").download(path);
+        if (read.error || !read.data) {
+          const storageError = read.error as { statusCode?: string | number; status?: string | number } | null;
+          const status = Number(storageError?.statusCode ?? storageError?.status);
+          throw Error(status === 404 ? "SOURCE_SUPPLY_ASSET_MISSING" : "SOURCE_SUPPLY_STORAGE_UNAVAILABLE");
+        }
+        return { bytes: new Uint8Array(await read.data.arrayBuffer()), mime: read.data.type };
+      }, async (bytes, mime) => {
+        verifySourceSignature(bytes, mime);
+        return { sha256: await sha256(bytes), bytes: bytes.byteLength };
+      });
+    } else if (sourceParentId) {
       const { data: previous, error } = await sb.from("27_content_pipeline_source_stage_job")
         .select("job_id,pipeline_image_id,contract_hash,status,spec,result")
         .eq("job_id", sourceParentId).single();
       if (error || !previous) throw Error("SOURCE_RESUME_ASSET_MISSING");
+      if ((s.sourceSupplyId ?? null) !== (previous.spec?.sourceSupplyId ?? null))
+        throw Error("SOURCE_RESUME_PROVENANCE_MISMATCH");
       const { data: candidate, error: candidateError } = await sb.rpc("content_pipeline_review_candidate_v1", {
         p_image_id: j.pipelineImageId, p_job_id: sourceParentId,
       });
@@ -259,6 +279,8 @@ Deno.serve(async (req) => {
       provenance: {
         ...(sourceResume ? sourceResume.provenance : {}),
         ...(composed ? { sources: composed.provenance, composition: composed.recipe, editingMethod: "DETERMINISTIC_SIDE_BY_SIDE" } : {}),
+        ...(s.sourceSupplyId && !sourceResume ? { sourceSupplyId: s.sourceSupplyId,
+          originalSha256: await sha256(source), sourceAcquisition: "STORED_AUTHORING_SUPPLY" } : {}),
         sourceAssetUrl: u?.href ??
           (s.productionMethod === "REAL_SOURCE_AI_EDIT"
             ? s.inputAssetUrl

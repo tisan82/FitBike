@@ -124,6 +124,11 @@ export function validateChatFile(raw: unknown): ChatFile {
 }
 export function generationCapabilities() {
   return {
+    sourceSupplySupported: true,
+    sourceSupplyVersion: "SOURCE_SUPPLY_V1",
+    sourceSupplyDispatchTool: "dispatch_visual_supplied_source",
+    sourceSupplyGenerationSupported: false,
+    authoringSourceEndpointRole: "AUTHORING",
     sourceTextAnnotationSupported: true,
     sourceAnnotationTypes: ["circle", "arrow", "label"],
     sourceLabelLanguages: ["ko", "en"],
@@ -268,6 +273,7 @@ export function visualExecutionProtocol(role: unknown, preflightOnly = true) {
     deliveryPolicy:{version:"CANDIDATE_QA_GATE_V2",claimRuntime:"Explicit actual WORK/CHAT/SCHEDULED required on new split Claims",environmentProbe:"Optional diagnostic; UNKNOWN or failed Probe does not block Claim; never bypass platform Safety Check",candidateInspection:"Inspect actual CANONICAL and MOBILE390; record_visual_pixel_inspection separately for each view under the owned Claim and exact Job/SHA before handoff/approval. Environment Probe PASS and previous Claim PASS never replace this."},
     checkKeys:"Use exact current Contract strings. expectedSha = inspection.sha256 (canonical); preStagingQa.sourceSha256 = inspection.sourceSha256 (actual gate input), not canonical SHA. Inspect actual pixels before any attestation."};
   if(executionRole === "PRODUCER") return {...common,
+    sourceSupply:"Recover admitted existing candidates first. Otherwise read current Task suppliedSources and use dispatch_visual_supplied_source with same owned Claim/supplyId. Stored original SHA is not final canonical SHA; actual candidate inspection is still required. New INPUT_REQUIRED Tasks without prepared input are not claimable.",
     phase1:"dispatch spec.preflightOnly=true without annotations; poll STAGED; inspect actual scene and technical Storage/decode/SHA; record each actual CANONICAL/MOBILE390 inspection with record_visual_pixel_inspection",
     phase2:"handoff_visual_review(requestId,jobId,expectedSha=inspection.sha256); re-read QA_PENDING and own activeClaim=false",
     qaFields:[],nativeGenerationAllowed:true,qaRecordingAllowed:false,approvalAllowed:false,successStatus:"QA_PENDING",

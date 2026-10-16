@@ -72,7 +72,7 @@ export async function queryProject(stage, sql, fetcher = fetch) {
   });
   if (!response.ok) {
     const body = await response.text();
-    const known = body.match(/DUPLICATE_[A-Z_]+|NORMAL_[A-Z_]+|SOURCE_[A-Z_]+|REVIEW_[A-Z_]+|SEMANTIC_[A-Z_]+|APPROVED_[A-Z_]+|AUTHORING_[A-Z_]+|VISUAL_[A-Z_]+|DELIVERY_[A-Z_]+|PIXEL_DELIVERY_[A-Z_]+|VALID_STORED_FIXTURE_REQUIRED|GATED_CLAIM_FAILED|STALE_PIXEL_PASS_ALLOWED|FOREIGN_RECEIPT_ALLOWED|CANDIDATE_CIRCUIT_[A-Z_]+/);
+    const known = body.match(/SUPPLY_[A-Z_]+|SOURCE_SUPPLY_[A-Z_]+|DUPLICATE_[A-Z_]+|NORMAL_[A-Z_]+|SOURCE_[A-Z_]+|REVIEW_[A-Z_]+|SEMANTIC_[A-Z_]+|APPROVED_[A-Z_]+|AUTHORING_[A-Z_]+|VISUAL_[A-Z_]+|DELIVERY_[A-Z_]+|PIXEL_DELIVERY_[A-Z_]+|VALID_STORED_FIXTURE_REQUIRED|GATED_CLAIM_FAILED|STALE_PIXEL_PASS_ALLOWED|FOREIGN_RECEIPT_ALLOWED|CANDIDATE_CIRCUIT_[A-Z_]+/);
     const sqlState = body.match(/(?:SQLSTATE[^A-Z0-9]*|ERROR:\s*)([0-9A-Z]{5})/i)?.[1];
     // Emit codes/metrics only; API errors can contain SQL and sensitive values.
     throw new Error(`${stage}: HTTP_${response.status}${known ? ':' + known[0] : ''}${sqlState ? ':SQLSTATE_' + sqlState : ''} (responseBytes=${Buffer.byteLength(body)})`);
@@ -129,6 +129,8 @@ export async function deploy() {
     await queryProject('DUPLICATE_RECOVERY_MIGRATION',migrationTransaction(readFileSync('supabase/migrations/20261013055416_duplicate_source_recovery.sql','utf8'),{version:'20261013055416',name:'duplicate_source_recovery',followUp:true}));
     await queryProject('DUPLICATE_BINDING_CORRECTION',readFileSync('scripts/content-factory/duplicate-source-binding-fix.sql','utf8'));
     await queryProject('CANDIDATE_QA_GATE',readFileSync('scripts/content-factory/candidate-qa-gate.sql','utf8'));
+    await queryProject('SOURCE_SUPPLY_MIGRATION', migrationTransaction(readFileSync('supabase/migrations/20261016012935_authoring_source_supply.sql','utf8'),{version:'20261016012935',name:'authoring_source_supply',followUp:true}));
+    await queryProject('SOURCE_SUPPLY_REGRESSION',readFileSync('scripts/content-factory/source-supply-regression.sql','utf8'));
     await queryProject('CANDIDATE_QA_REGRESSION',readFileSync('scripts/content-factory/candidate-qa-gate-regression.sql','utf8'));
     await queryProject('DUPLICATE_RECOVERY_REGRESSION',readFileSync('scripts/content-factory/duplicate-source-recovery-regression.sql','utf8'));
     await queryProject('PHOTO_POLICY_REGRESSION',readFileSync('scripts/content-factory/photo-source-policy-regression.sql','utf8'));
@@ -138,8 +140,9 @@ export async function deploy() {
     await requireCurrentMain();
     // JWT verification is already disabled in deployed v35. The function retains
     // its existing custom worker authentication; no auth policy change here.
-    cli('EDGE_DEPLOY', ['functions', 'deploy', 'content-pipeline-visual-mcp', '--project-ref', projectRef, '--use-api', '--no-verify-jwt']);
+    // Publish the private supplied-input consumer before exposing new dispatch tools.
     cli('SOURCE_STAGE_DEPLOY', ['functions','deploy','content-pipeline-source-stage','--project-ref',projectRef,'--use-api','--no-verify-jwt']);
+    cli('EDGE_DEPLOY', ['functions', 'deploy', 'content-pipeline-visual-mcp', '--project-ref', projectRef, '--use-api', '--no-verify-jwt']);
     await queryProject('DUPLICATE_INCIDENT_REPAIR',readFileSync('scripts/content-factory/duplicate-source-repair.sql','utf8'));
     console.log(`RELEASE_COMMIT: ${process.env.GITHUB_SHA}`);
     console.log('SCHEDULED_PIXEL_INSPECTION: NOT_VERIFIED; NATIVE_HANDOFF: NOT_VERIFIED');
