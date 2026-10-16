@@ -286,3 +286,9 @@ Service-only DB RPC:
 - content_pipeline_source_supply_queue_v1(worker,optionalPipelineId,optionalRole)
 
 Worker identity comes from authenticated MCP user, not submitted tool arguments. prepare/finish writes are authoring-run owner fenced; original immutable intent/Storage proof and operation replay are validated. Shared authorized operators may read supply receipts and consume bound input through their own exact Producer lease. Neither PUBLIC/anon/authenticated SQL access nor direct client-supplied proof is exposed by MCP. Final pixel QA is never inherited from sourceObservation.
+
+### Authoring MCP 입력 진단과 상태 조회
+
+`complete_content_authoring`은 기존 V1 package envelope 및 V5 Brief의 명시적 schema를 노출하고 DB 호출 전에 동일 schema로 검증한다. 입력 오류는 `AUTHORING_PACKAGE_INVALID`, `field`, `reason`, `stage=REQUEST_VALIDATION`, `mutationOutcome=NOT_ATTEMPTED`를 반환한다. Writer의 기존 본문/SEO 확장 필드는 보존하지만 `writer.authoringContext`는 서버 관리 필드다. DB의 Authoring 업무 오류 코드는 일반 서버 오류로 치환하지 않는다. 네트워크 등 결과 미확정 오류는 상태 조회 후 재개한다. 입력 원문·URL·본문을 오류 진단에 복사하지 않는다.
+
+`get_authoring_execution_status(requestId?,pipelineId?)`는 최소 하나의 식별자를 받아 현재 인증 작업자에게 결합된 AUTHORING_V1 Run만 조회한다. 반환 필드는 `activeExecution`, `pipelineRunId`, `runStatus`, Pipeline `stage`, 원래 `requestId`/`targetPipelineId`, `packageExecution`, `contentSaved`, `nextAction`이다. 읽기 전용이며 새 Claim·상태 변경·자동 만료를 수행하지 않는다. 이미지용 `get_visual_claim_result`의 NOT_FOUND는 Authoring 종료 증거가 아니다. RUNNING은 동일 Run으로 복구하고 저장 완료 PASS는 Source 공급으로 이어간다.

@@ -8,7 +8,7 @@ import ts from "typescript";
 const source=readFileSync(new URL("../../supabase/functions/content-pipeline-visual-mcp/index.ts",import.meta.url),"utf8").replace(/^import .*;$/gm,"").replaceAll('await import("./generation.ts")','await loadGeneration()').replaceAll('await import("./inspection.ts")','await loadInspection()').replaceAll('await import("./source-resolver.ts")','await loadResolver()').replaceAll('await import("./inspection-probe.ts")','await loadProbe()').replace('e instanceof Error?e.message:"VISUAL_OPERATION_FAILED"','String(e.message ?? e)');
 function loadAuthoringSupply(){
  const body=readFileSync(new URL("../../supabase/functions/content-pipeline-visual-mcp/authoring-supply.ts",import.meta.url),"utf8").replace(/^import .*;$/gm,"").replace(/export /g,"");
- return vm.runInNewContext("(()=>{"+ts.transpile(body,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022})+";return{authoringSupplyTools,authoringSupplyToolNames,executeAuthoringSupply};})()",{URL,crypto,Uint8Array,Blob,Error,Number,Array,JSON,String});
+ return vm.runInNewContext("(()=>{"+ts.transpile(body,{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022})+";return{authoringSupplyTools,authoringSupplyToolNames,executeAuthoringSupply,authoringDiagnostic};})()",{URL,crypto,Uint8Array,Blob,Error,Number,Array,JSON,String});
 }
 const REQUEST="11111111-1111-4111-8111-111111111111",JOB="22222222-2222-4222-8222-222222222222";
 function harness({email="operator@example.org",confirmed=true,configured=true,active=true,jobImage=2000,role="BODY",duplicate=false,recovery=null,signedError=false,staged=false,missingPixels=false,storageFailsOnce=false,claimResult,executionRole,visualPhase,contract,allowed=true,nativeAudit,nativeInput=null,readJob,auditValidation,auditRecordError,rpcErrors={},deliveryBoundRuntime,largePixels=false,endpointRole=null,inspectionEvents=[],loseObservationReply=false,reviewCandidate=null,duplicateReturn}={}){
@@ -30,7 +30,7 @@ function harness({email="operator@example.org",confirmed=true,configured=true,ac
 }
 test("authentication blocks anonymous, invalid, unconfigured and unapproved users",async()=>{for(const [options,token,status] of [[{},"",401],[{},"bad",401],[{configured:false},"valid",503],[{email:"other@example.org"},"valid",403],[{confirmed:false},"valid",403]]){const h=harness(options);assert.equal((await h.send("ping",{},null,token)).status,status);assert.equal(h.calls.length,0);}});
 test("null and arrays are rejected before JSON-RPC access",async()=>{for(const body of ["null","[]"]){assert.equal((await harness().send("ping",{},null,"valid",body)).status,400);}});
-test("tool list includes the complete 3-A boundaries with truthful annotations",async()=>{const b=await(await harness().send()).json();assert.equal(b.result.tools.length,38);assert.equal(b.result.tools.find(t=>t.name==="inspect_visual_source").annotations.readOnlyHint,true);assert.equal(b.result.tools.find(t=>t.name==="dispatch_visual_source").annotations.openWorldHint,true);});
+test("tool list includes the complete 3-A boundaries with truthful annotations",async()=>{const b=await(await harness().send()).json();assert.equal(b.result.tools.length,39);assert.equal(b.result.tools.find(t=>t.name==="inspect_visual_source").annotations.readOnlyHint,true);assert.equal(b.result.tools.find(t=>t.name==="dispatch_visual_source").annotations.openWorldHint,true);});
 test("valid source delegates only bounded named dispatch with server-owned worker",async()=>{const h=harness();const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{sourceAssetUrl:"https://photos.example.org/image.jpg",sourcePageUrl:"https://photos.example.org/page",sourceOwner:"Manufacturer",transform:{maxWidth:780,annotations:[{type:"circle",x:.5,y:.5,radius:.1}]}}},"dispatch_visual_source")).json();assert.equal(b.result.isError,undefined);const call=h.calls.at(-1);assert.equal(call.name,"content_pipeline_dispatch_visual_source_request_v1");assert.equal(call.args.p_worker_key,"mcp-3a-user");});
 test("invalid transform/rights fields and inactive claim never dispatch",async()=>{for(const [options,extra] of [[{}, {circle:{x:.5,y:.5,radius:.1}}],[{active:false},{}]]){const h=harness(options);const b=await(await h.send("tools/call",{requestId:REQUEST,operationId:JOB,spec:{sourceAssetUrl:"https://photos.example.org/image.jpg",sourcePageUrl:"https://photos.example.org/page",sourceOwner:"Manufacturer",transform:extra}},"dispatch_visual_source")).json();assert.equal(b.result.isError,true);assert.equal(h.calls.some(c=>c.name.includes("dispatch")),false);}});
 test("cross-image inspection is rejected before storage download",async()=>{const h=harness({jobImage:2001});const b=await(await h.send("tools/call",{requestId:REQUEST,jobId:JOB},"inspect_visual_source")).json();assert.equal(b.result.isError,true);assert.match(b.result.content[0].text,/ACCESS_DENIED/);});
@@ -380,4 +380,19 @@ test("Producer can dispatch supplied bytes but cannot perform Authoring mutation
  const h=harness({endpointRole:"PRODUCER"});const list=await(await h.send()).json();const names=list.result.tools.map(t=>t.name);
  assert.ok(names.includes("dispatch_visual_supplied_source"));assert.ok(!names.includes("persist_authoring_source"));
  const r=await(await h.send("tools/call",{},"persist_authoring_source")).json();assert.equal(r.result.isError,true);
+});
+
+test("Authoring package schema and structured field errors survive MCP transport before any completion RPC",async()=>{
+ const h=harness({endpointRole:"AUTHORING"});
+ const list=await(await h.send()).json();const tool=list.result.tools.find(t=>t.name==="complete_content_authoring");
+ assert.equal(tool.inputSchema.properties.package.properties.version.const,1);
+ assert.ok(list.result.tools.some(t=>t.name==="get_authoring_execution_status"&&t.annotations.readOnlyHint));
+ const r=await(await h.send("tools/call",{pipelineId:110,pipelineRunId:419,package:{version:"1",execution:{},planning:{},research:{},writer:{}}},"complete_content_authoring")).json();
+ assert.equal(r.result.isError,true);assert.equal(r.result.structuredContent.code,"AUTHORING_PACKAGE_INVALID");assert.equal(r.result.structuredContent.field,"package.version");assert.equal(r.result.structuredContent.mutationOutcome,"NOT_ATTEMPTED");
+ assert.equal(JSON.parse(r.result.content[0].text).field,"package.version");assert.equal(h.calls.length,0);
+});
+test("Authoring busy rejection stays distinct from unknown transport errors",async()=>{
+ const h=harness({endpointRole:"AUTHORING",rpcErrors:{content_pipeline_claim_authoring_supply_v1:"AUTHORING_EXECUTION_BUSY"}});
+ const r=await(await h.send("tools/call",{requestId:REQUEST,pipelineId:110},"claim_content_authoring")).json();
+ assert.equal(r.result.structuredContent.code,"AUTHORING_EXECUTION_BUSY");assert.equal(r.result.structuredContent.mutationOutcome,"REJECTED");assert.match(r.result.structuredContent.nextAction,/EXISTING_RUN/);
 });
