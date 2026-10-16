@@ -51,10 +51,13 @@ export function validateDeliveryEvent(event) {
   return event;
 }
 
-const producerOnly = new Set(['claim_visual_production', 'handoff_visual_review', 'open_visual_file_upload', 'validate_visual_generation_call', 'validate_visual_generation_result', 'record_visual_generation_attempt', 'resolve_visual_source_assets']);
+const authoringOnly = new Set(['claim_content_authoring','complete_content_authoring','fail_content_authoring','open_authoring_source_supply','preview_authoring_source','persist_authoring_source','get_authoring_source_supply']);
+const producerOnly = new Set(['dispatch_visual_supplied_source','claim_visual_production', 'handoff_visual_review', 'open_visual_file_upload', 'validate_visual_generation_call', 'validate_visual_generation_result', 'record_visual_generation_attempt', 'resolve_visual_source_assets']);
 const reviewerOnly = new Set(['claim_visual_review', 'record_visual_source_qa', 'approve_visual_source']);
 export function toolAllowedForRole(name, role) {
   if (!role) return true; // Existing shared endpoint stays compatible.
+  if (role === 'AUTHORING') return authoringOnly.has(name) || ['get_visual_generation_capabilities','resolve_visual_source_assets'].includes(name);
+  if (authoringOnly.has(name)) return false;
   if (name === 'claim_visual_image') return false;
   return role === 'PRODUCER' ? !reviewerOnly.has(name) : role === 'REVIEWER' ? !producerOnly.has(name) : false;
 }
@@ -92,3 +95,4 @@ export function inspectionRecovery(current, jobId, expectedSha, events) {
     nextAction: current.activeClaim !== true ? current.nextAction : views.every(v => v.pixelQa === 'PASS') ? current.executionRole === 'PRODUCER' ? 'HANDOFF_VISUAL_REVIEW' : 'CONTINUE_REVIEW_QA' : 'INSPECT_MISSING_VIEWS',
     previousClaimPixelsReusable: false, regenerate: false };
 }
+

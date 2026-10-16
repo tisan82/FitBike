@@ -267,3 +267,22 @@ Package의 루트 키는 `version`, `execution`, `planning`, `research`, `writer
 실패는 기존 `content_pipeline_fail_stage_v1`에 정확한 pipelineId/runId와 expected_stage=WRITING을 전달한다. 잘못된/과거 run은 현재 실행을 실패시킬 수 없다. 공식 HOLD/BLOCKED 이후 새 requestId + 해당 pipelineId로 claim_authoring을 호출하면 새 run fence를 발급한다. 과거 execution이 포함된 산출물을 재사용하지 않는다. generic resume는 통합 실행에 AUTHORING_RESUME_REQUIRES_REQUEST_ID로 거부한다. 응답 유실을 이유로 다른 requestId를 만들거나 직접 stage를 수정하지 않는다. 실행 종료가 확인되지 않은 RUNNING은 운영 복구 대상이며 자동 lease 만료를 새로 추가하지 않았다.
 
 기존 단계별 실행·산출물은 그대로 유지한다. 새 통합 경로 적용은 호출부/운영 지시를 이 RPC로 전환해야 하며 기존 예약·Supabase 프롬프트는 자동 변경하지 않는다.
+
+
+## Authoring Source supply V1
+
+기존 Visual MCP의 `?role=AUTHORING` endpoint는 동일 verified operator allowlist 인증 뒤에서 작성/Source 공급 도구만 노출한다. Producer/Reviewer 역할의 Claim/승인 도구는 AUTHORING에 노출하지 않는다. 파일 입력은 persist_authoring_source의 공식 fileParams를 사용하며 이 버전의 입력 종류는 REAL_SOURCE다. SOURCE_SUPPLY_V1 capability와 dispatch_visual_supplied_source는 기존 PRODUCER endpoint에 추가한다.
+
+Service-only DB RPC:
+- content_pipeline_claim_authoring_supply_v1(worker,requestId,optionalPipelineId)
+- content_pipeline_complete_authoring_supply_v1(worker,pipelineId,runId,existingV1Package)
+- content_pipeline_fail_authoring_supply_v1(worker,pipelineId,runId,HOLD|BLOCKED,error)
+- content_pipeline_open_source_supply_v1(worker,pipelineId)
+- content_pipeline_prepare_source_supply_v1(worker,runId,imageId,operationId,intent)
+- content_pipeline_finish_source_supply_v1(worker,supplyId,serverProof)
+- content_pipeline_source_supply_status_v1(worker,optionalPipelineId,optionalImageId)
+- content_pipeline_dispatch_supplied_source_v1(worker,requestId,operationId,supplyId,transform)
+- content_pipeline_reject_source_supply_v1(worker,requestId,supplyId,DUPLICATE_SOURCE_PREFLIGHT)
+- content_pipeline_source_supply_queue_v1(worker,optionalPipelineId,optionalRole)
+
+Worker identity comes from authenticated MCP user, not submitted tool arguments. prepare/finish writes are authoring-run owner fenced; original immutable intent/Storage proof and operation replay are validated. Shared authorized operators may read supply receipts and consume bound input through their own exact Producer lease. Neither PUBLIC/anon/authenticated SQL access nor direct client-supplied proof is exposed by MCP. Final pixel QA is never inherited from sourceObservation.

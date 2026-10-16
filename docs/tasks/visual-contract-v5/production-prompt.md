@@ -2,7 +2,7 @@
 
 대상 pipelineImageId: 미지정
 
-FitBike Visual Producer_02의 현재 노출 도구만 사용한다. connectedRole=PRODUCER를 확인한다.
+파이프라인 조회·Claim·Staging·검수 인계에는 FitBike Visual Producer_02를 사용하고 connectedRole=PRODUCER를 확인한다. Source 탐색에는 현재 실제 노출된 검색 도구를 사용할 수 있다. Native가 필요한 기존 Task는 실제 제공된 내장 생성 도구와 공식 파일 전달을 별도 확인한다. 없는 도구를 추정하지 않는다.
 
 공식 Production Queue에서 Image Task 1건을 처리한다. 성공 종료는 실제 STAGED 후보 → handoff_visual_review → visualPhase=QA_PENDING → 인계 Job/Contract/SHA 일치 → Production activeClaim=false 재조회다. Reviewer QA 기록·승인·READY_FOR_UPLOAD, 3-B 업로드/DONE, 게시, 코드/DB/Contract/예약 변경은 수행하지 않는다.
 
@@ -63,3 +63,10 @@ STAGED, Storage/decode/SHA를 실제 조회한다. inspect_visual_source 원본�
 보고: Task/Topic/requestId/전체 Hash, 실제 경로·Native 횟수, 감사·반환 파일 기록, operationId/Job/source SHA/canonical SHA, 인계·최종 phase·activeClaim. 실패하면 마지막 성공 단계/정확한 오류/보존 자산/재개 지점을 추가한다.
 
 다음 담당: 성공 시 3-A 검수. 실패 시 기록된 재개 지점 담당. 다음 작업을 반드시 한 줄로 명시한다.
+
+
+## SOURCE_SUPPLY_V1 공급 입력
+
+신규 통합 작성 Task는 Source 준비 후 제작 Queue에 나타난다. Task의 suppliedSources를 확인하고 기존 recoverableProductionCandidate/Staging/NativeInput이 없으면 현재 Hash의 supplyId를 사용한다. 실제 claim_visual_production(runtime)을 받은 뒤 dispatch_visual_supplied_source(requestId,operationId,supplyId,transform)로 private 원본을 제작한다. 원본 URL을 다시 다운로드하거나 fileParams로 다시 전송하지 않는다. 원본 Source 확인을 최종 후보 QA로 대체하지 않는다.
+
+등록된 공급 원본과 생성 canonical SHA는 별개다. 실제 CANONICAL/MOBILE390 및 역할 Crop을 보고 기록한 뒤 handoff_visual_review한다. 중복·영구 공급 파일 누락/identity 오류로 입력이 무효화되면 본인 Claim을 정식 실패 종료하고 재공급 사유를 보고한다. 동일 실행에서 무의미한 재호출이나 예약 비활성화는 하지 않는다. 플랫폼 차단은 기존 규칙대로 우회하지 않는다.

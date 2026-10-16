@@ -390,3 +390,8 @@ PIXEL_DELIVERY_V1 배포 후 새 관찰 프로토콜을 사용하는 경우, 동
 
 New Stage2 image briefs use the minimal semantic V5 contract defined by CONTENT.md; server validation and common policy replace Writer-authored feasibility/QA fields. V4 active claims and review candidates retain their exact Contract/Hash and queue semantics. A V5 NONE/REFERENCE/REQUIRED evidence level never bypasses eligibility, ownership, source evidence or final approval. Existing Task conversion is explicit and not part of normal scheduled processing.
 
+
+
+## Source supply eligibility — 2026-10-16
+
+SOURCE_SUPPLY_V1 통합 작성은 파일 미확보 Task를 INPUT_REQUIRED로 저장한다. Producer Queue와 Claim은 동일 content_pipeline_source_supply_eligible_v1 predicate를 사용한다. selected READY PRODUCTION_INPUT 또는 기존 안전한 복구 입력이 있어야 신규 제작 대상으로 보며, URL/REFERENCE_ONLY만으로 Claim하지 않는다. 기존 상태·phase·lease·Contract·backoff Gate도 계속 적용한다. 공급 실패는 본문 재작성이나 동일 Task의 무효 Claim 반복 사유가 아니다. 공급/재개 실행과 구체적 운영 책임은 CONTENT_FACTORY.md의 Unified Authoring Source supply 절을 따른다.
