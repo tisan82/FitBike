@@ -44,39 +44,8 @@ export default async function ModelDetailPage({ params }: Props) {
   try { data = await getCachedModelDetail(id); }
   catch (error) { if (error instanceof ModelDetailNotFoundError) notFound(); throw error; }
   const name = identity(data); const url = `${SITE_URL}/model-detail/${id}`; const image = getStoragePublicUrl(data.imageUrl);
-  const additionalProperty = [
-    data.frontTire.fullSize && { "@type": "PropertyValue", name: "앞 타이어 규격", value: data.frontTire.fullSize },
-    data.rearTire.fullSize && { "@type": "PropertyValue", name: "뒤 타이어 규격", value: data.rearTire.fullSize },
-    data.batteryStandardCode && { "@type": "PropertyValue", name: "배터리 규격", value: data.batteryStandardCode },
-    data.batteryVoltage && { "@type": "PropertyValue", name: "배터리 전압", value: data.batteryVoltage },
-    data.frontBrakeSpec && { "@type": "PropertyValue", name: "앞 브레이크", value: data.frontBrakeSpec },
-    data.rearBrakeSpec && { "@type": "PropertyValue", name: "뒤 브레이크", value: data.rearBrakeSpec },
-    data.engineCc !== null && { "@type": "PropertyValue", name: "배기량", value: `${Math.round(data.engineCc)}cc` },
-    data.category && { "@type": "PropertyValue", name: "차종", value: data.category },
-    data.generationName && { "@type": "PropertyValue", name: "세대", value: data.generationName },
-    data.frameCode && { "@type": "PropertyValue", name: "프레임 코드", value: data.frameCode },
-    data.trimName && { "@type": "PropertyValue", name: "트림", value: data.trimName },
-    data.variantName && { "@type": "PropertyValue", name: "사양", value: data.variantName },
-    data.engineType && { "@type": "PropertyValue", name: "엔진 형식", value: data.engineType },
-    data.coolingType && { "@type": "PropertyValue", name: "냉각 방식", value: data.coolingType },
-    data.fuelSystem && { "@type": "PropertyValue", name: "연료 공급 방식", value: data.fuelSystem },
-    data.transmissionType && { "@type": "PropertyValue", name: "변속기", value: data.transmissionType },
-    data.maxPowerPs !== null && { "@type": "PropertyValue", name: "최고출력", value: `${data.maxPowerPs} PS` },
-    data.maxTorqueNm !== null && { "@type": "PropertyValue", name: "최대토크", value: `${data.maxTorqueNm} Nm` },
-    data.seatHeightMm !== null && { "@type": "PropertyValue", name: "시트고", value: `${data.seatHeightMm} mm` },
-    data.curbWeightKg !== null && { "@type": "PropertyValue", name: "차량중량", value: `${data.curbWeightKg} kg` },
-    data.fuelCapacityL !== null && { "@type": "PropertyValue", name: "연료탱크", value: `${data.fuelCapacityL} L` },
-    data.priceMinKrw !== null && { "@type": "PropertyValue", name: "국내 가격(최소)", value: `${data.priceMinKrw} KRW` },
-    data.priceMaxKrw !== null && { "@type": "PropertyValue", name: "국내 가격(최대)", value: `${data.priceMaxKrw} KRW` },
-    data.engineOilChangeL !== null && { "@type": "PropertyValue", name: "엔진오일 교환량", value: `${data.engineOilChangeL} L` },
-    data.engineOilFilterChangeL !== null && { "@type": "PropertyValue", name: "필터 교환 시 엔진오일", value: `${data.engineOilFilterChangeL} L` },
-    data.engineOilTotalL !== null && { "@type": "PropertyValue", name: "엔진오일 총량", value: `${data.engineOilTotalL} L` },
-    data.engineOilSae && { "@type": "PropertyValue", name: "엔진오일 SAE", value: data.engineOilSae },
-    data.engineOilApi && { "@type": "PropertyValue", name: "엔진오일 API", value: data.engineOilApi },
-    data.engineOilJaso && { "@type": "PropertyValue", name: "엔진오일 JASO", value: data.engineOilJaso },
-  ].filter(Boolean);
   const jsonLd = { "@context": "https://schema.org", "@graph": [
-    { "@type": "Motorcycle", "@id": `${url}#motorcycle`, name, brand: { "@type": "Brand", name: data.brandNameKo ?? data.brandNameEn }, model: data.modelNameKo ?? data.modelNameEn, description: description(data), url, ...(image ? { image: [image] } : {}), additionalProperty },
+    { "@type": "WebPage", "@id": `${url}#webpage`, name, description: description(data), url, ...(image ? { image: [image] } : {}) },
     { "@type": "BreadcrumbList", itemListElement: [
       { "@type": "ListItem", position: 1, name: "FitBike", item: SITE_URL },
       { "@type": "ListItem", position: 2, name: "내 바이크 찾기", item: `${SITE_URL}/bike-selector` },

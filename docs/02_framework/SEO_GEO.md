@@ -34,7 +34,7 @@ Admin과 API는 robots에서 제외하되 robots를 보안 수단으로 간주�
 
 ## Structured Data Policy
 
-JSON-LD와 화면에 표시되는 실제 데이터만 사용한다. DB 문자열은 `<`를 Unicode escape해 serialize한다. Root는 Organization과 WebSite를 사용하고 Model-Year는 Motorcycle을 사용한다. BreadcrumbList는 실제 visible breadcrumb navigation이 구현된 경우에만 사용한다. Offer, price, availability, review, rating, sameAs는 검증된 visible data가 없으면 생성하지 않는다.
+JSON-LD와 화면에 표시되는 실제 데이터만 사용한다. DB 문자열은 `<`를 Unicode escape해 serialize한다. Root는 Organization과 WebSite를 사용한다. 판매 조건·리뷰·평점이 없는 Model-Year 정보 페이지는 WebPage를 사용한다. Motorcycle은 Product의 하위 유형으로 Google 제품 스니펫 검사를 유발하므로, 정보 페이지에 판매 조건을 임의 생성하거나 Motorcycle을 출력하지 않는다. BreadcrumbList는 실제 visible breadcrumb navigation이 구현된 경우에만 사용한다. Offer, price, availability, review, rating, sameAs는 검증된 visible data가 없으면 생성하지 않는다.
 
 Content Detail은 Article의 발행일·수정일을 metadata와 JSON-LD에 제공한다. 화면에는 사용자가 최초 등록 시점을 명확히 이해할 수 있도록 `등록일`로 발행일만 표시하고 수정일은 노출하지 않는다. BreadcrumbList의 단계와 이름은 화면의 breadcrumb navigation과 일치해야 한다. 네이버 검색 결과 가독성을 위해 Content description은 의미를 유지하는 범위에서 공백을 정규화하고 80자 이내로 제한한다.
 
