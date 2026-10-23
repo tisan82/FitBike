@@ -64,7 +64,7 @@ export default async function TireModelDetailPage({ params }: Props) {
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
-      { "@type": "Product", "@id": `${url}#product`, name: title, brand: { "@type": "Brand", name: model.brandName }, model: model.modelName, description: modelDescription(model), url, ...(image ? { image: [image] } : {}) },
+      { "@type": "CollectionPage", "@id": `${url}#webpage`, name: title, description: modelDescription(model), url, ...(image ? { image: [image] } : {}) },
       { "@type": "BreadcrumbList", itemListElement: [
         { "@type": "ListItem", position: 1, name: "FitBike", item: SITE_URL },
         { "@type": "ListItem", position: 2, name: "MAXXIS 타이어", item: `${SITE_URL}/tire-models/maxxis` },

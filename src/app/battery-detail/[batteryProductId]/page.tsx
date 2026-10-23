@@ -39,6 +39,7 @@ export default async function BatteryDetailPage({ params }: Props) {
   catch (error) { if (error instanceof BatteryProductNotFoundError) notFound(); throw error; }
 
   const name = batteryName(product.brandName, product.specCode); const image = getStoragePublicUrl(product.productImageUrl, "battery-assets"); const url = `${SITE_URL}/battery-detail/${id}`;
+  const hasOffer = product.price !== null && Number.isFinite(product.price) && product.price > 0 && Boolean(product.productUrl?.trim());
   const additionalProperty = [
     product.voltage && { "@type": "PropertyValue", name: "전압", value: `${product.voltage}V` },
     product.capacityAh !== null && { "@type": "PropertyValue", name: "용량", value: `${product.capacityAh}Ah` },
@@ -47,7 +48,7 @@ export default async function BatteryDetailPage({ params }: Props) {
     product.batteryType && { "@type": "PropertyValue", name: "배터리 타입", value: product.batteryType },
   ].filter(Boolean);
   const jsonLd = { "@context": "https://schema.org", "@graph": [
-    { "@type": "Product", "@id": `${url}#product`, name, description: batteryDescription(product), sku: product.batteryPartKey, brand: { "@type": "Brand", name: product.brandName }, url, ...(image ? { image: [image] } : {}), additionalProperty, ...(product.price !== null && product.productUrl ? { offers: { "@type": "Offer", priceCurrency: "KRW", price: product.price, url: product.productUrl } } : {}) },
+    { "@type": hasOffer ? "Product" : "WebPage", "@id": `${url}${hasOffer ? "#product" : "#webpage"}`, name, description: batteryDescription(product), url, ...(image ? { image: [image] } : {}), ...(hasOffer ? { sku: product.batteryPartKey, brand: { "@type": "Brand", name: product.brandName }, additionalProperty, offers: { "@type": "Offer", priceCurrency: "KRW", price: product.price, url: product.productUrl } } : {}) },
     { "@type": "BreadcrumbList", itemListElement: [
       { "@type": "ListItem", position: 1, name: "핏바이크", item: SITE_URL },
       { "@type": "ListItem", position: 2, name: "내 바이크 찾기", item: `${SITE_URL}/bike-selector` },

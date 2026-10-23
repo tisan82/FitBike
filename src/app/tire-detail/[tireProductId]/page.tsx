@@ -96,6 +96,7 @@ export default async function TireDetailPage({ params }: Props) {
   const name = tireName(product);
   const url = `${SITE_URL}/tire-detail/${id}`;
   const image = getStoragePublicUrl(product.model?.mainImageUrl);
+  const hasOffer = product.price !== null && Number.isFinite(product.price) && product.price > 0 && Boolean(product.productUrl?.trim());
   const additionalProperty = [
     product.tireSizeFull && { "@type": "PropertyValue", name: "타이어 규격", value: product.tireSizeFull },
     product.positionType && { "@type": "PropertyValue", name: "장착 위치", value: positionLabel(product.positionType) },
@@ -108,17 +109,17 @@ export default async function TireDetailPage({ params }: Props) {
     "@context": "https://schema.org",
     "@graph": [
       {
-        "@type": "Product",
-        "@id": `${url}#product`,
+        "@type": hasOffer ? "Product" : "WebPage",
+        "@id": `${url}${hasOffer ? "#product" : "#webpage"}`,
         name,
         description: tireDescription(product),
-        sku: product.tireProductKey,
-        brand: { "@type": "Brand", name: product.brandName },
         url,
         ...(image ? { image: [image] } : {}),
-        additionalProperty,
-        ...(product.price !== null && product.productUrl
+        ...(hasOffer
           ? {
+              sku: product.tireProductKey,
+              brand: { "@type": "Brand", name: product.brandName },
+              additionalProperty,
               offers: {
                 "@type": "Offer",
                 priceCurrency: "KRW",

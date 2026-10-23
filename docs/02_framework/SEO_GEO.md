@@ -48,6 +48,8 @@ Brand, Model, Year, model features, major changes와 기본 fitment spec은 serv
 
 공개 Tire/Battery Product Detail은 상품명, 실제 저장 규격, 가격(있는 경우), 호환 정보 요약을 최초 server-rendered HTML에 제공한다. 동일 서버 조회 결과를 Client Query의 initial data로 재사용해 metadata, JSON-LD, visible content가 같은 상품 상태를 설명하도록 한다. Product Detail은 활성 상품만 index하며 sitemap의 stable ID URL, self-canonical, 실제 화면과 일치하는 BreadcrumbList를 함께 제공한다.
 
+타이어 모델의 특징·여러 판매 규격을 소개하는 페이지는 `CollectionPage`로 표현한다. 개별 Tire/Battery SKU는 실제 화면에 표시되는 양수의 유한한 가격과 판매 URL이 모두 있을 때만 `Product`와 `Offer`를 제공하며, 판매 조건이 없으면 `WebPage`로 표현한다. 이 경우에도 페이지의 index/canonical과 BreadcrumbList는 유지한다. 규격별 가격을 하나의 `AggregateOffer`로 합치거나 실제 없는 리뷰·평점·재고·배송·반품 정책을 오류 해소용으로 생성하지 않는다.
+
 ## Google, Naver and AI / GEO
 
 Robots, sitemap, canonical과 semantic HTML을 일관되게 제공한다. AI 전용 schema, hidden content, fake FAQ, 자동 생성 설명, keyword stuffing을 만들지 않는다. GEO는 명확한 entity, 신뢰 가능한 DB 데이터, semantic heading, textual spec과 crawlable link를 기반으로 한다.
