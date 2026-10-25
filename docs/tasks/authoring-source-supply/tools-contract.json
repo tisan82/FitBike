@@ -1,0 +1,96 @@
+{
+  "status": "DESIGN_ONLY_NOT_EXPOSED_TO_RUNTIME",
+  "version": 1,
+  "security": {
+    "authoringEndpointRole": "AUTHORING",
+    "operatorAuthentication": "existing operator allowlist; derive worker on server",
+    "authoringSession": "server-issued session bound to operator, pipeline, allowed run or current DRAFTED supply scope; expiry enforced",
+    "storageIdentity": "server-calculated SHA, decode and read-back only",
+    "downloadUrl": "transient secret; do not persist in provenance or logs",
+    "newPublicSqlAccess": false,
+    "newGenerationProvider": false
+  },
+  "tools": [
+    {
+      "name": "prepare_authoring_sources",
+      "role": "AUTHORING",
+      "arguments": ["operationId:uuid", "pipelineId:bigint", "pipelineRunId:bigint", "imageBriefs:V5Brief[]"],
+      "returns": ["authoringSessionId", "manifestId", "imageId", "serverContractHash", "supplyId", "replayed"],
+      "requires": ["current authenticated running unified-authoring intent", "shared V5 normalizer used by actual image sync"],
+      "doesNot": ["create production claim", "mark source verified", "complete article"]
+    },
+    {
+      "name": "persist_authoring_source",
+      "role": "AUTHORING",
+      "arguments": ["authoringSessionId:uuid", "operationId:uuid", "supplyId:uuid", "sourceRole:PRODUCTION_INPUT|REFERENCE_ONLY", "productionPath:SERVER_TRANSFORM|STORED_NATIVE_OUTPUT|NATIVE_EDIT_REQUIRED|REFERENCE_ONLY", "source:oneOf({sourcePageUrl,sourceAssetUrl,sourceOwner},{file:officialFileParams,sourceKind,sourceOwner,nativeEvidence?})", "sourceInspection:{pixelsInspected:true,evidence:string,inspectedAt:datetime}"],
+      "returns": ["supplyId", "status:STORED|FAILED", "serverOriginalSha", "mime", "bytes", "width", "height", "replayed"],
+      "requires": ["exact session/supply/manifest identity", "only one URL or file input", "role/method/provenance validated", "safe DNS/redirect/size checks for source URL", "official file URL host and DNS policy for file input", "native evidence validated in Authoring scope when applicable", "actual Storage read-back SHA and decode"],
+      "doesNot": ["inherit pixel QA PASS", "write canonical SHA from caller", "approve", "publish"]
+    },
+    {
+      "name": "get_authoring_source_supply",
+      "role": "AUTHORING",
+      "arguments": ["authoringSessionId:uuid", "operationId?:uuid", "supplyId?:uuid"],
+      "returns": ["source status per image", "missing reasons", "operation receipt", "fresh preview when requested"],
+      "requires": ["owned active session or read-only owned completed receipt"],
+      "doesNot": ["retry mutation", "expose another operator's session", "expose durable signed URL"]
+    },
+    {
+      "name": "resume_authoring_source_supply",
+      "role": "AUTHORING",
+      "arguments": ["operationId:uuid", "pipelineId:bigint"],
+      "returns": ["new limited authoringSessionId", "current Task/hash manifest", "missingImageIds"],
+      "requires": ["authorized operator", "current DRAFTED or equivalent nonpublished allowed state", "no conflicting active source session or modified/claimed Task"],
+      "doesNot": ["rewrite article", "new topic", "production claim", "reactivate previous authoring lease"]
+    },
+    {
+      "name": "bind_authoring_source",
+      "role": "AUTHORING",
+      "arguments": ["authoringSessionId:uuid", "operationId:uuid", "supplyId:uuid", "pipelineImageId:bigint", "expectedContractHash:sha256"],
+      "returns": ["supplyId", "pipelineImageId", "status:BOUND", "sourceReady", "replayed"],
+      "requires": ["owned limited source-resume session", "same pipeline/current Task/hash", "STORED technical and observation proof", "Task row and relevant supplies locked", "no conflicting active production/review/publisher lease", "atomic retire of previous selected input and binding of new input", "same operation different intent rejected"],
+      "doesNot": ["rewrite writer package", "reuse old authoring run as an active lease", "rebind a different Task", "alter approved or published asset"]
+    },
+    {
+      "name": "complete_authoring_v2",
+      "role": "AUTHORING",
+      "arguments": ["pipelineId:bigint", "pipelineRunId:bigint", "package:existingAuthoringV1Package", "sourceManifest:{manifestId,selectedSupplyIds,missingReasonsByImageId}"],
+      "returns": ["contentSaved", "sourceSupplyStatus:AUTHORING_READY_FOR_PRODUCTION|CONTENT_SAVED_SOURCE_PENDING", "imageTasks", "missingImageIds", "replayed"],
+      "requires": ["exact current authoring execution", "unchanged manifest and server-normalized hash", "single DB transaction for existing completion + sync + source binding", "new Task policy INPUT_REQUIRED", "same-package/manifest replay hash"],
+      "doesNot": ["silently extend v1 allowed package keys", "treat incomplete supply as complete", "force existing Tasks into new policy"]
+    },
+    {
+      "name": "dispatch_visual_supplied_source",
+      "role": "PRODUCER",
+      "arguments": ["requestId:uuid", "operationId:uuid", "supplyId:uuid", "transform:existingTransformSchema"],
+      "returns": ["jobId", "status", "server provenance and original SHA"],
+      "requires": ["owned active Production Claim", "same Task/current hash and selected bound supply", "actual original bytes SHA recheck", "path execution supported", "existing production/semantic rejection checks"],
+      "doesNot": ["accept caller path or replacement URL", "remove same-worker recovery guards", "skip final pixel QA"]
+    },
+    {
+      "name": "publish_approved_visual_asset",
+      "role": "REVIEWER",
+      "arguments": ["requestId:uuid", "pipelineImageId:bigint", "approvedJobId:uuid", "contractHash:sha256", "expectedSha:sha256"],
+      "returns": ["publishRequestId", "status:DISPATCHED|IN_PROGRESS|DONE|BUSY|FAILED", "replayed", "publisherActiveClaim"],
+      "requires": ["authenticated operator", "READY_FOR_UPLOAD or exact completed replay", "approval snapshot matched under lock", "separate Publisher lease", "existing 3B immutable upload/verify backend", "same requestId different intent rejected"],
+      "doesNot": ["use expired Reviewer Claim", "accept uploaded replacement bytes", "approve implicitly", "select a different Task", "mark DONE before read-back"]
+    },
+    {
+      "name": "get_visual_publish_result",
+      "role": "REVIEWER",
+      "arguments": ["requestId:uuid"],
+      "returns": ["exact publish receipt", "status", "publisherActiveClaim", "resumeFrom", "verified Production SHA when DONE"],
+      "requires": ["owned publication request"],
+      "doesNot": ["dispatch implicitly", "claim another Task", "re-review approved asset"]
+    }
+  ],
+  "existingToolReuse": ["resolve_visual_source_assets", "inspect_visual_source", "record_visual_pixel_inspection", "record_visual_source_qa", "approve_visual_source", "get_visual_claim_result"],
+  "implementationNotes": [
+    "This is a logical API contract, not runtime JSON Schema. Implement complete inputSchema/fileParams and server validation together.",
+    "A native file reference that cannot be downloaded is not an asset. Keep failed supply and exact transport code.",
+    "After DRAFTED source-only resume, use a separate atomic bind operation under its supply session; do not replay complete_authoring_v2 with a modified package.",
+    "The source-only bind operation must lock current Task, reject conflicting active claims, compare current hash, bind the new supply, and return readiness.",
+    "After approval, the normal active Reviewer claim has ended; publication authorization comes from approval snapshot and a new Publisher lease.",
+    "A publish request that lost its response is queried before redispatch. Native platform safety blocks are not bypassed."
+  ]
+}
