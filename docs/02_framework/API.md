@@ -51,6 +51,11 @@ to that Tire Model; omitting it preserves the model-wide response.
 
 브랜드, 모델, 연식, Fitment 결과, 상품 연결, 콘텐츠 조회.
 
+
+## Live Service Shop Search
+
+`GET /api/v1/service-shops/naver-search?district={서울 자치구}`는 고객이 지역을 선택할 때 네이버 지역 검색을 실시간 호출한다. 서버 전용 NAVER API HUB Search 자격 정보만 사용하며 최대 5건의 `{ title, link }`를 반환한다. 검색 결과는 FitBike의 검증 정비소 DB에 저장하지 않고 별도의 출처 표기 영역에 표시한다. 응답과 외부 호출은 캐시하지 않는다. 허용되지 않는 자치구는 400, 검색 설정 누락은 503, 외부 검색 실패는 502로 응답한다.
+
 ## Contract
 
 기존 endpoint/method/response field/type/필수 parameter를 임의 변경하지
