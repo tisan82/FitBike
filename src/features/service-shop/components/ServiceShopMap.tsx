@@ -24,7 +24,7 @@ type NaverNamespace = {
     Marker: new (options: { position: NaverLatLng; map: NaverMap; title?: string }) => NaverMarker;
     InfoWindow: new (options: { content: string }) => NaverInfoWindow;
     Event: { addListener(target: NaverMarker, eventName: string, handler: () => void): void };
-    Service: {
+    Service?: {
       Status: { OK: string };
       geocode(options: { query: string }, callback: (status: string, response: GeocodeResponse) => void): void;
     };
@@ -65,9 +65,11 @@ function unique(values: Array<string | null>) {
 }
 
 function geocode(naverApi: NaverNamespace, query: string): Promise<Coordinates | null> {
+  const service = naverApi.maps.Service;
+  if (!service) return Promise.resolve(null);
   return new Promise((resolve) => {
-    naverApi.maps.Service.geocode({ query }, (status, response) => {
-      if (status !== naverApi.maps.Service.Status.OK) return resolve(null);
+    service.geocode({ query }, (status, response) => {
+      if (status !== service.Status.OK) return resolve(null);
       const first = response.v2?.addresses?.[0];
       if (!first) return resolve(null);
       const lat = Number(first.y);
@@ -78,11 +80,21 @@ function geocode(naverApi: NaverNamespace, query: string): Promise<Coordinates |
   });
 }
 
+async function waitForGeocoder(naverApi: NaverNamespace): Promise<boolean> {
+  // maps.js can finish loading before its geocoder submodule initializes.
+  for (let attempt = 0; attempt < 50; attempt++) {
+    if (naverApi.maps.Service?.geocode) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return false;
+}
+
 export function ServiceShopMap({ shops, naverMapClientId }: Props) {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const [resolvedShops, setResolvedShops] = useState<ResolvedShop[]>([]);
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [mapMessage, setMapMessage] = useState<string | null>(null);
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
   const [locationMessage, setLocationMessage] = useState("내 위치를 허용하면 가까운 정비소부터 보여드려요.");
   const [sido, setSido] = useState("");
@@ -135,6 +147,11 @@ export function ServiceShopMap({ shops, naverMapClientId }: Props) {
     const map = new naverApi.maps.Map(mapElementRef.current, { center: new naverApi.maps.LatLng(37.5665, 126.978), zoom: 11 });
 
     async function resolveAndDraw() {
+      if (filteredBaseShops.some((shop) => shop.latitude === null || shop.longitude === null)) {
+        const geocoderReady = await waitForGeocoder(naverApi);
+        if (cancelled) return;
+        if (!geocoderReady) setMapMessage("지도에서 정비소 위치를 불러오지 못했습니다. 아래 정비소 목록은 계속 이용할 수 있습니다.");
+      }
       const candidateShops = await Promise.all(filteredBaseShops.map(async (shop): Promise<ResolvedShop | null> => {
         const coordinates = shop.latitude !== null && shop.longitude !== null ? { lat: shop.latitude, lng: shop.longitude } : await geocode(naverApi, shop.roadAddress ?? shop.address);
         if (!coordinates) return null;
@@ -143,6 +160,7 @@ export function ServiceShopMap({ shops, naverMapClientId }: Props) {
       if (cancelled) return;
       const available = candidateShops.filter((shop): shop is ResolvedShop => shop !== null).sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
       setResolvedShops(available);
+      if (available.length > 0) setMapMessage(null);
       for (const shop of available) {
         const marker = new naverApi.maps.Marker({ map, position: new naverApi.maps.LatLng(shop.lat, shop.lng), title: shop.shopName });
         const info = new naverApi.maps.InfoWindow({ content: `<div style="padding:10px 12px;min-width:150px;font-size:13px"><strong>${escapeHtml(shop.shopName)}</strong><br/><span>${escapeHtml(shop.roadAddress ?? shop.address)}</span></div>` });
@@ -196,6 +214,7 @@ export function ServiceShopMap({ shops, naverMapClientId }: Props) {
           <button className="shrink-0 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white" onClick={requestLocation} type="button">내 위치</button>
         </div>
         {naverMapClientId ? <div className="h-[360px] w-full bg-surface-secondary sm:h-[460px]" ref={mapElementRef} /> : <div className="flex h-44 items-center justify-center bg-surface-secondary px-6 text-center text-sm leading-6 text-foreground-secondary">네이버 지도 Client ID 설정 후 지도가 표시됩니다. 지역별 정비소 목록은 지금도 확인할 수 있습니다.</div>}
+        {mapMessage ? <p className="px-4 py-3 text-sm text-foreground-secondary" role="status">{mapMessage}</p> : null}
       </section>
 
       <section className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
