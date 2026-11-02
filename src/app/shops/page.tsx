@@ -32,7 +32,7 @@ export default async function ServiceShopsPage() {
           현재는 서울 지역 검증 정비소부터 제공합니다. 영업시간과 실제 작업 가능 여부는 방문 전에 업체에 직접 확인하세요.
         </p>
       </header>
-      <ServiceShopMap naverMapClientId={clientId} shops={shops} />
+      <ServiceShopMap naverMapClientId={clientId} naverSearchEnabled={Boolean(process.env.NAVER_SEARCH_CLIENT_ID && process.env.NAVER_SEARCH_CLIENT_SECRET)} shops={shops} />
     </main>
   );
 }
