@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ServiceShop } from "@/features/service-shop/types/service-shop.types";
+import { NaverLiveShopSearch } from "@/features/service-shop/components/NaverLiveShopSearch";
 
 type Props = {
   shops: ServiceShop[];
@@ -241,6 +242,8 @@ export function ServiceShopMap({ shops, naverMapClientId }: Props) {
         </div>
         <p className="mt-2 text-xs leading-5 text-foreground-secondary">지역 데이터는 시·도 → 시/군/구 → 하위 구 → 동 순으로 관리합니다. 예: 경기도 → 안산시 → 상록구 → 본오동.</p>
       </section>
+
+      <NaverLiveShopSearch district={sigungu} key={sigungu} />
 
       <section>
         <div className="mb-3 flex items-end justify-between gap-4">
