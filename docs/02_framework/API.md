@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 10630)
-Total output lines: 298
-
 # FitBike API Guide
 
 **Version:** v1.1\
@@ -53,6 +50,7 @@ to that Tire Model; omitting it preserves the model-wide response.
 ## MVP Scope
 
 브랜드, 모델, 연식, Fitment 결과, 상품 연결, 콘텐츠 조회.
+
 
 ## Live Service Shop Search
 
@@ -167,7 +165,50 @@ Approval delegates existing Contract/claim/SHA/explicit QA guards, then re-reads
 Frontend: `https://fitbike.co.kr/oauth/consent` (noindex, robots excluded). It preserves authorization_id, authenticates existing Supabase users, checks server operator access through MCP ping, shows client/scopes/redirect and requests explicit consent. SDK approve/deny handles registered redirect URLs; query parameters are never arbitrary redirect destinations. Setup: Auth Site URL=https://fitbike.co.kr, OAuth authorization path=/oauth/consent, OAuth Server enabled, dynamic registration enabled (or a pre-registered supported client), server secret CONTENT_FACTORY_MCP_OPERATOR_EMAILS=<verified operator email>. Final account settings and Chat connection require the account holder/session; do not paste service keys or access tokens into Chat.
 
 
-3-A source selection preflight: call `check_visual_source_usage` with the claim requestId, actual page-confirmed sourceAssetUrl and sourceSha256 when known. It checks other READY_FOR_UPLOAD/DONE images; excludes this task for recovery. URL-only NO_KNOWN_DUPLICATE is provisional and does not identify alternate URLs/resolutions. Dispatch also rejects known exact-URL duplicates before creating a job. SHA/global approval gates remain authoritative and race-safe at approval. No source downloading, rights state or QA PASS …2130 tokens truncated…nternal prompt/session or authenticate a tool transcript. Audit events do not prove context isolation. Late RESULT/error recording is permitted only against a previously saved REQUEST and never renews the lease. Audit failure must not block official Claim release or existing asset recovery. This addition does not certify scheduled Native E2E success.
+3-A source selection preflight: call `check_visual_source_usage` with the claim requestId, actual page-confirmed sourceAssetUrl and sourceSha256 when known. It checks other READY_FOR_UPLOAD/DONE images; excludes this task for recovery. URL-only NO_KNOWN_DUPLICATE is provisional and does not identify alternate URLs/resolutions. Dispatch also rejects known exact-URL duplicates before creating a job. SHA/global approval gates remain authoritative and race-safe at approval. No source downloading, rights state or QA PASS is implied by this read tool. On duplicate/404/visual mismatch, preserve the failed candidate and switch source with a new operationId within the same valid claim, rather than immediately ending the task. Three failed candidates are not a search budget. Reuse requestId/operationId only for response-loss recovery, not a changed source. If continuation becomes impossible, fail normally and re-read claim closure; never claim another image first.
+
+
+Source Stage worker recovery: `content_pipeline_source_stage_status_v1` reconciles PENDING/RUNNING jobs against their exact pg_net response. Definitive HTTP errors (including546 WORKER_RESOURCE_LIMIT) mark the job FAILED and preserve original code/checkpoint; Image/Claim/approved QA stay unchanged. Transport timeout or two-minute timedOut alone is advisory, not proof of worker termination. The server enforces a ten-minute unresolved-job deadline and fences late receipt writes. Status includes transport httpStatus/timedOut/responseAvailable, pollAfterSeconds and nextAction. This service-role-only status call may finalize a failed candidate receipt; it never claims, approves or publishes. MCP inspection requires STAGED and otherwise supplies current status/failure/action instead of treating SOURCE_NOT_STAGED as a visual defect.
+
+Source processing uses one raster source decode and one WebP encode (quality84, bounded encoder effort), composites annotations without intermediate PNG roundtrips, loads PDF/SVG dependencies only when needed, limits source raster to8MP, PDF rendered page to4MP, final output to2MP/1600px height, and defaults maxWidth780 when unspecified. Larger sources should use a genuine page-provided smaller asset rather than guessed URLs. Storage read-back still performs independent actual WebP decode/SHA verification. A STORAGE_VERIFIED checkpoint is saved before the final STAGED receipt; Source Stage stores no new inspection chunk rows and reports inspectionTransport=CANONICAL_STORAGE and inspectionChunksStored=false; it is not STAGED/QA approval and can never enter Production without renewed technical and semantic validation.
+
+### Visual MCP native ChatGPT file handoff (2026-10-02)
+
+External generation model API calls are prohibited and removed. No image API key/model/enabled setting is read. `get_visual_generation_capabilities` reports executionMode=NATIVE_CHATGPT_FILE_HANDOFF, externalGenerationApiAllowed=false, nativeFileHandoff/fileParamsSupported/userFileUploadSupported=true, provider=NONE, requiredSettings=[]. Server model-generation booleans remain false by design. Host native imagegen availability and automatic generated-file transfer are separate and unverified until ordinary Chat testing.
+
+`get_visual_image_task(pipelineImageId)` reads exact state/Contract/hash without Claim or private URLs. `dispatch_visual_generation(requestId,operationId,spec,file?,inputFile?)` ingests already-created PNG/JPEG/WebP; it never generates. Both top-level file fields are declared in `_meta["openai/fileParams"]`. Each file schema declares download_url/file_id/mime_type/file_name; only download_url/file_id are required. The server computes SHA for file input. REAL_SOURCE_AI_EDIT additionally requires an inputFile whose bytes match the inspected public inputAssetUrl; native editing execution is operator-attested. Existing URL+expected SHA and preserved-input resume remain compatible. Missing input fails before dispatch.
+
+`open_visual_file_upload(requestId,operationId,spec)` is an authenticated read-only render tool. It requires the same active Claim and permitted Contract, and references MCP resource `ui://fitbike/visual-file-upload-v1.html`. The widget uses the standard MCP Apps bridge for tools/call and optional ChatGPT selectFiles/uploadFile/getFileDownloadUrl for user-selected files. It checks dispatch recovery before submission, never generates/approves, and does not contain credentials. No network/CSP domains are required. Host file helpers unavailable: attach the file in Chat and use official fileParams; unsupported host transport is reported, not assumed. Expired Claims must use normal same-image reclaim before opening a fresh widget.
+
+Service-only `content_pipeline_dispatch_visual_generation_request_v1` retains operator receipt, image/Contract permission, one-running-candidate and idempotent input identity guards. Native file identity excludes short-lived download_url only; changed fileId/prompt/references/method/transform/image/Contract is rejected. The worker scrubs download URLs after preservation or handled failure and never returns them in provenance. Existing source Jobs, inspection/approval APIs and normalized-WebP generatedInput resume protect the same private canonical identity. Generic source ingest still rejects generation specs, preventing permission bypass. No public table/RPC access is added.
+
+
+### Visual production/review handoff (2026-10-07)
+
+Additive MCP tools: `claim_visual_production(requestId,pipelineImageId?)`,
+`claim_visual_review(requestId,pipelineImageId?)`, `handoff_visual_review(requestId,jobId,expectedSha)`.
+Both stage claims retain server-derived user Worker and request idempotency. Role replay conflicts
+are rejected; pending review candidates are excluded from legacy/production claims.
+`get_visual_queue_status` optionally accepts executionRole PRODUCER/REVIEWER; Claim RPC selection
+is authoritative. Task and Claim reads expose visualPhase and verified reviewCandidate (no signed URL).
+
+Production dispatch requires spec.preflightOnly=true and no preStagingQa. Handoff requires current
+producer ownership, same Contract, owned STAGED Job, canonical SHA, actual private Storage metadata,
+decode/read-back proof and absence of semantic invalidation. It releases the lease and queues QA
+without final approval. Review dispatch accepts only the handed-off source/native resume and
+registered pixel QA; QA registration is parent-Job-bound, approval is parent or attested derivative.
+All new SQL RPCs remain service-role-only with empty search_path, no new public table grants.
+Migration: 20261007013115_visual_production_review_handoff.sql. Source-stage byte ingestion and
+existing approval gates remain authoritative; no external generation model is added.
+
+
+### Native generation attempt evidence (2026-10-07)
+
+`record_visual_generation_attempt(requestId, attemptId, phase, evidence)` appends immutable evidence to internal RLS-protected `30_content_pipeline_native_attempt_event`. UUID attemptId identifies one native call. The authenticated worker and original receipt derive the Task and Contract; callers cannot choose another owner.
+
+Before Claim, `validate_visual_generation_call(nativeCall)` performs read-only audit-capture validation and reports invalid `field`/`reason`. It does not validate runtime tool schema, references, Contract feasibility or pixels. New nativeCall format: `{toolName:"image_gen.text2im" (or actual image_gen.imagegen), schemaVersion:"RAW_ARGUMENTS_V1", arguments:{...exact actual native tool arguments...}}`. Tool-specific keys are preserved verbatim under arguments; size is bounded and credentials/signed capabilities/inline binary are prohibited. Legacy four-key imagegen calls remain supported. Rejected input is not saved as a successful invocation. Before imagegen, record REQUEST with `contractHash` and `nativeCall` containing the exact intended tool arguments (prompt and only actually used reference options). After the call, record RESULT with `actualNativeCall`, `outputs` (actual fileId/path), `inspectedOutput` (an exact member of outputs), `pixelsInspected`, `pixelQa` (PASS/FAIL/NOT_INSPECTED), `pixelEvidence` and the intended handoff `operationId`. A different actual call can be recorded as FAIL; it cannot assert PASS. Record connector rejection as TRANSPORT_ERROR with `operationId` and exact `error`. Never store connector download URLs or credentials. Each phase is immutable; identical replay succeeds and changed replay fails. Maximum three REQUEST events per receipt.
+
+`get_visual_image_task.nativeAttemptAudit` returns the latest 30 events for the authenticated worker. `get_visual_claim_result.nativeAttemptAudit` restricts to that receipt. Linked `serverReceivedJobs` are read from actual Job records, not operator assertions. Native input SHA, pre-staging source SHA and canonical SHA are distinct. Missing historical evidence is MISSING, never reconstructed. REQUEST is a saved intention; RESULT is operator-reported invocation evidence. The server cannot observe imagegen's internal prompt/session or authenticate a tool transcript. Audit events do not prove context isolation. Late RESULT/error recording is permitted only against a previously saved REQUEST and never renews the lease. Audit failure must not block official Claim release or existing asset recovery. This addition does not certify scheduled Native E2E success.
 
 
 Nullable Native prompt capture (2026-10-07): RAW_ARGUMENTS_V1 preserves null or omitted arguments.prompt; legacy prompt validation remains unchanged. Optional sibling `sceneInstruction:{text,location}` records a separate actual scene message without modifying arguments. location is TOOL_ARGUMENT (text must equal arguments.prompt), CONVERSATION_MESSAGE (actual operator-reported message, 20–6000 characters), or UNOBSERVED (explicit text:null). Omit it when unknown; never reconstruct a supposed runtime prompt. Preflight and each read-back event's captureValidation expose instructionVisibility=TOOL_ARGUMENT / OPERATOR_REPORTED_CONVERSATION / UNOBSERVED. valid means safe audit capture only. requestMatchesActualCall means exact reported JSON equality, not proven scene delivery or host observation. Pixel PASS remains an actual pixel attestation with existing identity checks; it does not certify instruction visibility. All native invocation and message evidence is operator-reported; serverObservedNativeCall and runtimeSchemaValidated remain false. No new table, Claim, Contract or approval behavior.
