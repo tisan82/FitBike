@@ -8,6 +8,7 @@ import { NaverLiveShopSearch } from "@/features/service-shop/components/NaverLiv
 type Props = {
   shops: ServiceShop[];
   naverMapClientId: string | null;
+  naverSearchEnabled: boolean;
 };
 
 type Coordinates = { lat: number; lng: number };
@@ -90,7 +91,7 @@ async function waitForGeocoder(naverApi: NaverNamespace): Promise<boolean> {
   return false;
 }
 
-export function ServiceShopMap({ shops, naverMapClientId }: Props) {
+export function ServiceShopMap({ shops, naverMapClientId, naverSearchEnabled }: Props) {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const [resolvedShops, setResolvedShops] = useState<ResolvedShop[]>([]);
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
@@ -243,7 +244,7 @@ export function ServiceShopMap({ shops, naverMapClientId }: Props) {
         <p className="mt-2 text-xs leading-5 text-foreground-secondary">지역 데이터는 시·도 → 시/군/구 → 하위 구 → 동 순으로 관리합니다. 예: 경기도 → 안산시 → 상록구 → 본오동.</p>
       </section>
 
-      <NaverLiveShopSearch district={sigungu} key={sigungu} />
+      {naverSearchEnabled ? <NaverLiveShopSearch district={sigungu} key={sigungu} /> : null}
 
       <section>
         <div className="mb-3 flex items-end justify-between gap-4">

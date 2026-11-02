@@ -12,8 +12,8 @@ export async function GET(request: Request) {
     return Response.json({ error: "INVALID_DISTRICT" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
 
-  const clientId = process.env.NAVER_SEARCH_CLIENT_ID ?? process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID;
-  const clientSecret = process.env.NAVER_SEARCH_CLIENT_SECRET ?? process.env.NAVER_CLIENT_SECRET;
+  const clientId = process.env.NAVER_SEARCH_CLIENT_ID;
+  const clientSecret = process.env.NAVER_SEARCH_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
     return Response.json({ error: "SEARCH_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
