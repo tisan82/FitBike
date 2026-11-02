@@ -182,7 +182,14 @@ export function ServiceShopMap({ shops, naverMapClientId }: Props) {
   }, [mapReady, filteredBaseShops, userLocation]);
 
   const visibleShops = useMemo(() => {
-    if (naverMapClientId && resolvedShops.length > 0) return resolvedShops;
+    const filteredIds = new Set(filteredBaseShops.map((shop) => shop.serviceShopId));
+    const matchingResolved = resolvedShops.filter((shop) => filteredIds.has(shop.serviceShopId));
+    if (naverMapClientId && matchingResolved.length === filteredBaseShops.length) {
+      return matchingResolved.map((shop) => ({
+        ...shop,
+        distanceKm: userLocation ? distanceKm(userLocation, shop) : null,
+      })).sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+    }
     return filteredBaseShops.map((shop): ResolvedShop => ({ ...shop, lat: shop.latitude ?? 0, lng: shop.longitude ?? 0, distanceKm: userLocation && shop.latitude !== null && shop.longitude !== null ? distanceKm(userLocation, { lat: shop.latitude, lng: shop.longitude }) : null }))
       .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
   }, [filteredBaseShops, naverMapClientId, resolvedShops, userLocation]);
